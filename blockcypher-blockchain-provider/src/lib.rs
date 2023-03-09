@@ -131,12 +131,14 @@ impl Blockchain for BlockcypherBlockchainProvider {
         Ok(self.network)
     }
 
+    // we need a get_blockchain_height that returns a u64. Fetch a JSON endpoint with a url '' as a BlockChainInfo struct and return the height field as a u64
     fn get_blockchain_height(&self) -> Result<u64, dlc_manager::error::Error> {
-        self.get_u64("blocks/tip/height")
+        let block_chain_info: BlockchainInfo = self.get_from_json("")?;
+        Ok(block_chain_info.height)
     }
 
     fn get_block_at_height(&self, height: u64) -> Result<Block, dlc_manager::error::Error> {
-        let hash_at_height = self.get_text(&format!("block-height/{height}"))?;
+        let hash_at_height = self.get_text(&format!("blocks/{height}"))?;
         let raw_block = self.get_bytes(&format!("block/{hash_at_height}/raw"))?;
         Block::consensus_decode(&mut std::io::Cursor::new(&*raw_block))
             .map_err(|_| Error::BlockchainError)
@@ -401,6 +403,7 @@ fn poll_for_fee_estimates(fees: Arc<HashMap<Target, AtomicU32>>, host: &str) {
 #[derive(Serialize, Deserialize, Debug)]
 struct BlockchainInfo {
     name: String,
+    height: u64,
     high_fee_per_kb: u32,
     medium_fee_per_kb: u32,
     low_fee_per_kb: u32,
