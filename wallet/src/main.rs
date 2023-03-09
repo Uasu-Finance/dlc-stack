@@ -24,7 +24,8 @@ use dlc_manager::{
 };
 use dlc_messages::{AcceptDlc, Message};
 use dlc_sled_storage_provider::SledStorageProvider;
-use electrs_blockchain_provider::ElectrsBlockchainProvider;
+// use electrs_blockchain_provider::ElectrsBlockchainProvider;
+use blockcypher_blockchain_provider::BlockcypherBlockchainProvider;
 use log::{debug, info, warn};
 use simple_wallet::SimpleWallet;
 
@@ -43,12 +44,12 @@ mod utils;
 mod macros;
 
 type DlcManager<'a> = Manager<
-    Arc<SimpleWallet<Arc<ElectrsBlockchainProvider>, Arc<SledStorageProvider>>>,
-    Arc<ElectrsBlockchainProvider>,
+    Arc<SimpleWallet<Arc<BlockcypherBlockchainProvider>, Arc<SledStorageProvider>>>,
+    Arc<BlockcypherBlockchainProvider>,
     Box<StorageProvider>,
     Arc<P2PDOracleClient>,
     Arc<SystemTimeProvider>,
-    Arc<ElectrsBlockchainProvider>,
+    Arc<BlockcypherBlockchainProvider>,
 >;
 
 const NUM_CONFIRMATIONS: u32 = 2;
@@ -70,41 +71,59 @@ struct ErrorsResponse {
 
 fn main() {
     env_logger::init();
+    let oracle_url: String = env::var("ORACLE_URL").unwrap_or("http://localhost:8080".to_string());
+
+    let funded_url: String = env::var("FUNDED_URL")
+        .unwrap_or("https://stacks-observer-mocknet.herokuapp.com/funded".to_string());
+    let wallet_backend_port: String = env::var("WALLET_BACKEND_PORT").unwrap_or("8085".to_string());
+    let mut funded_uuids: Vec<String> = vec![];
+
+    // Setup Blockchain Connection Object
+
+    // RPC CONFIG
     // let auth = Auth::UserPass(
     //     "testuser".to_string(),
     //     "lq6zequb-gYTdF2_ZEUtr8ywTXzLYtknzWU4nV8uVoo=".to_string(),
     // );
     // let url = "http://localhost:18443/wallet/alice"; - localhost
     // let url = "http://54.147.153.106:18443/"; - devnet
-
-    let oracle_url: String = env::var("ORACLE_URL").unwrap_or("http://localhost:8080".to_string());
     // let rpc_user: String = env::var("RPC_USER").unwrap_or("testuser".to_string());
     // let rpc_pass: String =
     //     env::var("RPC_PASS").unwrap_or("lq6zequb-gYTdF2_ZEUtr8ywTXzLYtknzWU4nV8uVoo=".to_string());
     // let btc_rpc_url: String =
     //     env::var("BTC_RPC_URL").unwrap_or("localhost:18443/wallet/alice".to_string());
-    let funded_url: String = env::var("FUNDED_URL")
-        .unwrap_or("https://stacks-observer-mocknet.herokuapp.com/funded".to_string());
-    let wallet_backend_port: String = env::var("WALLET_BACKEND_PORT").unwrap_or("8085".to_string());
-
-    let mut funded_uuids: Vec<String> = vec![];
 
     // let auth = Auth::UserPass(rpc_user, rpc_pass);
     // let rpc = Client::new(&format!("http://{}", btc_rpc_url), auth.clone()).unwrap();
     // let bitcoin_core = Arc::new(BitcoinCoreProvider::new_from_rpc_client(rpc));
-    let electrs = Arc::new(ElectrsBlockchainProvider::new(
-        "https://dev-oracle.dlc.link/electrs/".to_string(),
-        bitcoin::Network::Regtest,
+
+    // ELECTRUM / ELECTRS
+    // let electrs = Arc::new(ElectrsBlockchainProvider::new(
+    //     "https://dev-oracle.dlc.link/electrs/".to_string(),
+    //     bitcoin::Network::Regtest,
+    // ));
+
+    // Blockcypher
+    let blockcypher = Arc::new(BlockcypherBlockchainProvider::new(
+        "https://api.blockcypher.com/v1/".to_string(),
+        bitcoin::Network::Testnet,
     ));
-    // let store = StorageProvider::new();
+
+    // Set up DLC store
     let store = StorageProvider::new();
+
+    // Set up wallet store
     let sled_path: String = env::var("SLED_PATH").unwrap_or("wallet_db".to_string());
     let wallet_store = Arc::new(SledStorageProvider::new(sled_path.as_str()).unwrap());
+
+    // Set up wallet
     let wallet = Arc::new(SimpleWallet::new(
-        electrs.clone(),
+        blockcypher.clone(),
         wallet_store.clone(),
         bitcoin::Network::Regtest,
     ));
+
+    // Set up Oracle Client
     let p2p_client: P2PDOracleClient = retry!(
         P2PDOracleClient::new(&oracle_url),
         10,
@@ -113,32 +132,37 @@ fn main() {
     let oracle = Arc::new(p2p_client);
     let oracles: HashMap<bitcoin::XOnlyPublicKey, _> =
         HashMap::from([(oracle.get_public_key(), oracle.clone())]);
+
+    // Set up time provider
     let time_provider = SystemTimeProvider {};
+
+    // Create the DLC Manager
     let manager = Arc::new(Mutex::new(
         Manager::new(
             Arc::clone(&wallet),
-            Arc::clone(&electrs),
+            Arc::clone(&blockcypher),
             Box::new(store),
             oracles,
             Arc::new(time_provider),
-            Arc::clone(&electrs),
+            Arc::clone(&blockcypher),
         )
         .unwrap(),
     ));
 
+    // Start periodic_check thread
     let man2 = manager.clone();
     info!("periodic_check loop thread starting");
     debug!("Wallet address: {:?}", wallet.get_new_address());
     thread::spawn(move || loop {
-        check_close(
+        periodic_check(
             man2.clone(),
-            electrs.clone(),
+            blockcypher.clone(),
             funded_url.clone(),
             &mut funded_uuids,
         );
         debug!("Wallet balance: {}", wallet.get_balance());
         wallet
-            .refresh()
+            .refresh() //Do I really need to call this every 10 seconds?
             .unwrap_or_else(|e| println!("Error refreshing wallet {e}"));
         thread::sleep(Duration::from_millis(10000));
     });
@@ -218,7 +242,7 @@ impl FromStr for OfferType {
     }
 }
 
-fn check_close(
+fn periodic_check(
     manager: Arc<Mutex<DlcManager>>,
     blockchain: Arc<dyn Blockchain>,
     funded_url: String,

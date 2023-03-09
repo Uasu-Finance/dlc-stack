@@ -425,6 +425,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "blockcypher-blockchain-provider"
+version = "0.1.0"
+dependencies = [
+ "bitcoin 0.29.2",
+ "bitcoin-test-utils",
+ "dlc-manager",
+ "lightning 0.0.113",
+ "lightning-block-sync",
+ "reqwest",
+ "rust-bitcoin-coin-selection",
+ "serde",
+ "simple-wallet",
+ "tokio",
+]
+
+[[package]]
 name = "brotli"
 version = "3.3.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1136,6 +1152,7 @@ version = "0.1.0"
 dependencies = [
  "base64 0.13.1",
  "bitcoin 0.29.2",
+ "blockcypher-blockchain-provider",
  "chrono",
  "dlc 0.4.0",
  "dlc-clients",
@@ -1143,7 +1160,6 @@ dependencies = [
  "dlc-messages 0.4.0",
  "dlc-sled-storage-provider",
  "dlc-trie",
- "electrs-blockchain-provider",
  "env_logger",
  "hex",
  "lightning 0.0.113",
@@ -1257,23 +1273,6 @@ name = "either"
 version = "1.8.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7fcaabb2fef8c910e7f4c7ce9f67a1283a1715879a7c230ca9d6d1ae31f16d91"
-
-[[package]]
-name = "electrs-blockchain-provider"
-version = "0.1.0"
-source = "git+https://github.com/p2pderivatives/rust-dlc?tag=v0.4.0#51517f3f6ad764953983b001efc2eac197ddb080"
-dependencies = [
- "bitcoin 0.29.2",
- "bitcoin-test-utils",
- "dlc-manager",
- "lightning 0.0.113",
- "lightning-block-sync",
- "reqwest",
- "rust-bitcoin-coin-selection",
- "serde",
- "simple-wallet",
- "tokio",
-]
 
 [[package]]
 name = "encode_unicode"
