@@ -14,6 +14,7 @@ use std::{
     vec,
 };
 
+// use blockcypher_blockchain_provider::BlockcypherBlockchainProvider;
 use dlc_manager::{
     contract::{
         contract_input::{ContractInput, ContractInputInfo, OracleInput},
@@ -24,8 +25,8 @@ use dlc_manager::{
 };
 use dlc_messages::{AcceptDlc, Message};
 use dlc_sled_storage_provider::SledStorageProvider;
-// use electrs_blockchain_provider::ElectrsBlockchainProvider;
-use blockcypher_blockchain_provider::BlockcypherBlockchainProvider;
+use electrs_blockchain_provider::ElectrsBlockchainProvider;
+// use blockcypher_blockchain_provider::BlockcypherBlockchainProvider;
 use log::{debug, info, warn};
 use simple_wallet::SimpleWallet;
 
@@ -44,12 +45,12 @@ mod utils;
 mod macros;
 
 type DlcManager<'a> = Manager<
-    Arc<SimpleWallet<Arc<BlockcypherBlockchainProvider>, Arc<SledStorageProvider>>>,
-    Arc<BlockcypherBlockchainProvider>,
+    Arc<SimpleWallet<Arc<ElectrsBlockchainProvider>, Arc<SledStorageProvider>>>,
+    Arc<ElectrsBlockchainProvider>,
     Box<StorageProvider>,
     Arc<P2PDOracleClient>,
     Arc<SystemTimeProvider>,
-    Arc<BlockcypherBlockchainProvider>,
+    Arc<ElectrsBlockchainProvider>,
 >;
 
 const NUM_CONFIRMATIONS: u32 = 2;
@@ -98,16 +99,22 @@ fn main() {
     // let bitcoin_core = Arc::new(BitcoinCoreProvider::new_from_rpc_client(rpc));
 
     // ELECTRUM / ELECTRS
-    // let electrs = Arc::new(ElectrsBlockchainProvider::new(
-    //     "https://dev-oracle.dlc.link/electrs/".to_string(),
-    //     bitcoin::Network::Regtest,
-    // ));
-
-    // Blockcypher
-    let blockcypher = Arc::new(BlockcypherBlockchainProvider::new(
-        "https://api.blockcypher.com/v1/".to_string(),
+    // // mocknet
+    // let electrs_host = "https://dev-oracle.dlc.link/electrs/";
+    // testnet
+    let electrs_host = "https://blockstream.info/testnet/api/";
+    // // mainnet
+    // let electrs_host = "https://blockstream.info/api/";
+    let blockchain = Arc::new(ElectrsBlockchainProvider::new(
+        electrs_host.to_string(),
         bitcoin::Network::Testnet,
     ));
+
+    // Blockcypher
+    // let blockchain = Arc::new(BlockcypherBlockchainProvider::new(
+    //     "https://api.blockcypher.com".to_string(),
+    //     bitcoin::Network::Testnet,
+    // ));
 
     // Set up DLC store
     let store = StorageProvider::new();
@@ -118,9 +125,9 @@ fn main() {
 
     // Set up wallet
     let wallet = Arc::new(SimpleWallet::new(
-        blockcypher.clone(),
+        blockchain.clone(),
         wallet_store.clone(),
-        bitcoin::Network::Regtest,
+        bitcoin::Network::Testnet,
     ));
 
     // Set up Oracle Client
@@ -140,11 +147,11 @@ fn main() {
     let manager = Arc::new(Mutex::new(
         Manager::new(
             Arc::clone(&wallet),
-            Arc::clone(&blockcypher),
+            Arc::clone(&blockchain),
             Box::new(store),
             oracles,
             Arc::new(time_provider),
-            Arc::clone(&blockcypher),
+            Arc::clone(&blockchain),
         )
         .unwrap(),
     ));
@@ -156,7 +163,7 @@ fn main() {
     thread::spawn(move || loop {
         periodic_check(
             man2.clone(),
-            blockcypher.clone(),
+            blockchain.clone(),
             funded_url.clone(),
             &mut funded_uuids,
         );
