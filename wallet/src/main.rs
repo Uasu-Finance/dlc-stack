@@ -15,7 +15,7 @@ use std::{
     vec,
 };
 
-// use blockcypher_blockchain_provider::BlockcypherBlockchainProvider;
+use blockcypher_blockchain_provider::BlockcypherBlockchainProvider;
 use dlc_manager::{
     contract::{
         contract_input::{ContractInput, ContractInputInfo, OracleInput},
@@ -27,7 +27,6 @@ use dlc_manager::{
 use dlc_messages::{AcceptDlc, Message};
 use dlc_sled_storage_provider::SledStorageProvider;
 use electrs_blockchain_provider::ElectrsBlockchainProvider;
-// use blockcypher_blockchain_provider::BlockcypherBlockchainProvider;
 use log::{debug, info, warn};
 use simple_wallet::SimpleWallet;
 
@@ -46,12 +45,12 @@ mod utils;
 mod macros;
 
 type DlcManager<'a> = Manager<
-    Arc<SimpleWallet<Arc<ElectrsBlockchainProvider>, Arc<SledStorageProvider>>>,
-    Arc<ElectrsBlockchainProvider>,
+    Arc<SimpleWallet<Arc<BlockcypherBlockchainProvider>, Arc<SledStorageProvider>>>,
+    Arc<BlockcypherBlockchainProvider>,
     Box<StorageProvider>,
     Arc<P2PDOracleClient>,
     Arc<SystemTimeProvider>,
-    Arc<ElectrsBlockchainProvider>,
+    Arc<BlockcypherBlockchainProvider>,
 >;
 
 const NUM_CONFIRMATIONS: u32 = 2;
@@ -85,18 +84,20 @@ fn main() {
 
     // Setup Blockchain Connection Object
     // ELECTRUM / ELECTRS
-    let electrs_host =
-        env::var("ELECTRUM_API_URL").unwrap_or("https://blockstream.info/testnet/api/".to_string());
-    let blockchain = Arc::new(ElectrsBlockchainProvider::new(
-        electrs_host.to_string(),
-        bitcoin::Network::Testnet,
-    ));
-
-    // Blockcypher
-    // let blockchain = Arc::new(BlockcypherBlockchainProvider::new(
-    //     "https://api.blockcypher.com".to_string(),
+    // let electrs_host =
+    //     env::var("ELECTRUM_API_URL").unwrap_or("https://blockstream.info/testnet/api/".to_string());
+    // let blockchain = Arc::new(ElectrsBlockchainProvider::new(
+    //     electrs_host.to_string(),
     //     bitcoin::Network::Testnet,
     // ));
+
+    // Blockcypher
+    let blockcypher_host =
+        env::var("BLOCKCYPHER_API_URL").unwrap_or("https://api.blockcypher.com/".to_string());
+    let blockchain = Arc::new(BlockcypherBlockchainProvider::new(
+        blockcypher_host.to_string(),
+        bitcoin::Network::Regtest,
+    ));
 
     // Set up DLC store
     let store = StorageProvider::new();

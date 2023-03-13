@@ -432,6 +432,7 @@ dependencies = [
  "bitcoin-test-utils",
  "chrono",
  "dlc-manager",
+ "hex",
  "lightning 0.0.113",
  "lightning-block-sync",
  "mockito",
