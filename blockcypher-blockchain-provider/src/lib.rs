@@ -146,7 +146,7 @@ impl Blockchain for BlockcypherBlockchainProvider {
                 .txids
                 .iter()
                 .map(|id| {
-                    self.get_transaction(&Txid::from_hash(sha256d::Hash::from_str(id).unwrap()))
+                    self.get_transaction(&id.parse::<Txid>().unwrap()) // Todo: better handle unwrap
                         .unwrap()
                 })
                 .collect();
