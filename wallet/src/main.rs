@@ -104,6 +104,8 @@ fn main() {
         bitcoin::Network::Testnet,
     ));
 
+    let wallet2 = wallet.clone();
+
     // Set up Oracle Client
     let p2p_client: P2PDOracleClient = retry!(
         P2PDOracleClient::new(&oracle_url),
@@ -168,6 +170,9 @@ fn main() {
                         info!("Call cleanup contract offers feature disabled.");
                         Response::json(&("Disabled".to_string())).with_status_code(400)
                     }
+                },
+                (GET) (/unlockutxos) => {
+                    unlock_utxos(wallet2.clone(), Response::json(&("OK".to_string())).with_status_code(200))
                 },
                 (POST) (/offer) => {
                     info!("Call POST (create) offer {:?}", request);
@@ -430,6 +435,14 @@ fn accept_offer(accept_dlc: AcceptDlc, manager: Arc<Mutex<DlcManager>>) -> Respo
 fn delete_all_offers(manager: Arc<Mutex<DlcManager>>, response: Response) -> Response {
     let man = manager.lock().unwrap();
     man.get_store().delete_contracts();
+    return response;
+}
+
+fn unlock_utxos(
+    wallet: Arc<SimpleWallet<Arc<ElectrsBlockchainProvider>, Arc<SledStorageProvider>>>,
+    response: Response,
+) -> Response {
+    wallet.unreserve_all_utxos();
     return response;
 }
 
