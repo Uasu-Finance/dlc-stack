@@ -433,6 +433,7 @@ fn accept_offer(accept_dlc: AcceptDlc, manager: Arc<Mutex<DlcManager>>) -> Respo
 }
 
 fn delete_all_offers(manager: Arc<Mutex<DlcManager>>, response: Response) -> Response {
+    info!("Deleting all contracts from dlc-store");
     let man = manager.lock().unwrap();
     man.get_store().delete_contracts();
     return response;
@@ -442,6 +443,7 @@ fn unlock_utxos(
     wallet: Arc<SimpleWallet<Arc<ElectrsBlockchainProvider>, Arc<SledStorageProvider>>>,
     response: Response,
 ) -> Response {
+    info!("Unlocking UTXOs");
     wallet.unreserve_all_utxos();
     return response;
 }
