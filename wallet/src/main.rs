@@ -15,6 +15,7 @@ use std::{
     vec,
 };
 
+use bitcoin::Address;
 use dlc_manager::{
     contract::{
         contract_input::{ContractInput, ContractInputInfo, OracleInput},
@@ -184,6 +185,9 @@ fn main() {
                 },
                 (GET) (/unlockutxos) => {
                     unlock_utxos(wallet2.clone(), Response::json(&("OK".to_string())).with_status_code(200))
+                },
+                (GET) (/empty_to_address/{address: String}) => {
+                    empty_to_address(address, wallet2.clone(), Response::json(&("OK".to_string())).with_status_code(200))
                 },
                 (POST) (/offer) => {
                     info!("Call POST (create) offer {:?}", request);
@@ -445,6 +449,19 @@ fn unlock_utxos(
 ) -> Response {
     info!("Unlocking UTXOs");
     wallet.unreserve_all_utxos();
+    return response;
+}
+
+fn empty_to_address(
+    address: String,
+    wallet: Arc<SimpleWallet<Arc<ElectrsBlockchainProvider>, Arc<SledStorageProvider>>>,
+    response: Response,
+) -> Response {
+    info!("Unlocking UTXOs");
+    match wallet.empty_to_address(&Address::from_str(&address).unwrap()) {
+        Ok(_) => info!("Emptied bitcoin to {address}"),
+        Err(_) => warn!("Failed emptying bitcoin to {address}"),
+    }
     return response;
 }
 
