@@ -15,6 +15,7 @@ use std::{
     vec,
 };
 
+use bitcoin::Address;
 use blockcypher_blockchain_provider::BlockcypherBlockchainProvider;
 use dlc_manager::{
     contract::{
@@ -26,7 +27,7 @@ use dlc_manager::{
 };
 use dlc_messages::{AcceptDlc, Message};
 use dlc_sled_storage_provider::SledStorageProvider;
-use electrs_blockchain_provider::ElectrsBlockchainProvider;
+// use electrs_blockchain_provider::ElectrsBlockchainProvider;
 use log::{debug, info, warn};
 use simple_wallet::SimpleWallet;
 
@@ -83,12 +84,22 @@ fn main() {
     let mut funded_uuids: Vec<String> = vec![];
 
     // Setup Blockchain Connection Object
+    let active_network = match env::var("BITCOIN_NETWORK").as_deref() {
+        Ok("bitcoin") => bitcoin::Network::Bitcoin,
+        Ok("testnet") => bitcoin::Network::Testnet,
+        Ok("signet") => bitcoin::Network::Signet,
+        Ok("regtest") => bitcoin::Network::Regtest,
+        _ => panic!(
+            "Unknown Bitcoin Network, make sure to set BITCOIN_NETWORK in your env variables"
+        ),
+    };
+
     // ELECTRUM / ELECTRS
     // let electrs_host =
     //     env::var("ELECTRUM_API_URL").unwrap_or("https://blockstream.info/testnet/api/".to_string());
     // let blockchain = Arc::new(ElectrsBlockchainProvider::new(
     //     electrs_host.to_string(),
-    //     bitcoin::Network::Testnet,
+    //     active_network,
     // ));
 
     // Blockcypher
@@ -96,22 +107,25 @@ fn main() {
         env::var("BLOCKCYPHER_API_URL").unwrap_or("https://api.blockcypher.com/".to_string());
     let blockchain = Arc::new(BlockcypherBlockchainProvider::new(
         blockcypher_host.to_string(),
-        bitcoin::Network::Regtest,
+        active_network,
     ));
 
     // Set up DLC store
     let store = StorageProvider::new();
 
     // Set up wallet store
-    let sled_path: String = env::var("SLED_PATH").unwrap_or("wallet_db".to_string());
+    let root_sled_path: String = env::var("SLED_WALLET_PATH").unwrap_or("wallet_db".to_string());
+    let sled_path = format!("{root_sled_path}_{}", active_network);
     let wallet_store = Arc::new(SledStorageProvider::new(sled_path.as_str()).unwrap());
 
     // Set up wallet
     let wallet = Arc::new(SimpleWallet::new(
         blockchain.clone(),
         wallet_store.clone(),
-        bitcoin::Network::Testnet,
+        active_network,
     ));
+
+    let wallet2 = wallet.clone();
 
     // Set up Oracle Client
     let p2p_client: P2PDOracleClient = retry!(
@@ -147,7 +161,7 @@ fn main() {
         .unwrap_or(10);
     let man2 = manager.clone();
     info!("periodic_check loop thread starting");
-    debug!("Wallet address: {:?}", wallet.get_new_address());
+    debug!("Wallet address: {:?}", wallet.get_new_address()); // When supporting a more complete wallet type, consider whether to create a new address on each startup.
     thread::spawn(move || loop {
         periodic_check(
             man2.clone(),
@@ -157,8 +171,8 @@ fn main() {
         );
         debug!("Wallet balance: {}", wallet.get_balance());
         wallet
-            .refresh() //Do I really need to call this every 10 seconds?
-            .unwrap_or_else(|e| println!("Error refreshing wallet {e}"));
+            .refresh()
+            .unwrap_or_else(|e| warn!("Error refreshing wallet {e}"));
         thread::sleep(Duration::from_millis(
             cmp::max(10, bitcoin_check_interval_seconds) * 1000,
         ));
@@ -177,6 +191,12 @@ fn main() {
                         info!("Call cleanup contract offers feature disabled.");
                         Response::json(&("Disabled".to_string())).with_status_code(400)
                     }
+                },
+                (GET) (/unlockutxos) => {
+                    unlock_utxos(wallet2.clone(), Response::json(&("OK".to_string())).with_status_code(200))
+                },
+                (GET) (/empty_to_address/{address: String}) => {
+                    empty_to_address(address, wallet2.clone(), Response::json(&("OK".to_string())).with_status_code(200))
                 },
                 (POST) (/offer) => {
                     info!("Call POST (create) offer {:?}", request);
@@ -205,7 +225,6 @@ fn main() {
                         accept_message: String,
                     }
                     let json: AcceptOfferRequest = try_or_400!(rouille::input::json_input(request));
-                    info!("Accept message: {}", json.accept_message.clone());
                     let accept_dlc: AcceptDlc = match serde_json::from_str(&json.accept_message)
                     {
                         Ok(dlc) => dlc,
@@ -385,13 +404,7 @@ fn create_new_offer(
         &contract_input,
         STATIC_COUNTERPARTY_NODE_ID.parse().unwrap(),
     ) {
-        Ok(dlc) => {
-            debug!(
-                "Create new offer dlc output: {}",
-                serde_json::to_string(dlc).unwrap()
-            );
-            Response::json(dlc)
-        }
+        Ok(dlc) => Response::json(dlc),
         Err(e) => {
             info!("DLC manager - send offer error: {}", e.to_string());
             Response::json(&ErrorsResponse {
@@ -426,10 +439,6 @@ fn accept_offer(accept_dlc: AcceptDlc, manager: Arc<Mutex<DlcManager>>) -> Respo
             );
         }
     } {
-        debug!(
-            "Accept offer - signed dlc output: {}",
-            serde_json::to_string(&sign).unwrap()
-        );
         add_access_control_headers(Response::json(&sign))
     } else {
         panic!();
@@ -437,8 +446,31 @@ fn accept_offer(accept_dlc: AcceptDlc, manager: Arc<Mutex<DlcManager>>) -> Respo
 }
 
 fn delete_all_offers(manager: Arc<Mutex<DlcManager>>, response: Response) -> Response {
+    info!("Deleting all contracts from dlc-store");
     let man = manager.lock().unwrap();
     man.get_store().delete_contracts();
+    return response;
+}
+
+fn unlock_utxos(
+    wallet: Arc<SimpleWallet<Arc<BlockcypherBlockchainProvider>, Arc<SledStorageProvider>>>,
+    response: Response,
+) -> Response {
+    info!("Unlocking UTXOs");
+    wallet.unreserve_all_utxos();
+    return response;
+}
+
+fn empty_to_address(
+    address: String,
+    wallet: Arc<SimpleWallet<Arc<BlockcypherBlockchainProvider>, Arc<SledStorageProvider>>>,
+    response: Response,
+) -> Response {
+    info!("Unlocking UTXOs");
+    match wallet.empty_to_address(&Address::from_str(&address).unwrap()) {
+        Ok(_) => info!("Emptied bitcoin to {address}"),
+        Err(_) => warn!("Failed emptying bitcoin to {address}"),
+    }
     return response;
 }
 
