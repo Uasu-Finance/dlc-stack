@@ -1,11 +1,9 @@
 use std::collections::HashMap;
-use std::str::FromStr;
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 
 use bitcoin::consensus::Decodable;
-use bitcoin::hashes::sha256d;
 use bitcoin::{
     Block, BlockHash, BlockHeader, Network, OutPoint, Script, Transaction, TxMerkleNode, TxOut,
     Txid,
