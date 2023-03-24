@@ -27,7 +27,7 @@ use dlc_manager::{
 };
 use dlc_messages::{AcceptDlc, Message};
 use dlc_sled_storage_provider::SledStorageProvider;
-// use electrs_blockchain_provider::ElectrsBlockchainProvider;
+use lightning::chain::chaininterface::{ConfirmationTarget, FeeEstimator};
 use log::{debug, info, warn};
 use simple_wallet::SimpleWallet;
 
@@ -154,18 +154,19 @@ fn main() {
     ));
 
     // Start periodic_check thread
-
     let bitcoin_check_interval_seconds: u64 = env::var("BITCOIN_CHECK_INTERVAL_SECONDS")
         .unwrap_or("10".to_string())
         .parse::<u64>()
         .unwrap_or(10);
-    let man2 = manager.clone();
+
+    let manager2 = manager.clone();
+    let blockchain2 = blockchain.clone();
     info!("periodic_check loop thread starting");
     debug!("Wallet address: {:?}", wallet.get_new_address()); // When supporting a more complete wallet type, consider whether to create a new address on each startup.
     thread::spawn(move || loop {
         periodic_check(
-            man2.clone(),
-            blockchain.clone(),
+            manager2.clone(),
+            blockchain2.clone(),
             funded_url.clone(),
             &mut funded_uuids,
         );
@@ -209,7 +210,7 @@ fn main() {
                         total_outcomes: u64
                     }
                     let req: OfferRequest = try_or_400!(rouille::input::json_input(request));
-                    add_access_control_headers(create_new_offer(manager.clone(), oracle.clone(), req.uuid, req.accept_collateral, req.offer_collateral, req.total_outcomes))
+                    add_access_control_headers(create_new_offer(manager.clone(), oracle.clone(), blockchain.clone(), active_network, req.uuid, req.accept_collateral, req.offer_collateral, req.total_outcomes))
                 },
                 (OPTIONS) (/offer) => {
                     add_access_control_headers(Response::empty_204())
@@ -370,6 +371,8 @@ fn periodic_check(
 fn create_new_offer(
     manager: Arc<Mutex<DlcManager>>,
     oracle: Arc<P2PDOracleClient>,
+    blockchain: Arc<BlockcypherBlockchainProvider>,
+    active_network: bitcoin::Network,
     event_id: String,
     accept_collateral: u64,
     offer_collateral: u64,
@@ -393,10 +396,16 @@ fn create_new_offer(
         contract_descriptor: descriptor,
     };
 
+    // Some regtest networks have an unreliable fee estimation service
+    let fee_rate = match active_network {
+        bitcoin::Network::Regtest => 1,
+        _ => blockchain.get_est_sat_per_1000_weight(ConfirmationTarget::HighPriority) as u64,
+    };
+
     let contract_input = ContractInput {
         offer_collateral: offer_collateral,
         accept_collateral: accept_collateral,
-        fee_rate: 2,
+        fee_rate,
         contract_infos: vec![contract_info],
     };
 
