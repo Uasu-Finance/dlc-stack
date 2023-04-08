@@ -111,6 +111,7 @@ impl P2PDOracleClient {
     /// Try to create an instance of an oracle client connecting to the provided
     /// host. Returns an error if the host could not be reached. Panics if the
     /// oracle uses an incompatible format.
+    #[allow(dead_code)]
     pub fn new(host: &str) -> Result<P2PDOracleClient, DlcManagerError> {
         if host.is_empty() {
             return Err(DlcManagerError::InvalidParameters(

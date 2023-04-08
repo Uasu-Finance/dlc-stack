@@ -645,7 +645,7 @@ impl StorageApiClient {
 
     async fn delete_resources(&self, path: String) -> Result<(), ApiError> {
         let uri = format!("{}/{}", String::as_str(&self.host.clone()), path.as_str());
-        let url = Url::parse(uri.as_str()).unwrap();
+        let url = Url::parse(uri.as_str()).unwrap(); // huh?
         let res = match self.client.delete(url).send().await {
             Ok(result) => result,
             Err(e) => {

@@ -31,7 +31,7 @@ use lightning::chain::chaininterface::{ConfirmationTarget, FeeEstimator};
 use log::{debug, info, warn};
 use simple_wallet::SimpleWallet;
 
-use crate::storage::storage_provider::StorageProvider;
+// use crate::storage::storage_provider::StorageProvider;
 use oracle_client::P2PDOracleClient;
 use rouille::Response;
 use serde::{Deserialize, Serialize};
@@ -48,7 +48,7 @@ mod macros;
 type DlcManager<'a> = Manager<
     Arc<SimpleWallet<Arc<ElectrsBlockchainProvider>, Arc<SledStorageProvider>>>,
     Arc<ElectrsBlockchainProvider>,
-    Box<StorageProvider>,
+    Box<SledStorageProvider>,
     Arc<P2PDOracleClient>,
     Arc<SystemTimeProvider>,
     Arc<ElectrsBlockchainProvider>,
@@ -103,7 +103,7 @@ fn main() {
     ));
 
     // Set up DLC store
-    let store = StorageProvider::new();
+    let store = Arc::new(SledStorageProvider::new("dlc_db")).unwrap();
 
     // Set up wallet store
     let root_sled_path: String = env::var("SLED_WALLET_PATH").unwrap_or("wallet_db".to_string());
