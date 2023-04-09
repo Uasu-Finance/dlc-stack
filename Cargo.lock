@@ -363,15 +363,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a4a4ddaa51a5bc52a6948f74c06d20aaaddb71924eab79b8c97a8c556e942d6a"
 
 [[package]]
-name = "base64-compat"
-version = "1.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5a8d4d2746f89841e49230dd26917df1876050f95abafafbe34f47cb534b88d7"
-dependencies = [
- "byteorder",
-]
-
-[[package]]
 name = "bech32"
 version = "0.8.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -403,17 +394,6 @@ dependencies = [
  "bech32 0.9.1",
  "bitcoin_hashes 0.11.0",
  "secp256k1 0.24.3",
- "serde",
-]
-
-[[package]]
-name = "bitcoin-test-utils"
-version = "0.1.0"
-source = "git+https://github.com/p2pderivatives/rust-dlc?tag=v0.4.0#51517f3f6ad764953983b001efc2eac197ddb080"
-dependencies = [
- "bitcoin 0.29.2",
- "bitcoincore-rpc",
- "bitcoincore-rpc-json",
 ]
 
 [[package]]
@@ -433,33 +413,6 @@ name = "bitcoin_hashes"
 version = "0.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "90064b8dee6815a6470d60bad07bbbaee885c0e12d04177138fa3291a01b7bc4"
-dependencies = [
- "serde",
-]
-
-[[package]]
-name = "bitcoincore-rpc"
-version = "0.16.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0261b2bb7617e0c91b452a837bbd1291fd34ad6990cb8e3ffc28239cc045b5ca"
-dependencies = [
- "bitcoincore-rpc-json",
- "jsonrpc",
- "log",
- "serde",
- "serde_json",
-]
-
-[[package]]
-name = "bitcoincore-rpc-json"
-version = "0.16.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c231bea28e314879c5aef240f6052e8a72a369e3c9f9b20d9bfbb33ad18029b2"
-dependencies = [
- "bitcoin 0.29.2",
- "serde",
- "serde_json",
-]
 
 [[package]]
 name = "bitflags"
@@ -1214,12 +1167,12 @@ dependencies = [
  "dlc-messages 0.4.0",
  "dlc-sled-storage-provider",
  "dlc-trie",
- "electrs-blockchain-provider",
  "env_logger",
  "getrandom",
  "hex",
  "lightning 0.0.113",
  "log",
+ "mock-blockchain-provider",
  "mockito",
  "reqwest",
  "rouille",
@@ -1330,23 +1283,6 @@ name = "either"
 version = "1.8.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7fcaabb2fef8c910e7f4c7ce9f67a1283a1715879a7c230ca9d6d1ae31f16d91"
-
-[[package]]
-name = "electrs-blockchain-provider"
-version = "0.1.0"
-source = "git+https://github.com/p2pderivatives/rust-dlc?tag=v0.4.0#51517f3f6ad764953983b001efc2eac197ddb080"
-dependencies = [
- "bitcoin 0.29.2",
- "bitcoin-test-utils",
- "dlc-manager",
- "lightning 0.0.113",
- "lightning-block-sync",
- "reqwest",
- "rust-bitcoin-coin-selection",
- "serde",
- "simple-wallet",
- "tokio",
-]
 
 [[package]]
 name = "encode_unicode"
@@ -2020,18 +1956,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "jsonrpc"
-version = "0.12.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7f8423b78fc94d12ef1a4a9d13c348c9a78766dda0cc18817adf0faf77e670c8"
-dependencies = [
- "base64-compat",
- "serde",
- "serde_derive",
- "serde_json",
-]
-
-[[package]]
 name = "language-tags"
 version = "0.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2066,17 +1990,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "087add70f81d2fdc6d4409bc0cef69e11ad366ef1d0068550159bd22b3ac8664"
 dependencies = [
  "bitcoin 0.29.2",
-]
-
-[[package]]
-name = "lightning-block-sync"
-version = "0.0.113"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e2fc7227008536500026866e90d5e2db2da2725c5cdc7d19013df743d9de3e68"
-dependencies = [
- "bitcoin 0.29.2",
- "futures-util",
- "lightning 0.0.113",
 ]
 
 [[package]]
@@ -2223,6 +2136,13 @@ dependencies = [
  "log",
  "wasi 0.11.0+wasi-snapshot-preview1",
  "windows-sys 0.45.0",
+]
+
+[[package]]
+name = "mock-blockchain-provider"
+version = "0.1.0"
+dependencies = [
+ "bitcoin 0.29.2",
 ]
 
 [[package]]

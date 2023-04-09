@@ -26,9 +26,10 @@ use dlc_manager::{
 };
 use dlc_messages::{AcceptDlc, Message};
 use dlc_sled_storage_provider::SledStorageProvider;
-use electrs_blockchain_provider::ElectrsBlockchainProvider;
+// use electrs_blockchain_provider::ElectrsBlockchainProvider;
 use lightning::chain::chaininterface::{ConfirmationTarget, FeeEstimator};
 use log::{debug, info, warn};
+use mock_blockchain_provider::MockBlockchainProvider;
 use simple_wallet::SimpleWallet;
 
 // use crate::storage::storage_provider::StorageProvider;
@@ -46,12 +47,12 @@ mod utils;
 mod macros;
 
 type DlcManager<'a> = Manager<
-    Arc<SimpleWallet<Arc<ElectrsBlockchainProvider>, Arc<SledStorageProvider>>>,
-    Arc<ElectrsBlockchainProvider>,
+    Arc<SimpleWallet<Arc<MockBlockchainProvider>, Arc<SledStorageProvider>>>,
+    Arc<MockBlockchainProvider>,
     Box<SledStorageProvider>,
     Arc<P2PDOracleClient>,
     Arc<SystemTimeProvider>,
-    Arc<ElectrsBlockchainProvider>,
+    Arc<MockBlockchainProvider>,
 >;
 
 const NUM_CONFIRMATIONS: u32 = 2;
@@ -97,7 +98,7 @@ fn main() {
     // ELECTRUM / ELECTRS
     let electrs_host =
         env::var("ELECTRUM_API_URL").unwrap_or("https://blockstream.info/testnet/api/".to_string());
-    let blockchain = Arc::new(ElectrsBlockchainProvider::new(
+    let blockchain = Arc::new(MockBlockchainProvider::new(
         electrs_host.to_string(),
         active_network,
     ));
@@ -173,18 +174,18 @@ fn main() {
 
     rouille::start_server(format!("0.0.0.0:{}", wallet_backend_port), move |request| {
         router!(request,
-                (GET) (/cleanup) => {
-                    let contract_cleanup_enabled: bool = env::var("CONTRACT_CLEANUP_ENABLED")
-                        .unwrap_or("false".to_string())
-                        .parse().unwrap_or(false);
-                    if contract_cleanup_enabled {
-                        info!("Call cleanup contract offers.");
-                        delete_all_offers(manager.clone(), Response::json(&("OK".to_string())).with_status_code(200))
-                    } else {
-                        info!("Call cleanup contract offers feature disabled.");
-                        Response::json(&("Disabled".to_string())).with_status_code(400)
-                    }
-                },
+                // (GET) (/cleanup) => {
+                //     let contract_cleanup_enabled: bool = env::var("CONTRACT_CLEANUP_ENABLED")
+                //         .unwrap_or("false".to_string())
+                //         .parse().unwrap_or(false);
+                //     if contract_cleanup_enabled {
+                //         info!("Call cleanup contract offers.");
+                //         delete_all_offers(manager.clone(), Response::json(&("OK".to_string())).with_status_code(200))
+                //     } else {
+                //         info!("Call cleanup contract offers feature disabled.");
+                //         Response::json(&("Disabled".to_string())).with_status_code(400)
+                //     }
+                // },
                 (GET) (/unlockutxos) => {
                     unlock_utxos(wallet2.clone(), Response::json(&("OK".to_string())).with_status_code(200))
                 },
@@ -342,7 +343,7 @@ fn periodic_check(
 fn create_new_offer(
     manager: Arc<Mutex<DlcManager>>,
     oracle: Arc<P2PDOracleClient>,
-    blockchain: Arc<ElectrsBlockchainProvider>,
+    blockchain: Arc<MockBlockchainProvider>,
     active_network: bitcoin::Network,
     event_id: String,
     accept_collateral: u64,
@@ -425,15 +426,15 @@ fn accept_offer(accept_dlc: AcceptDlc, manager: Arc<Mutex<DlcManager>>) -> Respo
     }
 }
 
-fn delete_all_offers(manager: Arc<Mutex<DlcManager>>, response: Response) -> Response {
-    info!("Deleting all contracts from dlc-store");
-    let man = manager.lock().unwrap();
-    man.get_store().delete_contracts();
-    return response;
-}
+// fn delete_all_offers(manager: Arc<Mutex<DlcManager>>, response: Response) -> Response {
+//     info!("Deleting all contracts from dlc-store");
+//     let man = manager.lock().unwrap();
+//     man.get_store().delete_contracts();
+//     return response;
+// }
 
 fn unlock_utxos(
-    wallet: Arc<SimpleWallet<Arc<ElectrsBlockchainProvider>, Arc<SledStorageProvider>>>,
+    wallet: Arc<SimpleWallet<Arc<MockBlockchainProvider>, Arc<SledStorageProvider>>>,
     response: Response,
 ) -> Response {
     info!("Unlocking UTXOs");
@@ -443,7 +444,7 @@ fn unlock_utxos(
 
 fn empty_to_address(
     address: String,
-    wallet: Arc<SimpleWallet<Arc<ElectrsBlockchainProvider>, Arc<SledStorageProvider>>>,
+    wallet: Arc<SimpleWallet<Arc<MockBlockchainProvider>, Arc<SledStorageProvider>>>,
     response: Response,
 ) -> Response {
     info!("Unlocking UTXOs");
