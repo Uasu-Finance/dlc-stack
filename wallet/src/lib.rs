@@ -41,7 +41,7 @@ use std::fmt::Write as _;
 use utils::get_numerical_contract_info;
 
 mod oracle_client;
-mod storage;
+// mod storage;
 mod utils;
 #[macro_use]
 mod macros;
@@ -104,7 +104,8 @@ fn main() {
     ));
 
     // Set up DLC store
-    let store = Arc::new(SledStorageProvider::new("dlc_db")).unwrap();
+    let store =
+        Box::new(SledStorageProvider::new("dlc_db")).expect("Create a SledStorageProvider object");
 
     // Set up wallet store
     let root_sled_path: String = env::var("SLED_WALLET_PATH").unwrap_or("wallet_db".to_string());
@@ -250,64 +251,64 @@ fn periodic_check(
 
     let store = man.get_store();
 
-    collected_response["signed_contracts"] = store
-        .get_signed_contracts()
-        .unwrap_or(vec![])
-        .iter()
-        .map(|c| {
-            let confirmations = match blockchain
-                .get_transaction_confirmations(&c.accepted_contract.dlc_transactions.fund.txid())
-            {
-                Ok(confirms) => confirms,
-                Err(e) => {
-                    info!("Error checking confirmations: {}", e.to_string());
-                    0
-                }
-            };
-            if confirmations >= NUM_CONFIRMATIONS {
-                let uuid = c.accepted_contract.offered_contract.contract_info[0]
-                    .oracle_announcements[0]
-                    .oracle_event
-                    .event_id
-                    .clone();
-                if !funded_uuids.contains(&uuid) {
-                    let mut post_body = HashMap::new();
-                    post_body.insert("uuid", &uuid);
+    // collected_response["signed_contracts"] = store
+    //     .get_signed_contracts()
+    //     .unwrap_or(vec![])
+    //     .iter()
+    //     .map(|c| {
+    //         let confirmations = match blockchain
+    //             .get_transaction_confirmations(&c.accepted_contract.dlc_transactions.fund.txid())
+    //         {
+    //             Ok(confirms) => confirms,
+    //             Err(e) => {
+    //                 info!("Error checking confirmations: {}", e.to_string());
+    //                 0
+    //             }
+    //         };
+    //         if confirmations >= NUM_CONFIRMATIONS {
+    //             let uuid = c.accepted_contract.offered_contract.contract_info[0]
+    //                 .oracle_announcements[0]
+    //                 .oracle_event
+    //                 .event_id
+    //                 .clone();
+    //             if !funded_uuids.contains(&uuid) {
+    //                 let mut post_body = HashMap::new();
+    //                 post_body.insert("uuid", &uuid);
 
-                    let client = reqwest::blocking::Client::builder()
-                        .use_rustls_tls()
-                        .build();
-                    if client.is_ok() {
-                        let res = client.unwrap().post(&funded_url).json(&post_body).send();
+    //                 let client = reqwest::blocking::Client::builder()
+    //                     .use_rustls_tls()
+    //                     .build();
+    //                 if client.is_ok() {
+    //                     let res = client.unwrap().post(&funded_url).json(&post_body).send();
 
-                        match res {
-                            Ok(res) => match res.error_for_status() {
-                                Ok(_res) => {
-                                    funded_uuids.push(uuid.clone());
-                                    info!(
-                                        "Success setting funded to true: {}, {}",
-                                        uuid,
-                                        _res.status()
-                                    );
-                                }
-                                Err(e) => {
-                                    info!(
-                                        "Error setting funded to true: {}: {}",
-                                        uuid,
-                                        e.to_string()
-                                    );
-                                }
-                            },
-                            Err(e) => {
-                                info!("Error setting funded to true: {}: {}", uuid, e.to_string());
-                            }
-                        }
-                    }
-                }
-            }
-            c.accepted_contract.get_contract_id_string()
-        })
-        .collect();
+    //                     match res {
+    //                         Ok(res) => match res.error_for_status() {
+    //                             Ok(_res) => {
+    //                                 funded_uuids.push(uuid.clone());
+    //                                 info!(
+    //                                     "Success setting funded to true: {}, {}",
+    //                                     uuid,
+    //                                     _res.status()
+    //                                 );
+    //                             }
+    //                             Err(e) => {
+    //                                 info!(
+    //                                     "Error setting funded to true: {}: {}",
+    //                                     uuid,
+    //                                     e.to_string()
+    //                                 );
+    //                             }
+    //                         },
+    //                         Err(e) => {
+    //                             info!("Error setting funded to true: {}: {}", uuid, e.to_string());
+    //                         }
+    //                     }
+    //                 }
+    //             }
+    //         }
+    //         c.accepted_contract.get_contract_id_string()
+    //     })
+    //     .collect();
 
     collected_response["confirmed_contracts"] = store
         .get_confirmed_contracts()

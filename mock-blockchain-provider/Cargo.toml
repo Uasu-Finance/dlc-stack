@@ -5,4 +5,11 @@ version = "0.1.0"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 [dependencies]
-bitcoin = {version = "0.29.2"}
+bitcoin = {version = "0.29.2", features=["serde"]}
+serde = {version = "*", features = ["derive"]}
+dlc-manager = {version = "0.4.0", git = "https://github.com/p2pderivatives/rust-dlc", tag="v0.4.0", features = ["use-serde"]}
+simple-wallet = {version = "0.1.0", git = "https://github.com/p2pderivatives/rust-dlc", tag="v0.4.0"}
+lightning = {version = "0.0.113"}
+lightning-block-sync = {version = "0.0.113"}
+# reqwest = {version = "0.11", features = ["blocking", "json"]}
+rust-bitcoin-coin-selection = {version = "0.1.0", git = "https://github.com/p2pderivatives/rust-bitcoin-coin-selection", features = ["rand"]}

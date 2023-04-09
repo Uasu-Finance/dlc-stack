@@ -13,7 +13,7 @@
 extern crate chrono;
 extern crate dlc_manager;
 extern crate dlc_messages;
-extern crate reqwest;
+// extern crate reqwest;
 extern crate secp256k1_zkp;
 extern crate serde;
 
@@ -25,7 +25,7 @@ use dlc_manager::Oracle;
 use dlc_messages::oracle_msgs::{OracleAnnouncement, OracleAttestation};
 use log::info;
 use secp256k1_zkp::{schnorr::Signature, XOnlyPublicKey};
-use serde_json::Value;
+use serde_json::{json, Value};
 
 /// Enables interacting with a DLC oracle.
 pub struct P2PDOracleClient {
@@ -72,27 +72,28 @@ struct AttestationResponse {
     values: Vec<String>,
 }
 
-fn get_object<T>(path: &str) -> Result<T, DlcManagerError>
-where
-    T: serde::de::DeserializeOwned,
-{
-    reqwest::blocking::get(path)
-        .map_err(|x| {
-            dlc_manager::error::Error::IOError(std::io::Error::new(std::io::ErrorKind::Other, x))
-        })?
-        .json::<T>()
-        .map_err(|e| dlc_manager::error::Error::OracleError(e.to_string()))
-}
+// fn get_object<T>(path: &str) -> Result<T, DlcManagerError>
+// where
+//     T: serde::de::DeserializeOwned,
+// {
+//     reqwest::blocking::get(path)
+//         .map_err(|x| {
+//             dlc_manager::error::Error::IOError(std::io::Error::new(std::io::ErrorKind::Other, x))
+//         })?
+//         .json::<T>()
+//         .map_err(|e| dlc_manager::error::Error::OracleError(e.to_string()))
+// }
 
 fn get_json(path: &str) -> Result<Value, DlcManagerError> {
-    reqwest::blocking::get(path)
-        .map_err(|x| {
-            dlc_manager::error::Error::IOError(std::io::Error::new(std::io::ErrorKind::Other, x))
-        })?
-        .json::<Value>()
-        .map_err(|x| {
-            dlc_manager::error::Error::IOError(std::io::Error::new(std::io::ErrorKind::Other, x))
-        })
+    // reqwest::blocking::get(path)
+    //     .map_err(|x| {
+    //         dlc_manager::error::Error::IOError(std::io::Error::new(std::io::ErrorKind::Other, x))
+    //     })?
+    //     .json::<Value>()
+    //     .map_err(|x| {
+    //         dlc_manager::error::Error::IOError(std::io::Error::new(std::io::ErrorKind::Other, x))
+    //     })
+    Ok(json!({"name": "John"}))
 }
 
 fn pubkey_path(host: &str) -> String {
@@ -128,7 +129,8 @@ impl P2PDOracleClient {
         info!("Getting pubkey from {}", path);
         // let runtime = tokio::runtime::Runtime::new().expect("Unable to create a runtime");
         // let public_key = runtime.block_on(get::<String>(&path))?;
-        let public_key = get_object::<String>(&path)?; //.public_key;
+        // let public_key = get_object::<String>(&path)?; //.public_key;
+        let public_key = "asdfasdf";
 
         info!("Oracle Pub Key: {}", public_key.to_string());
 
