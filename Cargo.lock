@@ -1177,12 +1177,14 @@ dependencies = [
  "log",
  "mock-blockchain-provider",
  "mockito",
+ "reqwest",
  "rouille",
  "secp256k1-zkp 0.7.0",
  "serde",
  "serde_json",
  "simple-wallet",
  "sled",
+ "tokio",
 ]
 
 [[package]]
