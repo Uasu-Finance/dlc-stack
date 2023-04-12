@@ -54,8 +54,6 @@ type DlcManager<'a> = Manager<
     Arc<ElectrsBlockchainProvider>,
 >;
 
-const NUM_CONFIRMATIONS: u32 = 2;
-
 // The contracts in dlc-manager expect a node id, but web extensions often don't have this, so hardcode it for now. Should not have any ramifications.
 const STATIC_COUNTERPARTY_NODE_ID: &str =
     "02fc8e97419286cf05e5d133f41ff6d51f691dda039e9dc007245a421e2c7ec61c";
@@ -93,6 +91,11 @@ fn main() {
             "Unknown Bitcoin Network, make sure to set BITCOIN_NETWORK in your env variables"
         ),
     };
+    let num_confirmations: u32 = env::var("NUM_CONFIRMATIONS")
+        .unwrap_or("14".to_string())
+        .parse()
+        .unwrap_or(14);
+
     let refund_delay_days: u32 = env::var("REFUND_DELAY_DAYS")
         .unwrap_or("14".to_string())
         .parse()
@@ -136,7 +139,7 @@ fn main() {
     // Set up time provider
     let time_provider = SystemTimeProvider {};
     let manager_options = ManagerOptions {
-        nb_confirmations: 1,
+        nb_confirmations: num_confirmations,
         refund_delay: RefundDelayWindow {
             min: (refund_delay_days / 2) * 86400,
             max: refund_delay_days * 86400,
@@ -174,6 +177,7 @@ fn main() {
             blockchain2.clone(),
             funded_url.clone(),
             &mut funded_uuids,
+            num_confirmations,
         );
         debug!("Wallet balance: {}", wallet.get_balance());
         wallet
@@ -248,6 +252,7 @@ fn periodic_check(
     blockchain: Arc<dyn Blockchain>,
     funded_url: String,
     funded_uuids: &mut Vec<String>,
+    num_confirmations: u32,
 ) -> Response {
     let mut collected_response = json!({});
     let mut man = manager.lock().unwrap();
@@ -276,7 +281,7 @@ fn periodic_check(
                     0
                 }
             };
-            if confirmations >= NUM_CONFIRMATIONS {
+            if confirmations >= num_confirmations {
                 let uuid = c.accepted_contract.offered_contract.contract_info[0]
                     .oracle_announcements[0]
                     .oracle_event
