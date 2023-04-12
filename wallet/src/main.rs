@@ -21,7 +21,7 @@ use dlc_manager::{
         contract_input::{ContractInput, ContractInputInfo, OracleInput},
         Contract,
     },
-    manager::Manager,
+    manager::{Manager, ManagerOptions, RefundDelayWindow},
     Blockchain, Oracle, Storage, SystemTimeProvider, Wallet,
 };
 use dlc_messages::{AcceptDlc, Message};
@@ -93,6 +93,10 @@ fn main() {
             "Unknown Bitcoin Network, make sure to set BITCOIN_NETWORK in your env variables"
         ),
     };
+    let refund_delay_days: u32 = env::var("REFUND_DELAY_DAYS")
+        .unwrap_or("14".to_string())
+        .parse()
+        .unwrap_or(14);
 
     // ELECTRUM / ELECTRS
     let electrs_host =
@@ -131,6 +135,14 @@ fn main() {
 
     // Set up time provider
     let time_provider = SystemTimeProvider {};
+    let manager_options = ManagerOptions {
+        nb_confirmations: 1,
+        refund_delay: RefundDelayWindow {
+            min: (refund_delay_days / 2) * 86400,
+            max: refund_delay_days * 86400,
+        },
+        ..Default::default()
+    };
 
     // Create the DLC Manager
     let manager = Arc::new(Mutex::new(
@@ -141,6 +153,7 @@ fn main() {
             oracles,
             Arc::new(time_provider),
             Arc::clone(&blockchain),
+            Some(manager_options),
         )
         .unwrap(),
     ));
