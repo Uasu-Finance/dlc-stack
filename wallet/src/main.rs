@@ -92,9 +92,9 @@ fn main() {
         ),
     };
     let num_confirmations: u32 = env::var("NUM_CONFIRMATIONS")
-        .unwrap_or("14".to_string())
+        .unwrap_or("1".to_string())
         .parse()
-        .unwrap_or(14);
+        .unwrap_or(1);
 
     let refund_delay_days: u32 = env::var("REFUND_DELAY_DAYS")
         .unwrap_or("14".to_string())
