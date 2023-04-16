@@ -154,7 +154,11 @@ fn main() {
     let manager2 = manager.clone();
     let blockchain2 = blockchain.clone();
     info!("periodic_check loop thread starting");
-    debug!("Wallet address: {:?}", wallet.get_new_address());
+
+    let address = wallet
+        .get_new_address()
+        .expect("Wallet to generate a new address");
+    debug!("Wallet address: {:?}", address);
     thread::spawn(move || loop {
         periodic_check(
             manager2.clone(),
@@ -162,7 +166,11 @@ fn main() {
             funded_url.clone(),
             &mut funded_uuids,
         );
-        debug!("Wallet balance: {}", wallet.get_balance());
+        debug!(
+            "Wallet address: {} - balance: {}",
+            address,
+            wallet.get_balance()
+        );
         wallet
             .refresh()
             .unwrap_or_else(|e| warn!("Error refreshing wallet {e}"));
@@ -230,6 +238,14 @@ fn main() {
     });
 }
 
+fn hex_str(value: &[u8]) -> String {
+    let mut res = String::with_capacity(64);
+    for v in value {
+        write!(res, "{:02x}", v).unwrap();
+    }
+    res
+}
+
 fn periodic_check(
     manager: Arc<Mutex<DlcManager>>,
     blockchain: Arc<dyn Blockchain>,
@@ -249,7 +265,8 @@ fn periodic_check(
 
     let store = man.get_store();
 
-    collected_response["signed_contracts"] = store
+    // Loop through all signed contracts, checking if we should run the "set-funded" action
+    let _ = store
         .get_signed_contracts()
         .unwrap_or(vec![])
         .iter()
@@ -305,35 +322,62 @@ fn periodic_check(
                 }
             }
             c.accepted_contract.get_contract_id_string()
-        })
-        .collect();
+        });
 
-    collected_response["confirmed_contracts"] = store
-        .get_confirmed_contracts()
-        .unwrap_or(vec![])
-        .iter()
-        .map(|c| c.accepted_contract.get_contract_id_string())
-        .collect();
+    let mut collected_contracts: Vec<Vec<String>> = vec![
+        vec![],
+        vec![],
+        vec![],
+        vec![],
+        vec![],
+        vec![],
+        vec![],
+        vec![],
+        vec![],
+    ];
 
-    collected_response["preclosed_contracts"] = store
-        .get_preclosed_contracts()
-        .unwrap_or(vec![])
-        .iter()
-        .map(|c| c.signed_contract.accepted_contract.get_contract_id_string())
-        .collect();
+    let contracts = store
+        .get_contracts()
+        .expect("Error retrieving contract list.");
 
-    let mut closed_contracts: Vec<String> = Vec::new();
-    for val in store.get_contracts().unwrap_or(vec![]).iter() {
-        if let Contract::Closed(c) = val {
-            let mut string_id = String::with_capacity(32 * 2 + 2);
-            string_id.push_str("0x");
-            for i in &c.contract_id {
-                write!(string_id, "{:02x}", i).unwrap();
+    for contract in contracts {
+        let id = hex_str(&contract.get_id());
+        match contract {
+            Contract::Offered(_) => {
+                collected_contracts[0].push(id);
             }
-            closed_contracts.push(string_id);
+            Contract::Accepted(_) => {
+                collected_contracts[1].push(id);
+            }
+            Contract::Confirmed(_) => {
+                collected_contracts[2].push(id);
+            }
+            Contract::Signed(_) => {
+                collected_contracts[3].push(id);
+            }
+            Contract::Closed(_) => {
+                collected_contracts[4].push(id);
+            }
+            Contract::Refunded(_) => {
+                collected_contracts[5].push(id);
+            }
+            Contract::FailedAccept(_) | Contract::FailedSign(_) => {
+                collected_contracts[6].push(id);
+            }
+            Contract::Rejected(_) => collected_contracts[7].push(id),
+            Contract::PreClosed(_) => collected_contracts[8].push(id),
         }
     }
-    collected_response["closed_contracts"] = closed_contracts.into();
+
+    collected_response["Offered"] = collected_contracts[0].clone().into();
+    collected_response["Accepted"] = collected_contracts[1].clone().into();
+    collected_response["Confirmed"] = collected_contracts[2].clone().into();
+    collected_response["Signed"] = collected_contracts[3].clone().into();
+    collected_response["Closed"] = collected_contracts[4].clone().into();
+    collected_response["Refunded"] = collected_contracts[5].clone().into();
+    collected_response["Failed"] = collected_contracts[6].clone().into();
+    collected_response["Rejected"] = collected_contracts[7].clone().into();
+    collected_response["PreClosed"] = collected_contracts[8].clone().into();
 
     debug!("check_close collected_response: {}", collected_response);
     Response::json(&collected_response)
