@@ -140,10 +140,10 @@ fn main() {
     let time_provider = SystemTimeProvider {};
     let manager_options = ManagerOptions {
         nb_confirmations: num_confirmations,
-        refund_delay: RefundDelayWindow {
-            min: (refund_delay_days / 2) * 86400,
-            max: refund_delay_days * 86400,
-        },
+        // refund_delay: RefundDelayWindow {
+        //     min: (refund_delay_days / 2) * 86400,
+        //     max: refund_delay_days * 86400,
+        // },
         ..Default::default()
     };
 
