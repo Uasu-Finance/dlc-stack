@@ -267,6 +267,8 @@ fn periodic_check(
     let store = man.get_store();
 
     // Loop through all signed contracts, checking if we should run the "set-funded" action
+    // This should happen before the periodic_check, as periodic_check might move contracts to the next state before we mark them as funded.
+    // Also, periodic_check might error, which also could return thus not running this code.
     let _ = store
         .get_signed_contracts()
         .unwrap_or(vec![])
