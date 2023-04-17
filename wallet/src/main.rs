@@ -264,14 +264,6 @@ fn periodic_check(
     let mut collected_response = json!({});
     let mut man = manager.lock().unwrap();
 
-    match man.periodic_check() {
-        Ok(_) => (),
-        Err(e) => {
-            info!("Error in periodic_check, will retry: {}", e.to_string());
-            return Response::empty_400();
-        }
-    };
-
     let store = man.get_store();
 
     // Loop through all signed contracts, checking if we should run the "set-funded" action
@@ -289,6 +281,7 @@ fn periodic_check(
                     0
                 }
             };
+
             if confirmations >= num_confirmations {
                 let uuid = c.accepted_contract.offered_contract.contract_info[0]
                     .oracle_announcements[0]
@@ -389,6 +382,16 @@ fn periodic_check(
     collected_response["PreClosed"] = collected_contracts[8].clone().into();
 
     debug!("check_close collected_response: {}", collected_response);
+
+    // Any error within this function raises immediately, so the following logic won't run.
+    match man.periodic_check() {
+        Ok(_) => (),
+        Err(e) => {
+            info!("Error in periodic_check, will retry: {}", e.to_string());
+            return Response::empty_400();
+        }
+    };
+
     Response::json(&collected_response)
 }
 
