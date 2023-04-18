@@ -17,14 +17,11 @@ use std::{
 
 use bitcoin::Address;
 use dlc_manager::{
-    contract::{
-        contract_input::{ContractInput, ContractInputInfo, OracleInput},
-        Contract,
-    },
+    contract::contract_input::{ContractInput, ContractInputInfo, OracleInput},
     manager::Manager,
-    Blockchain, Oracle, Storage, SystemTimeProvider, Wallet,
+    Oracle, SystemTimeProvider, Wallet,
 };
-use dlc_messages::{AcceptDlc, Message};
+use dlc_messages::{AcceptDlc, Message, OfferDlc, SignDlc};
 use dlc_sled_storage_provider::SledStorageProvider;
 // use electrs_blockchain_provider::ElectrsBlockchainProvider;
 use lightning::chain::chaininterface::{ConfirmationTarget, FeeEstimator};
@@ -36,8 +33,6 @@ use simple_wallet::SimpleWallet;
 use oracle_client::P2PDOracleClient;
 use rouille::Response;
 use serde::{Deserialize, Serialize};
-use serde_json::json;
-use std::fmt::Write as _;
 use utils::get_numerical_contract_info;
 
 mod oracle_client;
@@ -79,10 +74,7 @@ fn main() {
     env_logger::init();
     let oracle_url: String = env::var("ORACLE_URL").unwrap_or("http://localhost:8080".to_string());
 
-    let funded_url: String = env::var("FUNDED_URL")
-        .unwrap_or("https://stacks-observer-mocknet.herokuapp.com/funded".to_string());
     let wallet_backend_port: String = env::var("WALLET_BACKEND_PORT").unwrap_or("8085".to_string());
-    let mut funded_uuids: Vec<String> = vec![];
 
     // Setup Blockchain Connection Object
     let active_network = match env::var("BITCOIN_NETWORK").as_deref() {
@@ -153,17 +145,9 @@ fn main() {
         .parse::<u64>()
         .unwrap_or(10);
 
-    let manager2 = manager.clone();
-    let blockchain2 = blockchain.clone();
     info!("periodic_check loop thread starting");
     debug!("Wallet address: {:?}", wallet.get_new_address());
     thread::spawn(move || loop {
-        periodic_check(
-            manager2.clone(),
-            blockchain2.clone(),
-            funded_url.clone(),
-            &mut funded_uuids,
-        );
         debug!("Wallet balance: {}", wallet.get_balance());
         wallet
             .refresh()
@@ -212,133 +196,39 @@ fn main() {
                 (OPTIONS) (/offer/accept) => {
                     add_access_control_headers(Response::empty_204())
                 },
-                (PUT) (/offer/accept) => {
-                    info!("Call PUT (accept) offer {:?}", request);
+                (PUT) (/offer/receive) => {
+                    info!("Call PUT (receive) offer {:?}", request);
                     #[derive(Deserialize)]
                     #[serde(rename_all = "camelCase")]
-                    struct AcceptOfferRequest {
-                        accept_message: String,
+                    struct ReceiveOfferRequest {
+                        receive_offer_message: String,
                     }
-                    let json: AcceptOfferRequest = try_or_400!(rouille::input::json_input(request));
-                    let accept_dlc: AcceptDlc = match serde_json::from_str(&json.accept_message)
+                    let json: ReceiveOfferRequest = try_or_400!(rouille::input::json_input(request));
+                    let receive_offer_dlc: OfferDlc = match serde_json::from_str(&json.receive_offer_message)
                     {
                         Ok(dlc) => dlc,
                         Err(e) => return add_access_control_headers(Response::json(&ErrorsResponse{status: 400, errors: vec![ErrorResponse{message: e.to_string(), code: None}]}).with_status_code(400)),
                     };
-                    accept_offer(accept_dlc, manager.clone())
+                    receive_offer(receive_offer_dlc, manager.clone())
+                },
+                (PUT) (/offer/sign) => {
+                    info!("Call PUT (sign) offer {:?}", request);
+                    #[derive(Deserialize)]
+                    #[serde(rename_all = "camelCase")]
+                    struct SignOfferRequest {
+                        sign_message: String,
+                    }
+                    let json: SignOfferRequest = try_or_400!(rouille::input::json_input(request));
+                    let sign_dlc: SignDlc = match serde_json::from_str(&json.sign_message)
+                    {
+                        Ok(dlc) => dlc,
+                        Err(e) => return add_access_control_headers(Response::json(&ErrorsResponse{status: 400, errors: vec![ErrorResponse{message: e.to_string(), code: None}]}).with_status_code(400)),
+                    };
+                    sign_offer(sign_dlc, manager.clone())
                 },
                 _ => rouille::Response::empty_404()
         )
     });
-}
-
-fn periodic_check(
-    manager: Arc<Mutex<DlcManager>>,
-    blockchain: Arc<dyn Blockchain>,
-    funded_url: String,
-    funded_uuids: &mut Vec<String>,
-) -> Response {
-    let mut collected_response = json!({});
-    let mut man = manager.lock().unwrap();
-
-    match man.periodic_check() {
-        Ok(_) => (),
-        Err(e) => {
-            info!("Error in periodic_check, will retry: {}", e.to_string());
-            return Response::empty_400();
-        }
-    };
-
-    let store = man.get_store();
-
-    // collected_response["signed_contracts"] = store
-    //     .get_signed_contracts()
-    //     .unwrap_or(vec![])
-    //     .iter()
-    //     .map(|c| {
-    //         let confirmations = match blockchain
-    //             .get_transaction_confirmations(&c.accepted_contract.dlc_transactions.fund.txid())
-    //         {
-    //             Ok(confirms) => confirms,
-    //             Err(e) => {
-    //                 info!("Error checking confirmations: {}", e.to_string());
-    //                 0
-    //             }
-    //         };
-    //         if confirmations >= NUM_CONFIRMATIONS {
-    //             let uuid = c.accepted_contract.offered_contract.contract_info[0]
-    //                 .oracle_announcements[0]
-    //                 .oracle_event
-    //                 .event_id
-    //                 .clone();
-    //             if !funded_uuids.contains(&uuid) {
-    //                 let mut post_body = HashMap::new();
-    //                 post_body.insert("uuid", &uuid);
-
-    //                 let client = reqwest::blocking::Client::builder()
-    //                     .use_rustls_tls()
-    //                     .build();
-    //                 if client.is_ok() {
-    //                     let res = client.unwrap().post(&funded_url).json(&post_body).send();
-
-    //                     match res {
-    //                         Ok(res) => match res.error_for_status() {
-    //                             Ok(_res) => {
-    //                                 funded_uuids.push(uuid.clone());
-    //                                 info!(
-    //                                     "Success setting funded to true: {}, {}",
-    //                                     uuid,
-    //                                     _res.status()
-    //                                 );
-    //                             }
-    //                             Err(e) => {
-    //                                 info!(
-    //                                     "Error setting funded to true: {}: {}",
-    //                                     uuid,
-    //                                     e.to_string()
-    //                                 );
-    //                             }
-    //                         },
-    //                         Err(e) => {
-    //                             info!("Error setting funded to true: {}: {}", uuid, e.to_string());
-    //                         }
-    //                     }
-    //                 }
-    //             }
-    //         }
-    //         c.accepted_contract.get_contract_id_string()
-    //     })
-    //     .collect();
-
-    collected_response["confirmed_contracts"] = store
-        .get_confirmed_contracts()
-        .unwrap_or(vec![])
-        .iter()
-        .map(|c| c.accepted_contract.get_contract_id_string())
-        .collect();
-
-    collected_response["preclosed_contracts"] = store
-        .get_preclosed_contracts()
-        .unwrap_or(vec![])
-        .iter()
-        .map(|c| c.signed_contract.accepted_contract.get_contract_id_string())
-        .collect();
-
-    let mut closed_contracts: Vec<String> = Vec::new();
-    for val in store.get_contracts().unwrap_or(vec![]).iter() {
-        if let Contract::Closed(c) = val {
-            let mut string_id = String::with_capacity(32 * 2 + 2);
-            string_id.push_str("0x");
-            for i in &c.contract_id {
-                write!(string_id, "{:02x}", i).unwrap();
-            }
-            closed_contracts.push(string_id);
-        }
-    }
-    collected_response["closed_contracts"] = closed_contracts.into();
-
-    debug!("check_close collected_response: {}", collected_response);
-    Response::json(&collected_response)
 }
 
 fn create_new_offer(
@@ -401,14 +291,14 @@ fn create_new_offer(
     }
 }
 
-fn accept_offer(accept_dlc: AcceptDlc, manager: Arc<Mutex<DlcManager>>) -> Response {
-    if let Some(Message::Sign(sign)) = match manager.lock().unwrap().on_dlc_message(
-        &Message::Accept(accept_dlc),
+fn receive_offer(dlc_offer_message: OfferDlc, manager: Arc<Mutex<DlcManager>>) -> Response {
+    match manager.lock().unwrap().on_dlc_message(
+        &Message::Offer(dlc_offer_message.clone()),
         STATIC_COUNTERPARTY_NODE_ID.parse().unwrap(),
     ) {
-        Ok(dlc) => dlc,
+        Ok(_) => (),
         Err(e) => {
-            info!("DLC manager - accept offer error: {}", e.to_string());
+            info!("DLC manager - receive offer error: {}", e.to_string());
             return add_access_control_headers(
                 Response::json(&ErrorsResponse {
                     status: 400,
@@ -420,20 +310,42 @@ fn accept_offer(accept_dlc: AcceptDlc, manager: Arc<Mutex<DlcManager>>) -> Respo
                 .with_status_code(400),
             );
         }
-    } {
-        add_access_control_headers(Response::json(&sign))
-    } else {
-        panic!();
+    }
+
+    let temporary_contract_id = dlc_offer_message.temporary_contract_id;
+
+    let (_, _, accept_msg) = manager
+        .lock()
+        .unwrap()
+        .accept_contract_offer(&temporary_contract_id)
+        .expect("Error accepting contract offer");
+
+    add_access_control_headers(Response::json(&accept_msg))
+}
+
+fn sign_offer(dlc_sign_message: SignDlc, manager: Arc<Mutex<DlcManager>>) -> Response {
+    match manager.lock().unwrap().on_dlc_message(
+        &Message::Sign(dlc_sign_message),
+        STATIC_COUNTERPARTY_NODE_ID.parse().unwrap(),
+    ) {
+        Ok(_) => add_access_control_headers(Response::json(&"OK".to_string())),
+        Err(e) => {
+            info!("DLC manager - sign offer error: {}", e.to_string());
+            return add_access_control_headers(
+                Response::json(&ErrorsResponse {
+                    status: 400,
+                    errors: vec![ErrorResponse {
+                        message: e.to_string(),
+                        code: None,
+                    }],
+                })
+                .with_status_code(400),
+            );
+        }
     }
 }
 
-// fn delete_all_offers(manager: Arc<Mutex<DlcManager>>, response: Response) -> Response {
-//     info!("Deleting all contracts from dlc-store");
-//     let man = manager.lock().unwrap();
-//     man.get_store().delete_contracts();
-//     return response;
-// }
-
+// Can remove this when we implement BDK, assuming BDK also doesn't do reserving (locking) of utxos
 fn unlock_utxos(
     wallet: Arc<SimpleWallet<Arc<MockBlockchainProvider>, Arc<SledStorageProvider>>>,
     response: Response,
