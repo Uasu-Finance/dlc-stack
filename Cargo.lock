@@ -1175,10 +1175,11 @@ dependencies = [
  "hex",
  "lightning 0.0.113",
  "log",
- "mock-blockchain-provider",
  "mockito",
+ "mocks",
  "reqwest",
  "rouille",
+ "rust-bitcoin-coin-selection",
  "secp256k1-zkp 0.7.0",
  "serde",
  "serde_json",
@@ -1969,17 +1970,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "lightning-block-sync"
-version = "0.0.113"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e2fc7227008536500026866e90d5e2db2da2725c5cdc7d19013df743d9de3e68"
-dependencies = [
- "bitcoin 0.29.2",
- "futures-util",
- "lightning 0.0.113",
-]
-
-[[package]]
 name = "link-cplusplus"
 version = "1.0.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2126,19 +2116,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "mock-blockchain-provider"
-version = "0.1.0"
-dependencies = [
- "bitcoin 0.29.2",
- "dlc-manager",
- "lightning 0.0.113",
- "lightning-block-sync",
- "rust-bitcoin-coin-selection",
- "serde",
- "simple-wallet",
-]
-
-[[package]]
 name = "mockito"
 version = "0.31.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2154,6 +2131,20 @@ dependencies = [
  "serde_json",
  "serde_urlencoded",
  "similar",
+]
+
+[[package]]
+name = "mocks"
+version = "0.1.0"
+source = "git+https://github.com/p2pderivatives/rust-dlc?tag=v0.4.0#51517f3f6ad764953983b001efc2eac197ddb080"
+dependencies = [
+ "bitcoin 0.29.2",
+ "dlc 0.4.0",
+ "dlc-manager",
+ "dlc-messages 0.4.0",
+ "lightning 0.0.113",
+ "secp256k1-zkp 0.7.0",
+ "simple-wallet",
 ]
 
 [[package]]

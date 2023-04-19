@@ -8,13 +8,13 @@ version = "0.4.0"
 [lib]
 crate-type = ["cdylib"]
 
-[[bin]]
-name = "dlc-protocol-wallet"
-path = "src/lib.rs"
+# [[bin]]
+# name = "dlc-protocol-wallet"
+# path = "src/lib.rs"
 
 [dependencies]
 base64 = "0.13.1"
-bitcoin = {version = "0.29.2"}
+bitcoin = {version = "0.29.2", features=["serde"]}
 chrono = {version = "0.4.19", features = ["serde"]}
 # dlc = {version = "0.4.0", git = "https://github.com/p2pderivatives/rust-dlc", tag="v0.4.0", features = ["use-serde"]}
 dlc-manager = {version = "0.4.0", git = "https://github.com/p2pderivatives/rust-dlc", tag="v0.4.0", features = ["use-serde"]}
@@ -22,7 +22,8 @@ dlc-messages = {version = "0.4.0", git = "https://github.com/p2pderivatives/rust
 dlc-trie = {version = "0.4.0", git = "https://github.com/p2pderivatives/rust-dlc", tag="v0.4.0", features = ["use-serde"]}
 dlc-sled-storage-provider = {version = "0.1.0", git = "https://github.com/p2pderivatives/rust-dlc", tag="v0.4.0", features=["wallet"]}
 # electrs-blockchain-provider = {version = "0.1.0", git = "https://github.com/p2pderivatives/rust-dlc", tag="v0.4.0"}
-mock-blockchain-provider = {path = "../mock-blockchain-provider"}
+rust-bitcoin-coin-selection = {version = "0.1.0", git = "https://github.com/p2pderivatives/rust-bitcoin-coin-selection", features = ["rand"]}
+mocks = {version = "0.1.0", git = "https://github.com/p2pderivatives/rust-dlc", tag="v0.4.0"}
 env_logger = "0.9.0"
 getrandom = { version = "0.2", features = ["js"] }
 lightning = {version = "0.0.113" }
