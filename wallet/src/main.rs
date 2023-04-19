@@ -22,7 +22,7 @@ use dlc_manager::{
         Contract,
     },
     manager::{Manager, ManagerOptions},
-    Blockchain, Oracle, Storage, SystemTimeProvider, Wallet,
+    Oracle, Storage, SystemTimeProvider, Wallet,
 };
 use dlc_messages::{AcceptDlc, Message};
 use dlc_sled_storage_provider::SledStorageProvider;
@@ -79,7 +79,7 @@ fn main() {
     let funded_url: String = env::var("FUNDED_URL")
         .unwrap_or("https://stacks-observer-mocknet.herokuapp.com/funded".to_string());
     let wallet_backend_port: String = env::var("WALLET_BACKEND_PORT").unwrap_or("8085".to_string());
-    let mut funded_uuids: Vec<String> = vec![];
+    let mut funded_contract_ids: Vec<String> = vec![];
 
     // Setup Blockchain Connection Object
     let active_network = match env::var("BITCOIN_NETWORK").as_deref() {
@@ -159,7 +159,6 @@ fn main() {
         .unwrap_or(10);
 
     let manager2 = manager.clone();
-    let blockchain2 = blockchain.clone();
     info!("periodic_check loop thread starting");
 
     let address = wallet
@@ -169,10 +168,8 @@ fn main() {
     thread::spawn(move || loop {
         periodic_check(
             manager2.clone(),
-            blockchain2.clone(),
             funded_url.clone(),
-            &mut funded_uuids,
-            num_confirmations,
+            &mut funded_contract_ids,
         );
         debug!(
             "Wallet address: {} - balance: {}",
@@ -256,77 +253,12 @@ fn hex_str(value: &[u8]) -> String {
 
 fn periodic_check(
     manager: Arc<Mutex<DlcManager>>,
-    blockchain: Arc<dyn Blockchain>,
     funded_url: String,
-    funded_uuids: &mut Vec<String>,
-    num_confirmations: u32,
+    funded_contract_ids: &mut Vec<String>,
 ) -> Response {
     let mut collected_response = json!({});
     let mut man = manager.lock().unwrap();
-
     let store = man.get_store();
-
-    // Loop through all signed contracts, checking if we should run the "set-funded" action
-    // This should happen before the periodic_check, as periodic_check might move contracts to the next state before we mark them as funded.
-    // Also, periodic_check might error, which also could return thus not running this code.
-    let _ = store
-        .get_signed_contracts()
-        .unwrap_or(vec![])
-        .iter()
-        .map(|c| {
-            let confirmations = match blockchain
-                .get_transaction_confirmations(&c.accepted_contract.dlc_transactions.fund.txid())
-            {
-                Ok(confirms) => confirms,
-                Err(e) => {
-                    info!("Error checking confirmations: {}", e.to_string());
-                    0
-                }
-            };
-
-            if confirmations >= num_confirmations {
-                let uuid = c.accepted_contract.offered_contract.contract_info[0]
-                    .oracle_announcements[0]
-                    .oracle_event
-                    .event_id
-                    .clone();
-                if !funded_uuids.contains(&uuid) {
-                    let mut post_body = HashMap::new();
-                    post_body.insert("uuid", &uuid);
-
-                    let client = reqwest::blocking::Client::builder()
-                        .use_rustls_tls()
-                        .build();
-                    if client.is_ok() {
-                        let res = client.unwrap().post(&funded_url).json(&post_body).send();
-
-                        match res {
-                            Ok(res) => match res.error_for_status() {
-                                Ok(_res) => {
-                                    funded_uuids.push(uuid.clone());
-                                    info!(
-                                        "Success setting funded to true: {}, {}",
-                                        uuid,
-                                        _res.status()
-                                    );
-                                }
-                                Err(e) => {
-                                    info!(
-                                        "Error setting funded to true: {}: {}",
-                                        uuid,
-                                        e.to_string()
-                                    );
-                                }
-                            },
-                            Err(e) => {
-                                info!("Error setting funded to true: {}: {}", uuid, e.to_string());
-                            }
-                        }
-                    }
-                }
-            }
-            c.accepted_contract.get_contract_id_string()
-        });
 
     let mut collected_contracts: Vec<Vec<String>> = vec![
         vec![],
@@ -353,8 +285,48 @@ fn periodic_check(
             Contract::Accepted(_) => {
                 collected_contracts[1].push(id);
             }
-            Contract::Confirmed(_) => {
-                collected_contracts[2].push(id);
+            Contract::Confirmed(c) => {
+                collected_contracts[2].push(id.clone());
+                if !funded_contract_ids.contains(&id) {
+                    let uuid = c.accepted_contract.offered_contract.contract_info[0]
+                        .oracle_announcements[0]
+                        .oracle_event
+                        .event_id
+                        .clone();
+
+                    let mut post_body = HashMap::new();
+                    post_body.insert("uuid", &uuid);
+
+                    let client = reqwest::blocking::Client::builder()
+                        .use_rustls_tls()
+                        .build();
+                    if client.is_ok() {
+                        let res = client.unwrap().post(&funded_url).json(&post_body).send();
+
+                        match res {
+                            Ok(res) => match res.error_for_status() {
+                                Ok(_res) => {
+                                    funded_contract_ids.push(uuid.clone());
+                                    info!(
+                                        "Success setting funded to true: {}, {}",
+                                        uuid,
+                                        _res.status()
+                                    );
+                                }
+                                Err(e) => {
+                                    info!(
+                                        "Error setting funded to true: {}: {}",
+                                        uuid,
+                                        e.to_string()
+                                    );
+                                }
+                            },
+                            Err(e) => {
+                                info!("Error setting funded to true: {}: {}", uuid, e.to_string());
+                            }
+                        }
+                    }
+                }
             }
             Contract::Signed(_) => {
                 collected_contracts[3].push(id);
