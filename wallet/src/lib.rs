@@ -1,29 +1,21 @@
 #![allow(unreachable_code)]
 extern crate log;
 
-// use wasm_bindgen::prelude::*;
+use dlc_messages::{Message, OfferDlc, SignDlc};
+use wasm_bindgen::prelude::*;
 
 use std::{
-    cmp,
     collections::HashMap,
-    env, panic,
     str::FromStr,
     sync::{Arc, Mutex},
-    thread,
-    time::Duration,
     vec,
 };
 
 use bitcoin::{Address, Network};
-use dlc_manager::{
-    contract::contract_input::{ContractInput, ContractInputInfo, OracleInput},
-    manager::Manager,
-    Oracle, SystemTimeProvider, Wallet,
-};
-use dlc_messages::{AcceptDlc, Message, OfferDlc, SignDlc};
+use dlc_manager::{manager::Manager, Oracle, SystemTimeProvider};
 use dlc_sled_storage_provider::SledStorageProvider;
-// use electrs_blockchain_provider::ElectrsBlockchainProvider;
-use lightning::chain::chaininterface::{ConfirmationTarget, FeeEstimator};
+// use electrs_blockchain_provectrsBlockchainProvider;
+
 use log::{debug, info, warn};
 // use mock_blockchain_provider::MockBlockchainProvider;
 use mocks::{memory_storage_provider::MemoryStorage, mock_blockchain::MockBlockchain};
@@ -34,7 +26,6 @@ use simple_wallet::SimpleWallet;
 use oracle_client::P2PDOracleClient;
 use rouille::Response;
 use serde::{Deserialize, Serialize};
-use utils::get_numerical_contract_info;
 
 mod oracle_client;
 // mod storage;
