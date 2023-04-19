@@ -306,23 +306,27 @@ fn periodic_check(
                         match res {
                             Ok(res) => match res.error_for_status() {
                                 Ok(_res) => {
-                                    funded_contract_ids.push(uuid.clone());
+                                    funded_contract_ids.push(id.clone());
                                     info!(
-                                        "Success setting funded to true: {}, {}",
+                                        "Success setting funded to true on uuid: {}, {}",
                                         uuid,
                                         _res.status()
                                     );
                                 }
                                 Err(e) => {
                                     info!(
-                                        "Error setting funded to true: {}: {}",
+                                        "Error setting funded to true on uuid: {}: {}",
                                         uuid,
                                         e.to_string()
                                     );
                                 }
                             },
                             Err(e) => {
-                                info!("Error setting funded to true: {}: {}", uuid, e.to_string());
+                                info!(
+                                    "Error setting funded to true on uuid: {}: {}",
+                                    uuid,
+                                    e.to_string()
+                                );
                             }
                         }
                     }
