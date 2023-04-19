@@ -6,7 +6,10 @@ name = "dlc-protocol-wallet"
 version = "0.4.0"
 
 [lib]
-crate-type = ["cdylib"]
+crate-type = ["cdylib", "rlib"]
+
+[features]
+default = ["console_error_panic_hook"]
 
 [dependencies]
 base64 = "0.13.1"
@@ -16,7 +19,7 @@ chrono = {version = "0.4.19", features = ["serde"]}
 dlc-manager = {version = "0.4.0", git = "https://github.com/p2pderivatives/rust-dlc", tag="v0.4.0", features = ["use-serde"]}
 dlc-messages = {version = "0.4.0", git = "https://github.com/p2pderivatives/rust-dlc", tag="v0.4.0", features = ["use-serde"]}
 dlc-trie = {version = "0.4.0", git = "https://github.com/p2pderivatives/rust-dlc", tag="v0.4.0", features = ["use-serde"]}
-dlc-sled-storage-provider = {version = "0.1.0", git = "https://github.com/p2pderivatives/rust-dlc", tag="v0.4.0", features=["wallet"]}
+# dlc-sled-storage-provider = {version = "0.1.0", git = "https://github.com/p2pderivatives/rust-dlc", tag="v0.4.0", features=["wallet"]}
 # electrs-blockchain-provider = {version = "0.1.0", git = "https://github.com/p2pderivatives/rust-dlc", tag="v0.4.0"}
 rust-bitcoin-coin-selection = {version = "0.1.0", git = "https://github.com/p2pderivatives/rust-bitcoin-coin-selection", features = ["rand"]}
 mocks = {version = "0.1.0", git = "https://github.com/p2pderivatives/rust-dlc", tag="v0.4.0"}
@@ -25,9 +28,8 @@ getrandom = { version = "0.2", features = ["js"] }
 lightning = {version = "0.0.113" }
 hex = "0.4"
 log = "0.4.17"
-reqwest = {version = "0.11.16"}
+reqwest = {version = "0.11.16", features = ["json"] }
 # dlc-clients = { path = "../clients"  }
-rouille = {version = "3.5.0"}
 serde = {version = "*", features = ["derive"]}
 serde_json = "1.0.81"
 secp256k1-zkp = {version = "0.7.0" }
@@ -35,13 +37,30 @@ simple-wallet = {version = "0.1.0", git = "https://github.com/p2pderivatives/rus
 sled = "0.34"
 # [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 # tokio = {version = "1.23.0" } #, optional = true}
+serde-wasm-bindgen = "0.4"
 wasm-bindgen-futures = {version="0.4.34"}
 wasm-bindgen = { version = "0.2.84", features = ["serde-serialize"]  }
-# warp = "0.3"
+# The `console_error_panic_hook` crate provides better debugging of panics by
+# logging them with `console.error`. This is great for development, but requires
+# all the `std::fmt` and `std::panicking` infrastructure, so isn't great for
+# code size when deploying.
+console_error_panic_hook = { version = "0.1.6", optional = true }
+js-sys = "0.3.61"
 
 [dev-dependencies]
 mockito = "0.31.0"
+wasm-bindgen-test = "0.3.13"
+
+[dependencies.web-sys]
+version = "0.3"
+features = [
+  "console",
+]
 
 # [features]
 # async_support = ["dep:tokio", "dlc-clients/async-support"]
 # wasm_support = ["dep:wasm-bindgen", "dep:wasm-bindgen-futures", "dlc-clients/wasm-support"]
+
+[profile.release]
+# Tell `rustc` to optimize for small code size.
+opt-level = "s"
