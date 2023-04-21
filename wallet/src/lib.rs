@@ -84,7 +84,8 @@ pub struct JsDLCInterfaceOptions {
 impl Default for JsDLCInterfaceOptions {
     fn default() -> Self {
         Self {
-            oracle_url: "https://testnet.dlc.link/oracle".to_string(),
+            // oracle_url: "https://testnet.dlc.link/oracle".to_string(),
+            oracle_url: "http://localhost:8081".to_string(),
             network: "regtest".to_string(),
             electrs_host: "https://blockstream.info/testnet/api/".to_string(),
         }
