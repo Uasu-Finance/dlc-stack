@@ -151,6 +151,14 @@ impl JsDLCInterface {
         JsDLCInterface { options, manager }
     }
 
+    pub fn oracle_url(&self) -> String {
+        self.options.oracle_url.clone()
+    }
+
+    pub fn send_options_to_js(&self) -> JsValue {
+        serde_wasm_bindgen::to_value(&self.options).unwrap()
+    }
+
     pub async fn receive_offer(&self, dlc_offer_message: Vec<u8>) -> Uint8Array {
         let dlc_offer_message: OfferDlc = serde_json::from_slice(&dlc_offer_message).unwrap();
         match self.manager.lock().unwrap().on_dlc_message(
@@ -179,7 +187,8 @@ impl JsDLCInterface {
         // return accept_msg;
     }
 
-    pub async fn sign_offer(&self, dlc_sign_message: Vec<u8>) -> () {
+    pub async fn sign_offer(&self, dlc_sign_message: Uint8Array) -> () {
+        let dlc_sign_message = dlc_sign_message.to_vec();
         let dlc_sign_message: SignDlc = serde_json::from_slice(&dlc_sign_message).unwrap();
         match self.manager.lock().unwrap().on_dlc_message(
             &Message::Sign(dlc_sign_message),
