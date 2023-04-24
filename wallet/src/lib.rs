@@ -4,7 +4,9 @@ extern crate log;
 extern crate console_error_panic_hook;
 
 use dlc_messages::{AcceptDlc, Message, OfferDlc, SignDlc};
-use wasm_bindgen::prelude::*;
+use gloo_utils::format::{self, JsValueSerdeExt};
+use serde_wasm_bindgen::from_value;
+use wasm_bindgen::prelude::{wasm_bindgen, JsValue};
 use web_sys::Response;
 
 use core::panic;
@@ -18,11 +20,14 @@ use std::{
 use js_sys::Uint8Array;
 
 use bitcoin::{Address, Network};
-use dlc_manager::{manager::Manager, Oracle, SystemTimeProvider};
+use dlc_manager::{
+    manager::{Manager, ManagerOptions},
+    Oracle, SystemTimeProvider,
+};
 // use dlc_sled_storage_provider::SledStorageProvider;
 // use electrs_blockchain_provectrsBlockchainProvider;
 
-use log::{debug, info, warn};
+use log::{debug, error, info, warn};
 // use mock_blockchain_provider::MockBlockchainProvider;
 use mocks::{memory_storage_provider::MemoryStorage, mock_blockchain::MockBlockchain};
 
@@ -108,11 +113,6 @@ impl JsDLCInterface {
         // Set up DLC store
         let store = MemoryStorage::new();
 
-        // Set up wallet store
-        // I think this needs to change b/c the simple wallet won't work in wasm?
-        let root_sled_path: String = "wallet_db".to_string();
-
-        let sled_path = format!("{root_sled_path}_{}", active_network);
         let wallet_store = Arc::new(MemoryStorage::new());
 
         // Set up wallet
@@ -145,6 +145,7 @@ impl JsDLCInterface {
                 oracles,
                 Arc::new(time_provider),
                 Arc::clone(&blockchain),
+                None,
             )
             .unwrap(),
         ));
@@ -160,19 +161,22 @@ impl JsDLCInterface {
         serde_wasm_bindgen::to_value(&self.options).unwrap()
     }
 
-    pub async fn receive_offer(&self, dlc_offer_message: Vec<u8>) -> Uint8Array {
-        let dlc_offer_message: OfferDlc = serde_json::from_slice(&dlc_offer_message).unwrap();
+    pub async fn receive_offer(&self, val: JsValue) -> Uint8Array {
+        clog!("receive_offer - before on_dlc_message");
+        let dlc_offer_message: OfferDlc = from_value(val).unwrap();
+        clog!("dlc_offer_message: {:?}", dlc_offer_message);
         match self.manager.lock().unwrap().on_dlc_message(
             &Message::Offer(dlc_offer_message.clone()),
             STATIC_COUNTERPARTY_NODE_ID.parse().unwrap(),
         ) {
             Ok(_) => (),
             Err(e) => {
-                info!("DLC manager - receive offer error: {}", e.to_string());
-                panic!();
+                clog!("DLC manager - receive offer error: {}", e.to_string());
+                return js_sys::Uint8Array::new_with_length(0);
             }
         }
 
+        clog!("receive_offer - after on_dlc_message");
         let temporary_contract_id = dlc_offer_message.temporary_contract_id;
 
         let (_contract_id, _public_key, accept_msg) = self
@@ -182,7 +186,10 @@ impl JsDLCInterface {
             .accept_contract_offer(&temporary_contract_id)
             .expect("Error accepting contract offer");
 
+        clog!("receive_offer - after accept_contract_offer");
+
         let accept_msg = serde_json::to_vec(&accept_msg).unwrap();
+        clog!("receive_offer - after serde_json::to_vec");
         // serde_wasm_bindgen::to_value(&accept_msg).unwrap()
         js_sys::Uint8Array::from(&accept_msg[..])
         // return accept_msg;
