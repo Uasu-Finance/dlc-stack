@@ -3,6 +3,9 @@ extern crate log;
 
 extern crate console_error_panic_hook;
 
+#[macro_use]
+extern crate lazy_static;
+
 use dlc_messages::{AcceptDlc, Message, OfferDlc, SignDlc};
 use gloo_utils::format::{self, JsValueSerdeExt};
 use serde_wasm_bindgen::from_value;
@@ -161,9 +164,16 @@ impl JsDLCInterface {
         serde_wasm_bindgen::to_value(&self.options).unwrap()
     }
 
-    pub async fn receive_offer(&self, val: JsValue) -> Uint8Array {
+    pub async fn receive_test_offer(&self) -> Uint8Array {
+        const OFFER_JSON: &str = include_str!("./contract.json");
+
+        // lazy_static! {
+        let dlc_offer_message: OfferDlc = serde_json::from_str(&OFFER_JSON).unwrap();
+        // }
+
+        // pub async fn receive_offer(&self, val: JsValue) -> Uint8Array {
         clog!("receive_offer - before on_dlc_message");
-        let dlc_offer_message: OfferDlc = from_value(val).unwrap();
+        // let dlc_offer_message: OfferDlc = from_value(val).unwrap();
         clog!("dlc_offer_message: {:?}", dlc_offer_message);
         match self.manager.lock().unwrap().on_dlc_message(
             &Message::Offer(dlc_offer_message.clone()),

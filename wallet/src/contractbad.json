@@ -1,0 +1,116 @@
+{
+    "protocolVersion": 1,
+    "contractFlags": 0,
+    "chainHash": "06226e46111a0b59caaf126043eb5bbf28c34f3a5e332a1fc7b2b73cf188910f",
+    "temporaryContractId": "7617be9bdf3a75187bd9411ffcaf8dacccc1ea97d283ba6c062cfd65a6305830",
+    "contractInfo": {
+        "singleContractInfo": {
+            "totalCollateral": 10000,
+            "contractInfo": {
+                "contractDescriptor": {
+                    "numericOutcomeContractDescriptor": {
+                        "numDigits": 14,
+                        "payoutFunction": {
+                            "payoutFunctionPieces": [
+                                {
+                                    "endPoint": {
+                                        "eventOutcome": 0,
+                                        "outcomePayout": 0,
+                                        "extraPrecision": 0
+                                    },
+                                    "payoutCurvePiece": {
+                                        "polynomialPayoutCurvePiece": {
+                                            "payoutPoints": []
+                                        }
+                                    }
+                                },
+                                {
+                                    "endPoint": {
+                                        "eventOutcome": 1,
+                                        "outcomePayout": 10000,
+                                        "extraPrecision": 0
+                                    },
+                                    "payoutCurvePiece": {
+                                        "polynomialPayoutCurvePiece": {
+                                            "payoutPoints": []
+                                        }
+                                    }
+                                }
+                            ],
+                            "lastEndpoint": {
+                                "eventOutcome": 16383,
+                                "outcomePayout": 10000,
+                                "extraPrecision": 0
+                            }
+                        },
+                        "roundingIntervals": {
+                            "intervals": [
+                                {
+                                    "beginInterval": 0,
+                                    "roundingMod": 1
+                                }
+                            ]
+                        }
+                    }
+                },
+                "oracleInfo": {
+                    "single": {
+                        "oracleAnnouncement": {
+                            "announcementSignature": "887dbec05f66b957ed414bfc7b6423fa2b6e8c36ffe9487f5f782db4b3a81c11a17d0d82da7efef14626977dd81a5a6a4e36e9f6a5550a4588972acbf9f3c35b",
+                            "oraclePublicKey": "65b927bc31cc677373b963d69b0725520139cf55ff52a8ee890ba6565f868209",
+                            "oracleEvent": {
+                                "oracleNonces": [
+                                    "f1c09f1559b0ebc5ad70aa1d9bb3e9426fd98296dde31b509543863c2638fb81",
+                                    "352be63371b268ead263c8b26ac1720bce59663be0df67680ea32a2185b4ae67",
+                                    "3124b9690a2e687637f9acd3241fd249395940e5ed2ccc676b769b86e0757ea4",
+                                    "0237ff4f6a65109d021482640eedc44cdedf194a7f36a31ebcef6e245d042315",
+                                    "b31e9b2bed1bad5b4771fb5ee6d09d61f1fc84fd3195cca741b5efc7f6783524",
+                                    "da97513c372212ab6afec142149fd686a0eb21c71889899e77f275312ed3cb38",
+                                    "6a2cf2f9878781a9cbc486c66fcdffe494c51fc8390252af18863115d804bead",
+                                    "96c2ac63d481547aa976f20e931055adafd44bc6f43600722e1de83a3c007633",
+                                    "76d486231d2e6adc8bc5b4aeafa988704f8c66cd8425fb25115aa47c8f23ebfb",
+                                    "4e42cf784f065cad7fb535f440cdf7e69f0adf98a976710d61043f7345dcf0bb",
+                                    "fca169d3413a15ab843f196eabd64918ff7a72af71bc3f05e007c635fca593b4",
+                                    "6bc101bfbc70be486f3ff936b95cef2043e731ac0e5c5ee164c9de230f4d8f0c",
+                                    "28979a0772fe27354371fdeb83ac00611f68b071b8f5fd8326f70e273e2ef9a8",
+                                    "08e8df8069d091975ca790a803495ba2d584ac52a3eec9cb0c08a80915e97f69"
+                                ],
+                                "eventMaturityEpoch": 1665236880,
+                                "eventDescriptor": {
+                                    "digitDecompositionEvent": {
+                                        "base": 2,
+                                        "isSigned": false,
+                                        "unit": "BTCUSD",
+                                        "precision": 0,
+                                        "nbDigits": 14
+                                    }
+                                },
+                                "eventId": "abc123"
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "fundingPubkey": "03f5986ae99f772fc7da686396d0e0310b0a8338bf71353a1606aae369e2fe6fae",
+    "payoutSpk": "0014d9db41c4adeeadb2e1da125ce8a685cd22d2a74b",
+    "payoutSerialId": 5934357550413424838,
+    "offerCollateral": 0,
+    "fundingInputs": [
+        {
+            "inputSerialId": 16121567908679349032,
+            "prevTx": "020000000001035d654e216e2ca4943e5d8d3e5c483e2d77e3e024b02d986d05bce42f1da0b1ab0000000000ffffffff27829734ae214c6dad4ecf4c8a1e860229b6abf7845cf78ff925331a36b0e6d90100000000fffffffff22669cb80bd18c35a13d8eedde72631a9797fda42694204cfd942b1d2ad28fa0200000000ffffffff0308a50600000000001600148ae4a48cb0c3b7874460a6f5287d9dd512a18246a22e02000000000022002019954fff12885ed6f31ac6f509ebfc14a9ee1ca263339dfac313bca3c3959a5c2b7b0d00000000001600144839c1c1ca64479ab8339f17da71586a058e30a40247304402202724a7f14fb2f5e1de21c6569b7a5ab7ebba8dea8331371b3cdccbf93d4a54fb02204052fd79ddedd2316172c1754ff21151b8ea53c38b75f784c7331641d9f7a671012103ab37f5b606931d7828855affe75199d952bc6174b4a23861b7ac94132210508c0247304402206917afb80520fdf5458cc605c59b7098af321619b4556fef8e3a06a97e8ca6f80220208a70f0459e01e6c28ea6daf39a6e712fc51ac4da578dd98685be74261d4871012103ab37f5b606931d7828855affe75199d952bc6174b4a23861b7ac94132210508c0247304402203a4aeb80e54db2654013a065f6cf7b350e7ab152c32ae06dfa0b1e8879ad410c022040b3ef3cf924703980d3de135aa0f68db6bf5ad6a3f354707634b825e18ebb370121037e20777f911c66a9e85938ef21cbf2818504131e83df8f1377dd4f9d7b4df3f300000000",
+            "prevTxVout": 2,
+            "sequence": 4294967295,
+            "maxWitnessLen": 107,
+            "redeemScript": ""
+        }
+    ],
+    "changeSpk": "00147e8b8e52f1a2d9de4d194c45a977bb3d7d07033d",
+    "changeSerialId": 14608235643564608788,
+    "fundOutputSerialId": 7814511944568199169,
+    "feeRatePerVb": 253,
+    "cetLocktime": 1682702867,
+    "refundLocktime": 1665841680
+}

@@ -1146,6 +1146,7 @@ dependencies = [
  "gloo-utils",
  "hex",
  "js-sys",
+ "lazy_static",
  "lightning 0.0.113",
  "log",
  "mockito",
