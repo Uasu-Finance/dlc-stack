@@ -1,8 +1,10 @@
 [workspace]
 members = [
+    "esplora-async-blockchain-provider",
     "oracle",
     "oracle-discovery",
     "wallet",
+    "wasm-wallet",
     "clients",
     "storage/reader",
     "storage/writer",

@@ -1,0 +1,116 @@
+{
+    "protocolVersion": 1,
+    "contractFlags": 0,
+    "chainHash": "06226e46111a0b59caaf126043eb5bbf28c34f3a5e332a1fc7b2b73cf188910f",
+    "temporaryContractId": "87b1d169a5d25da3022ed238bba6b7b846be96766e4d0980097eedccdf65aa81",
+    "contractInfo": {
+        "singleContractInfo": {
+            "totalCollateral": 100000,
+            "contractInfo": {
+                "contractDescriptor": {
+                    "numericOutcomeContractDescriptor": {
+                        "numDigits": 14,
+                        "payoutFunction": {
+                            "payoutFunctionPieces": [
+                                {
+                                    "endPoint": {
+                                        "eventOutcome": 0,
+                                        "outcomePayout": 0,
+                                        "extraPrecision": 0
+                                    },
+                                    "payoutCurvePiece": {
+                                        "polynomialPayoutCurvePiece": {
+                                            "payoutPoints": []
+                                        }
+                                    }
+                                },
+                                {
+                                    "endPoint": {
+                                        "eventOutcome": 100,
+                                        "outcomePayout": 100000,
+                                        "extraPrecision": 0
+                                    },
+                                    "payoutCurvePiece": {
+                                        "polynomialPayoutCurvePiece": {
+                                            "payoutPoints": []
+                                        }
+                                    }
+                                }
+                            ],
+                            "lastEndpoint": {
+                                "eventOutcome": 16383,
+                                "outcomePayout": 100000,
+                                "extraPrecision": 0
+                            }
+                        },
+                        "roundingIntervals": {
+                            "intervals": [
+                                {
+                                    "beginInterval": 0,
+                                    "roundingMod": 1
+                                }
+                            ]
+                        }
+                    }
+                },
+                "oracleInfo": {
+                    "single": {
+                        "oracleAnnouncement": {
+                            "announcementSignature": "274fc23867e5c0d6633221b3190416140f3102f3db0d04ec1bdf3ea22fdd38bf04fc07bdee1518cb39bdffd54ee7c419c33f3beb775684ac615c197f5589c297",
+                            "oraclePublicKey": "5607e156ca69c0509a1c1098468a21c97fdec69cb91cc4a3a4e20a158b205245",
+                            "oracleEvent": {
+                                "oracleNonces": [
+                                    "77fee1dd170730458958ea2c83275e31691e323e1e3f2aeca2f60b0c0ffba678",
+                                    "bf5dbbf65641293fbaa75e3e51ac8efb6130d3091869c465d807ebff3669567c",
+                                    "614f5c23525bb70f7d81b6199ca928ac34d574c5d32f2b0bb6cd4c7869c584ad",
+                                    "77656adaac9c034265328ebe35b8fc6e5c8493add07495c73036283db0449cd3",
+                                    "9242a30845c9d0f8d80b2ae68ca73586587a9ccd216fc8d2b4cc95e6e953f608",
+                                    "b8b44c54b1bcd23f689b9f97dd14e3c8a0b034d396673b9a798e573517d20216",
+                                    "0cc871fccfed31956f224364210afcea5906fd6c2f60bf62b115c18e6ea660b0",
+                                    "48382422eeba6cd64b7537196c5947222d07466e870124d9db0d59d801abcefc",
+                                    "67a24e424af8e1bd5320595d512846cf8a2e34ad19716e290c31da77afe91069",
+                                    "b12f5f428a9611d9906da0d20e1d6d5eae3a9e6b9b8cf50452c732595cd53ee2",
+                                    "8d97b77506377d52c4a822ac821961a110bdd7860dc53f31594904dae6d3d4ef",
+                                    "065068521883beef483d536e74dd90a943f875a76d27b4c13e81b869f82d096a",
+                                    "ef21d49e812554ffa82b05194511a9701f94a07206e85fcac2e8a99e5dcc9340",
+                                    "be090709ea3ac6f217963a78846ddafcd41ad09434348c43054bb46a0aaca408"
+                                ],
+                                "eventMaturityEpoch": 0,
+                                "eventDescriptor": {
+                                    "digitDecompositionEvent": {
+                                        "base": 2,
+                                        "isSigned": false,
+                                        "unit": "BTCUSD",
+                                        "precision": 0,
+                                        "nbDigits": 14
+                                    }
+                                },
+                                "eventId": "abc12345"
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "fundingPubkey": "02b97646abd493560d61f0193c33558d8b76c1782dd4c58a740d76545cfd12dea6",
+    "payoutSpk": "0014921a8a07db393df266bf85b22c682f4274615489",
+    "payoutSerialId": 4737331438704232936,
+    "offerCollateral": 0,
+    "fundingInputs": [
+        {
+            "inputSerialId": 3934686481245408725,
+            "prevTx": "010000000187f8f0093bd3a4c1f737336981e99b821d65205e8ec6f3fb3cf32d15c03b276c010000006a47304402203d6c9ef931492a05783fc50e9ea28769ddf1e0896952ffe2aa2cc9f6770f922802207ff6b981cf4d9e8d1be1df60b62b9b18a2a8f0b7f8abdbd024e5f9ed11cec631012102add319140c528a8955d76d4afe32c4d3143fea57ea353a31ce793cffb77ef861fdffffff0200e1f505000000001600146430186e1b81e4badb6b364b98ad6d03e1297f2de0d43277000000001976a9142b19bade75a48768a5ffc142a86490303a95f41388ac00000000",
+            "prevTxVout": 0,
+            "sequence": 4294967295,
+            "maxWitnessLen": 107,
+            "redeemScript": ""
+        }
+    ],
+    "changeSpk": "001470a8f72256a0b222e1bd38c0298a6e7a80b3f44b",
+    "changeSerialId": 1947127176658279362,
+    "fundOutputSerialId": 17100423542163727572,
+    "feeRatePerVb": 1,
+    "cetLocktime": 1683816405,
+    "refundLocktime": 604800
+}
