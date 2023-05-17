@@ -5,7 +5,6 @@ extern crate log;
 use bitcoin::{Address, Network};
 use dlc_messages::{Message, OfferDlc, SignDlc};
 use wasm_bindgen::prelude::{wasm_bindgen, JsValue};
-use web_sys::Response;
 
 use core::panic;
 use std::{
@@ -17,7 +16,7 @@ use std::{
 
 use dlc_manager::{manager::Manager, Oracle, SystemTimeProvider, Wallet};
 
-use log::{info, warn};
+use log::info;
 use mocks::memory_storage_provider::MemoryStorage;
 
 use esplora_async_blockchain_provider::EsploraAsyncBlockchainProvider;
@@ -79,7 +78,7 @@ pub struct JsDLCInterfaceOptions {
 impl Default for JsDLCInterfaceOptions {
     fn default() -> Self {
         Self {
-            oracle_url: "https://testnet.dlc.link/oracle".to_string(),
+            oracle_url: "https://not-testnet.dlc.link/oracle".to_string(),
             // oracle_url: "http://localhost:8081".to_string(),
             network: "regtest".to_string(),
             electrs_host: "https://blockstream.info/testnet/api/".to_string(),
