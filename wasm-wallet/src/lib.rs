@@ -4,17 +4,31 @@ extern crate log;
 
 use bitcoin::{Address, Network};
 use dlc_messages::{Message, OfferDlc, SignDlc};
+use serde_json::json;
 use wasm_bindgen::prelude::{wasm_bindgen, JsValue};
+
+use lightning::util::ser::Readable;
+
+use secp256k1_zkp::{
+    hashes::*, All, KeyPair, Secp256k1, SecretKey, XOnlyPublicKey as SchnorrPublicKey,
+};
 
 use core::panic;
 use std::{
     collections::HashMap,
     env,
+    io::Cursor,
     str::FromStr,
     sync::{Arc, Mutex},
 };
 
-use dlc_manager::{manager::Manager, Oracle, SystemTimeProvider, Wallet};
+use dlc_manager::{
+    contract::{offered_contract::OfferedContract, Contract},
+    manager::Manager,
+    ContractId, Oracle, Storage, SystemTimeProvider, Wallet,
+};
+
+use std::fmt::Write as _;
 
 use log::info;
 use mocks::memory_storage_provider::MemoryStorage;
@@ -76,12 +90,12 @@ pub struct JsDLCInterfaceOptions {
 }
 
 impl Default for JsDLCInterfaceOptions {
+    // Default values for Manager Options
     fn default() -> Self {
         Self {
-            oracle_url: "https://not-testnet.dlc.link/oracle".to_string(),
-            // oracle_url: "http://localhost:8081".to_string(),
+            oracle_url: "https://testnet.dlc.link/oracle".to_string(),
             network: "regtest".to_string(),
-            electrs_host: "https://blockstream.info/testnet/api/".to_string(),
+            electrs_host: "https://dev-oracle.dlc.link/electrs".to_string(),
             address: "".to_string(),
         }
     }
@@ -90,7 +104,9 @@ impl Default for JsDLCInterfaceOptions {
 #[wasm_bindgen]
 impl JsDLCInterface {
     pub async fn new() -> JsDLCInterface {
+        //privkey: String) -> JsDLCInterface {
         console_error_panic_hook::set_once();
+
         let mut options = JsDLCInterfaceOptions::default();
         let active_network: Network = options
             .network
@@ -98,17 +114,18 @@ impl JsDLCInterface {
             .expect("Must use a valid bitcoin network");
 
         // ELECTRUM / ELECTRS ASYNC
-        let electrs_host = env::var("ELECTRUM_API_URL")
+        options.electrs_host = env::var("ELECTRUM_API_URL")
             .unwrap_or("https://dev-oracle.dlc.link/electrs".to_string());
-        let blockchain = Arc::new(EsploraAsyncBlockchainProvider::new(
-            electrs_host.to_string(),
-            active_network,
-        ));
+
+        let blockchain: Arc<EsploraAsyncBlockchainProvider> = Arc::new(
+            EsploraAsyncBlockchainProvider::new(options.electrs_host.to_string(), active_network),
+        );
 
         // Set up DLC store
         let store = MemoryStorage::new();
-
         let wallet_store = Arc::new(MemoryStorage::new());
+
+        // Pass the private key to the simplewallet constructor, upsert the keypair. Don't create additional keypairs
 
         // Set up wallet
         let wallet = Arc::new(SimpleWallet::new(
@@ -117,7 +134,6 @@ impl JsDLCInterface {
             active_network,
         ));
 
-        clog!("options: {:?}", options);
         let address = wallet.get_new_address().unwrap();
         clog!("address {}", address);
         options.address = address.to_string();
@@ -158,11 +174,7 @@ impl JsDLCInterface {
         }
     }
 
-    pub fn oracle_url(&self) -> String {
-        self.options.oracle_url.clone()
-    }
-
-    pub fn send_options_to_js(&self) -> JsValue {
+    pub fn get_options(&self) -> JsValue {
         serde_wasm_bindgen::to_value(&self.options).unwrap()
     }
 
@@ -174,9 +186,43 @@ impl JsDLCInterface {
         self.wallet.get_balance()
     }
 
-    pub async fn receive_offer_and_accept(&self, offer_json: String) -> String {
+    // public async function for fetching all the contracts on the manager
+    pub async fn get_contracts(&self) -> JsValue {
+        let contracts: Vec<JsContract> = self
+            .manager
+            .lock()
+            .unwrap()
+            .get_store()
+            .get_contracts()
+            .unwrap()
+            .into_iter()
+            .map(|contract| JsContract::from_contract(contract))
+            .collect();
+
+        serde_wasm_bindgen::to_value(&contracts).unwrap()
+    }
+
+    // public async function for fetching one contract as a JsContract type
+    pub async fn get_contract(&self, contract_str: String) -> JsValue {
+        let contract_id = ContractId::read(&mut Cursor::new(&contract_str)).unwrap();
+        let contract = self
+            .manager
+            .lock()
+            .unwrap()
+            .get_store()
+            .get_contract(&contract_id)
+            .unwrap();
+        match contract {
+            Some(contract) => {
+                serde_wasm_bindgen::to_value(&JsContract::from_contract(contract)).unwrap()
+            }
+            None => JsValue::NULL,
+        }
+    }
+
+    pub async fn accept_offer(&self, offer_json: String) -> String {
         let dlc_offer_message: OfferDlc = serde_json::from_str(&offer_json).unwrap();
-        clog!("received offer: {:?}", dlc_offer_message);
+        clog!("Offer to accept: {:?}", dlc_offer_message);
         match self.manager.lock().unwrap().on_dlc_message(
             &Message::Offer(dlc_offer_message.clone()),
             STATIC_COUNTERPARTY_NODE_ID.parse().unwrap(),
@@ -202,6 +248,8 @@ impl JsDLCInterface {
         serde_json::to_string(&accept_msg).unwrap()
     }
 
+    // acceptContract(contractId: string, btcAddress: string, btcPublicKey: string, btcPrivateKey: string, btcNetwork: NetworkType): Promise<AnyContract>
+
     pub async fn countersign_and_broadcast(&self, dlc_sign_message: String) -> () {
         clog!("sign_offer - before on_dlc_message");
         let dlc_sign_message: SignDlc = serde_json::from_str(&dlc_sign_message).unwrap();
@@ -217,5 +265,66 @@ impl JsDLCInterface {
             }
         }
         clog!("sign_offer - after on_dlc_message");
+    }
+
+    pub async fn reject_offer(&self, contract_id: String) -> () {
+        let contract_id = ContractId::read(&mut Cursor::new(&contract_id)).unwrap();
+        let contract = self
+            .manager
+            .lock()
+            .unwrap()
+            .get_store()
+            .get_contract(&contract_id)
+            .unwrap();
+
+        match contract {
+            Some(Contract::Offered(c)) => {
+                self.manager
+                    .lock()
+                    .unwrap()
+                    .get_store()
+                    .update_contract(&Contract::Rejected(c))
+                    .unwrap();
+            }
+            _ => (),
+        };
+    }
+}
+
+#[derive(Serialize, Deserialize)]
+#[wasm_bindgen]
+struct JsContract {
+    id: String,
+    state: String,
+}
+
+// implement the from_contract method for JsContract
+impl JsContract {
+    fn from_contract(contract: Contract) -> JsContract {
+        let state = match contract {
+            Contract::Offered(_) => "offered",
+            Contract::Accepted(_) => "accepted",
+            Contract::Signed(_) => "signed",
+            Contract::Confirmed(_) => "confirmed",
+            Contract::PreClosed(_) => "pre-closed",
+            Contract::Closed(_) => "closed",
+            Contract::Refunded(_) => "refunded",
+            Contract::FailedAccept(_) => "failed accept",
+            Contract::FailedSign(_) => "failed sign",
+            Contract::Rejected(_) => "rejected",
+        };
+
+        fn hex_str(value: &[u8]) -> String {
+            let mut res = String::with_capacity(64);
+            for v in value {
+                write!(res, "{:02x}", v).unwrap();
+            }
+            res
+        }
+
+        JsContract {
+            id: hex_str(&contract.get_id()),
+            state: state.to_string(),
+        }
     }
 }

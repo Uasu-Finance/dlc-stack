@@ -17,10 +17,25 @@ async function fetchOffer() {
     }).then(res => res.json());
 }
 
+// class BaseContract {
+//     state,
+//     temporaryContractId
+// }
+// class OfferedContract extends StatelessContract<BaseContract> {
+//     state: ContractState.Offered
+//     contractInfo: ContractInfo
+//     fundOutputSerialId: number
+//     feeRatePerVByte: number
+//     contractMaturityBound: number
+//     contractTimeOut: number
+//     isOfferParty: false
+// }
+
 async function setup() {
     console.log("Setting up");
     const dlc_man = await JsDLCInterface.new();
-    console.log(dlc_man.send_options_to_js());
+    console.log("options: ", dlc_man.get_options());
+    dlc_man.get_contracts().then((res) => console.log("contracts: ", res));
     var balance = 0;
     var offered_contract;
     var runonce = true;
@@ -35,7 +50,7 @@ async function setup() {
                 console.log("offer_json: ", offer_json);
 
 
-                dlc_man.receive_offer_and_accept(JSON.stringify(offer_json)).then((accepted_contract) => {
+                dlc_man.accept_offer(JSON.stringify(offer_json)).then((accepted_contract) => {
 
                     console.log("Got response from receive_offer_and_accept", accepted_contract);
                     fetch('http://localhost:8085/offer/accept', {
