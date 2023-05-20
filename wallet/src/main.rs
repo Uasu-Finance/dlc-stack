@@ -200,11 +200,10 @@ fn main() {
                     struct OfferRequest {
                         uuid: String,
                         accept_collateral: u64,
-                        offer_collateral: u64,
                         total_outcomes: u64
                     }
                     let req: OfferRequest = try_or_400!(rouille::input::json_input(request));
-                    add_access_control_headers(create_new_offer(manager.clone(), oracle.clone(), blockchain.clone(), active_network, req.uuid, req.accept_collateral, req.offer_collateral, req.total_outcomes))
+                    add_access_control_headers(create_new_offer(manager.clone(), oracle.clone(), blockchain.clone(), active_network, req.uuid, req.accept_collateral, req.total_outcomes))
                 },
                 (OPTIONS) (/offer) => {
                     add_access_control_headers(Response::empty_204())
@@ -398,16 +397,16 @@ fn create_new_offer(
     active_network: bitcoin::Network,
     event_id: String,
     accept_collateral: u64,
-    offer_collateral: u64,
     total_outcomes: u64,
 ) -> Response {
+    const OFFER_COLLATERAL: u64 = 0;
     let (_event_descriptor, descriptor) =
-        get_numerical_contract_info(accept_collateral, offer_collateral, total_outcomes);
+        get_numerical_contract_info(accept_collateral, OFFER_COLLATERAL, total_outcomes);
     info!(
         "Creating new offer with event id: {}, accept collateral: {}, offer_collateral: {}",
         event_id.clone(),
         accept_collateral,
-        offer_collateral
+        OFFER_COLLATERAL
     );
 
     let contract_info = ContractInputInfo {
@@ -426,7 +425,7 @@ fn create_new_offer(
     };
 
     let contract_input = ContractInput {
-        offer_collateral: offer_collateral,
+        offer_collateral: OFFER_COLLATERAL,
         accept_collateral: accept_collateral,
         fee_rate,
         contract_infos: vec![contract_info],
