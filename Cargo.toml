@@ -1,6 +1,7 @@
 [workspace]
 members = [
     "esplora-async-blockchain-provider",
+    "js-interface-wallet",
     "oracle",
     "oracle-discovery",
     "wallet",

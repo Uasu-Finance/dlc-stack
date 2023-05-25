@@ -1324,6 +1324,7 @@ dependencies = [
  "getrandom",
  "gloo-utils",
  "hex",
+ "js-interface-wallet",
  "js-sys",
  "lightning",
  "log",
@@ -2072,6 +2073,19 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "936cfd212a0155903bcbc060e316fb6cc7cbf2e1907329391ebadc1fe0ce77c2"
 dependencies = [
  "libc",
+]
+
+[[package]]
+name = "js-interface-wallet"
+version = "0.1.0"
+dependencies = [
+ "bitcoin",
+ "dlc 0.4.0",
+ "dlc-manager 0.4.0",
+ "lightning",
+ "mocks",
+ "rust-bitcoin-coin-selection",
+ "secp256k1-zkp",
 ]
 
 [[package]]
