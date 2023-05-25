@@ -2,16 +2,14 @@
 extern crate console_error_panic_hook;
 extern crate log;
 
-use bitcoin::{Address, Network};
+use bitcoin::{Network, PrivateKey};
 use dlc_messages::{Message, OfferDlc, SignDlc};
-use serde_json::json;
-use wasm_bindgen::prelude::{wasm_bindgen, JsValue};
+// use wasm_bindgen::prelude::{wasm_bindgen, JsValue};
+use wasm_bindgen::prelude::*;
 
 use lightning::util::ser::Readable;
 
-use secp256k1_zkp::{
-    hashes::*, All, KeyPair, Secp256k1, SecretKey, XOnlyPublicKey as SchnorrPublicKey,
-};
+use secp256k1_zkp::hashes::*;
 
 use core::panic;
 use std::{
@@ -23,9 +21,7 @@ use std::{
 };
 
 use dlc_manager::{
-    contract::{offered_contract::OfferedContract, Contract},
-    manager::Manager,
-    ContractId, Oracle, Storage, SystemTimeProvider, Wallet,
+    contract::Contract, manager::Manager, ContractId, Oracle, Storage, SystemTimeProvider,
 };
 
 use std::fmt::Write as _;
@@ -35,7 +31,7 @@ use mocks::memory_storage_provider::MemoryStorage;
 
 use esplora_async_blockchain_provider::EsploraAsyncBlockchainProvider;
 
-use simple_wallet::SimpleWallet;
+use js_interface_wallet::JSInterfaceWallet;
 
 use oracle_client::P2PDOracleClient;
 use serde::{Deserialize, Serialize};
@@ -46,7 +42,7 @@ mod utils;
 mod macros;
 
 type DlcManager = Manager<
-    Arc<SimpleWallet<Arc<EsploraAsyncBlockchainProvider>, Arc<MemoryStorage>>>,
+    Arc<JSInterfaceWallet>,
     Arc<EsploraAsyncBlockchainProvider>,
     Box<MemoryStorage>,
     Arc<P2PDOracleClient>,
@@ -72,11 +68,18 @@ struct ErrorsResponse {
     status: u64,
 }
 
+#[derive(Serialize, Deserialize)]
+struct UtxoInput {
+    txid: String,
+    vout: u32,
+    value: u64,
+}
+
 #[wasm_bindgen]
 pub struct JsDLCInterface {
     options: JsDLCInterfaceOptions,
     manager: Arc<Mutex<DlcManager>>,
-    wallet: Arc<SimpleWallet<Arc<EsploraAsyncBlockchainProvider>, Arc<MemoryStorage>>>,
+    wallet: Arc<JSInterfaceWallet>,
     blockchain: Arc<EsploraAsyncBlockchainProvider>,
 }
 
@@ -93,7 +96,7 @@ impl Default for JsDLCInterfaceOptions {
     // Default values for Manager Options
     fn default() -> Self {
         Self {
-            oracle_url: "https://testnet.dlc.link/oracle".to_string(),
+            oracle_url: "https://dev-oracle.dlc.link/oracle".to_string(),
             network: "regtest".to_string(),
             electrs_host: "https://dev-oracle.dlc.link/electrs".to_string(),
             address: "".to_string(),
@@ -123,20 +126,38 @@ impl JsDLCInterface {
 
         // Set up DLC store
         let store = MemoryStorage::new();
-        let wallet_store = Arc::new(MemoryStorage::new());
+        // let wallet_store = Arc::new(MemoryStorage::new());
 
-        // Pass the private key to the simplewallet constructor, upsert the keypair. Don't create additional keypairs
+        // Pass the private key to the JSInterfaceWallet constructor, upsert the keypair. Don't create additional keypairs
 
+        let key = "f8ec31c12b6d014249935f2cb76b543b442ac2325993b44cbed4cdf773fbc8df";
+        // Generate keypair from secret key
+        let seckey = secp256k1_zkp::SecretKey::from_str(key).unwrap();
+
+        // let seckey = SecretKey::new(&mut thread_rng());
+        // let pubkey = PublicKey::from_secret_key(&Secp256k1::new(), &seckey);
+        // let address = Address::p2wpkh(
+        //     &bitcoin::PublicKey {
+        //         inner: pubkey,
+        //         compressed: true,
+        //     },
+        //     active_network,
+        // )
+        // .unwrap();
+
+        // clog!("try this new address {}", address);
+
+        let static_address = "bcrt1qatfjgacgqaua975r0cnsqtl09td8636jm3vnp0";
         // Set up wallet
-        let wallet = Arc::new(SimpleWallet::new(
-            blockchain.clone(),
-            wallet_store.clone(),
+        let wallet = Arc::new(JSInterfaceWallet::new(
+            static_address.to_string(),
             active_network,
+            PrivateKey::new(seckey, active_network),
         ));
 
-        let address = wallet.get_new_address().unwrap();
-        clog!("address {}", address);
-        options.address = address.to_string();
+        // let address = wallet.get_new_address().unwrap();
+        // clog!("address {}", address);
+        options.address = static_address.to_string();
 
         // Set up Oracle Client
         let p2p_client: P2PDOracleClient = P2PDOracleClient::new(&options.oracle_url)
@@ -166,6 +187,8 @@ impl JsDLCInterface {
 
         clog!("Finished setting up manager");
 
+        blockchain.refresh_chain_data(options.address.clone()).await;
+
         JsDLCInterface {
             options,
             manager,
@@ -180,10 +203,12 @@ impl JsDLCInterface {
 
     pub async fn get_wallet_balance(&self) -> u64 {
         self.blockchain
-            .fetch_utxos_for_later(&Address::from_str(&self.options.address).unwrap())
+            .refresh_chain_data(self.options.address.clone())
             .await;
-        self.wallet.refresh().unwrap();
-        self.wallet.get_balance()
+        self.wallet
+            .set_utxos(self.blockchain.get_utxos().unwrap())
+            .unwrap();
+        self.blockchain.get_balance().await.unwrap()
     }
 
     // public async function for fetching all the contracts on the manager
@@ -220,7 +245,41 @@ impl JsDLCInterface {
         }
     }
 
-    pub async fn accept_offer(&self, offer_json: String) -> String {
+    pub async fn accept_offer(&self, offer_json: String, address: String) -> String {
+        //, utxos: String) -> String {
+        // self.blockchain.refresh_chain_data(address.clone()).await;
+        // let utxo_inputs: Vec<UtxoInput> = serde_json::from_str(&utxos).unwrap();
+
+        // log out utxo_inputs
+        // clog!("utxo_inputs {:?}", utxo_inputs);
+
+        // let utxos: Vec<Utxo> = utxo_inputs
+        //     .into_iter()
+        //     .map(|utxo| Utxo {
+        //         address: address.clone(),
+        //         outpoint: OutPoint {
+        //             txid: utxo
+        //                 .txid
+        //                 .parse()
+        //                 .expect("To be able to parse the txid from the utxo"),
+        //             vout: utxo.vout,
+        //         },
+        //         redeem_script: Script::default(),
+        //         reserved: false,
+        //         tx_out: TxOut {
+        //             value: utxo.value,
+        //             script_pubkey: address.script_pubkey(),
+        //         },
+        //     })
+        //     .collect();
+
+        // log out utxos
+        // clog!("utxos {:?}", utxos);
+
+        // Then the utxos can be set in the js-interface-wallet as the current utxos, overwriting the previous ones
+        // the wallet should use that list for the remainder of the operation.
+        // self.wallet.set_utxos(utxos).unwrap();
+
         let dlc_offer_message: OfferDlc = serde_json::from_str(&offer_json).unwrap();
         clog!("Offer to accept: {:?}", dlc_offer_message);
         match self.manager.lock().unwrap().on_dlc_message(
@@ -236,6 +295,8 @@ impl JsDLCInterface {
 
         clog!("receive_offer - after on_dlc_message");
         let temporary_contract_id = dlc_offer_message.temporary_contract_id;
+
+        clog!("accepting contract with id {:?}", temporary_contract_id);
 
         let (_contract_id, _public_key, accept_msg) = self
             .manager

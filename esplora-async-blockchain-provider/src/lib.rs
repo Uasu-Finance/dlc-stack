@@ -1,5 +1,5 @@
 use bitcoin::consensus::Decodable;
-use bitcoin::{Block, Network, OutPoint, Script, Transaction, TxOut, Txid};
+use bitcoin::{Address, Block, Network, OutPoint, Script, Transaction, TxOut, Txid};
 use dlc_manager::{error::Error, Blockchain, Utxo};
 
 use lightning::chain::chaininterface::FeeEstimator;
@@ -48,6 +48,7 @@ pub struct EsploraAsyncBlockchainProvider {
     blockchain: EsploraBlockchain,
     utxos: RefCell<Option<Vec<Utxo>>>,
     txs: RefCell<Option<HashMap<String, Vec<u8>>>>,
+    height: RefCell<Option<u64>>,
 }
 
 impl EsploraAsyncBlockchainProvider {
@@ -59,6 +60,7 @@ impl EsploraAsyncBlockchainProvider {
             blockchain,
             utxos: Some(vec![]).into(),
             txs: Some(HashMap::new()).into(),
+            height: Some(0).into(),
         }
     }
 
@@ -102,13 +104,32 @@ impl EsploraAsyncBlockchainProvider {
             .collect::<Vec<_>>())
     }
 
-    pub async fn fetch_utxos_for_later(&self, address: &bitcoin::Address) -> () {
+    async fn get_text(&self, sub_url: &str) -> Result<String, Error> {
+        self.get(sub_url).await.unwrap().text().await.map_err(|x| {
+            dlc_manager::error::Error::IOError(std::io::Error::new(std::io::ErrorKind::Other, x))
+        })
+    }
+
+    async fn get_u64(&self, sub_url: &str) -> Result<u64, Error> {
+        self.get_text(sub_url)
+            .await
+            .unwrap()
+            .parse()
+            .map_err(|e: std::num::ParseIntError| Error::BlockchainError(e.to_string()))
+    }
+
+    // gets all the utxos and txs and height of chain, and returns the balance of the address
+    pub async fn refresh_chain_data(&self, address: String) -> () {
+        *self.height.borrow_mut() = Some(self.blockchain.get_height().await.unwrap() as u64);
+        //Some(self.get_u64("blocks/tip/height").await.unwrap());
+
         let utxos: Vec<UtxoResp> = self
             .get_from_json(&format!("address/{address}/utxo"))
             .await
             .unwrap();
 
-        let utxos = utxos
+        let address = Address::from_str(&address).unwrap();
+        let mut utxos = utxos
             .into_iter()
             .map(|x| Utxo {
                 address: address.clone(),
@@ -131,30 +152,29 @@ impl EsploraAsyncBlockchainProvider {
             })
             .collect::<Vec<Utxo>>();
 
-        let mut utxo_spent_pairs = Vec::new();
-        for utxo in utxos {
-            let is_spent: UTXOSpent = self
-                .get_from_json::<UTXOSpent>(&format!(
-                    "tx/{0}/outspend/{1}",
-                    &utxo.outpoint.txid, utxo.outpoint.vout
-                ))
-                .await
-                .unwrap();
-            utxo_spent_pairs.push((utxo, is_spent.spent));
-        }
+        // let mut utxo_spent_pairs = Vec::new();
+        // for utxo in utxos {
+        //     let is_spent: UTXOSpent = self
+        //         .get_from_json::<UTXOSpent>(&format!(
+        //             "tx/{0}/outspend/{1}",
+        //             &utxo.outpoint.txid, utxo.outpoint.vout
+        //         ))
+        //         .await
+        //         .unwrap();
+        //     utxo_spent_pairs.push((utxo, is_spent.spent));
+        // }
 
-        let mut utxos: Vec<Utxo> = Vec::new();
-        for (utxo, result) in utxo_spent_pairs {
-            if !result {
-                utxos.push(utxo);
-            }
-        }
-
-        self.utxos.borrow_mut().as_mut().unwrap().clear();
+        self.utxos
+            .try_borrow_mut()
+            .unwrap() // FIXME this blows up sometimes!
+            .as_mut()
+            .unwrap()
+            .clear();
         self.utxos.borrow_mut().as_mut().unwrap().append(&mut utxos);
 
         for utxo in self.utxos.borrow().as_ref().unwrap() {
             let txid = utxo.outpoint.txid.to_string();
+            // self.blockchain.get_tx(txid).await.unwrap();
             let tx: Vec<u8> = self.get_bytes(&format!("tx/{}/raw", txid)).await.unwrap();
             self.txs
                 .borrow_mut()
@@ -162,6 +182,21 @@ impl EsploraAsyncBlockchainProvider {
                 .unwrap()
                 .insert(txid, tx.clone());
         }
+    }
+
+    pub fn get_utxos(&self) -> Result<Vec<Utxo>, Error> {
+        Ok(self.utxos.borrow().as_ref().unwrap().clone())
+    }
+
+    pub async fn get_balance(&self) -> Result<u64, Error> {
+        Ok(self
+            .utxos
+            .borrow()
+            .as_ref()
+            .unwrap()
+            .iter()
+            .map(|x| x.tx_out.value)
+            .sum())
     }
 }
 
@@ -177,7 +212,7 @@ impl Blockchain for EsploraAsyncBlockchainProvider {
         Ok(bitcoin::Network::Regtest)
     }
     fn get_blockchain_height(&self) -> Result<u64, Error> {
-        Ok(10)
+        Ok(self.height.borrow().unwrap())
     }
     fn get_block_at_height(&self, _height: u64) -> Result<Block, Error> {
         unimplemented!();
@@ -189,7 +224,7 @@ impl Blockchain for EsploraAsyncBlockchainProvider {
             .map_err(|e| Error::BlockchainError(e.to_string()))
     }
     fn get_transaction_confirmations(&self, _tx_id: &Txid) -> Result<u32, Error> {
-        Ok(6)
+        unimplemented!()
     }
 }
 
