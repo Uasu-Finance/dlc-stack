@@ -106,8 +106,7 @@ impl Default for JsDLCInterfaceOptions {
 
 #[wasm_bindgen]
 impl JsDLCInterface {
-    pub async fn new() -> JsDLCInterface {
-        //privkey: String) -> JsDLCInterface {
+    pub async fn new(privkey: String, address: String) -> JsDLCInterface {
         console_error_panic_hook::set_once();
 
         let mut options = JsDLCInterfaceOptions::default();
@@ -126,38 +125,18 @@ impl JsDLCInterface {
 
         // Set up DLC store
         let store = MemoryStorage::new();
-        // let wallet_store = Arc::new(MemoryStorage::new());
 
-        // Pass the private key to the JSInterfaceWallet constructor, upsert the keypair. Don't create additional keypairs
-
-        let key = "f8ec31c12b6d014249935f2cb76b543b442ac2325993b44cbed4cdf773fbc8df";
         // Generate keypair from secret key
-        let seckey = secp256k1_zkp::SecretKey::from_str(key).unwrap();
+        let seckey = secp256k1_zkp::SecretKey::from_str(&privkey).unwrap();
 
-        // let seckey = SecretKey::new(&mut thread_rng());
-        // let pubkey = PublicKey::from_secret_key(&Secp256k1::new(), &seckey);
-        // let address = Address::p2wpkh(
-        //     &bitcoin::PublicKey {
-        //         inner: pubkey,
-        //         compressed: true,
-        //     },
-        //     active_network,
-        // )
-        // .unwrap();
-
-        // clog!("try this new address {}", address);
-
-        let static_address = "bcrt1qatfjgacgqaua975r0cnsqtl09td8636jm3vnp0";
         // Set up wallet
         let wallet = Arc::new(JSInterfaceWallet::new(
-            static_address.to_string(),
+            address.to_string(),
             active_network,
             PrivateKey::new(seckey, active_network),
         ));
 
-        // let address = wallet.get_new_address().unwrap();
-        // clog!("address {}", address);
-        options.address = static_address.to_string();
+        options.address = address.to_string();
 
         // Set up Oracle Client
         let p2p_client: P2PDOracleClient = P2PDOracleClient::new(&options.oracle_url)
