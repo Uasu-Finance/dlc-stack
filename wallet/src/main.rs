@@ -419,6 +419,22 @@ fn create_new_offer(
         contract_descriptor: descriptor,
     };
 
+    // check if the oracle has an event with the id of event_id
+   match oracle.get_announcement(&event_id) {
+        Ok(_announcement) => (),
+        Err(e) => {
+            info!("Error getting announcement: {}", event_id);
+            return Response::json(&ErrorsResponse {
+                status: 400,
+                errors: vec![ErrorResponse {
+                    message: format!("Error: unable to get announcement. Does it exist? -- {}", e.to_string()),
+                    code: None,
+                }],
+            })
+            .with_status_code(400)
+        }
+   }
+
     // Some regtest networks have an unreliable fee estimation service
     let fee_rate = match active_network {
         bitcoin::Network::Regtest => 1,
