@@ -62,8 +62,8 @@ async function runDLCFlow(dlc_man) {
     const signed_contract = await sendAcceptedOfferToProtocolWallet(accepted_contract);
     console.log("signed offer: ", signed_contract);
 
-    const result = await dlc_man.countersign_and_broadcast(JSON.stringify(signed_contract))
-    console.log("Got response from sign_offer", result);
+    const tx_id = await dlc_man.countersign_and_broadcast(JSON.stringify(signed_contract))
+    console.log(`Broadcast DLC with tx-id ${tx_id}`);
 
     const contracts = await dlc_man.get_contracts();
     console.log("Got contracts: ", contracts);

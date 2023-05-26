@@ -19,7 +19,7 @@ use std::{
 };
 
 use dlc_manager::{
-    contract::Contract, manager::Manager, ContractId, Oracle, Storage, SystemTimeProvider,
+    contract::{Contract, signed_contract::SignedContract}, manager::Manager, ContractId, Oracle, Storage, SystemTimeProvider,
 };
 
 use std::fmt::Write as _;
@@ -257,12 +257,12 @@ impl JsDLCInterface {
         serde_json::to_string(&accept_msg).unwrap()
     }
 
-    pub async fn countersign_and_broadcast(&self, dlc_sign_message: String) -> () {
+    pub async fn countersign_and_broadcast(&self, dlc_sign_message: String) -> String {
         clog!("sign_offer - before on_dlc_message");
         let dlc_sign_message: SignDlc = serde_json::from_str(&dlc_sign_message).unwrap();
         clog!("dlc_sign_message: {:?}", dlc_sign_message);
         match self.manager.lock().unwrap().on_dlc_message(
-            &Message::Sign(dlc_sign_message),
+            &Message::Sign(dlc_sign_message.clone()),
             STATIC_COUNTERPARTY_NODE_ID.parse().unwrap(),
         ) {
             Ok(_) => (),
@@ -272,6 +272,16 @@ impl JsDLCInterface {
             }
         }
         clog!("sign_offer - after on_dlc_message");
+        let manager = self.manager.lock().unwrap();
+        let store = manager.get_store();
+        let contract: SignedContract = store
+            .get_signed_contracts()
+            .unwrap()
+            .into_iter()
+            .filter(|c| c.accepted_contract.get_contract_id() == dlc_sign_message.contract_id)
+            .next()
+            .unwrap();
+        contract.accepted_contract.dlc_transactions.fund.txid().to_string()
     }
 
     pub async fn reject_offer(&self, contract_id: String) -> () {
