@@ -104,19 +104,19 @@ impl EsploraAsyncBlockchainProvider {
             .collect::<Vec<_>>())
     }
 
-    async fn get_text(&self, sub_url: &str) -> Result<String, Error> {
-        self.get(sub_url).await.unwrap().text().await.map_err(|x| {
-            dlc_manager::error::Error::IOError(std::io::Error::new(std::io::ErrorKind::Other, x))
-        })
-    }
+    // async fn get_text(&self, sub_url: &str) -> Result<String, Error> {
+    //     self.get(sub_url).await.unwrap().text().await.map_err(|x| {
+    //         dlc_manager::error::Error::IOError(std::io::Error::new(std::io::ErrorKind::Other, x))
+    //     })
+    // }
 
-    async fn get_u64(&self, sub_url: &str) -> Result<u64, Error> {
-        self.get_text(sub_url)
-            .await
-            .unwrap()
-            .parse()
-            .map_err(|e: std::num::ParseIntError| Error::BlockchainError(e.to_string()))
-    }
+    // async fn get_u64(&self, sub_url: &str) -> Result<u64, Error> {
+    //     self.get_text(sub_url)
+    //         .await
+    //         .unwrap()
+    //         .parse()
+    //         .map_err(|e: std::num::ParseIntError| Error::BlockchainError(e.to_string()))
+    // }
 
     // gets all the utxos and txs and height of chain, and returns the balance of the address
     pub async fn refresh_chain_data(&self, address: String) -> () {

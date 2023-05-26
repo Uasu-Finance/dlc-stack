@@ -1078,17 +1078,6 @@ dependencies = [
 [[package]]
 name = "dlc"
 version = "0.4.0"
-dependencies = [
- "bitcoin",
- "miniscript 8.0.1",
- "secp256k1-sys",
- "secp256k1-zkp",
- "serde",
-]
-
-[[package]]
-name = "dlc"
-version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "19c812e884d551a686e5c8d0273e6e2232a6a1665bc5ea07d9ca9f84d3b02fb5"
 dependencies = [
@@ -1103,6 +1092,18 @@ dependencies = [
 name = "dlc"
 version = "0.4.0"
 source = "git+https://github.com/p2pderivatives/rust-dlc?tag=v0.4.0#51517f3f6ad764953983b001efc2eac197ddb080"
+dependencies = [
+ "bitcoin",
+ "miniscript 8.0.1",
+ "secp256k1-sys",
+ "secp256k1-zkp",
+ "serde",
+]
+
+[[package]]
+name = "dlc"
+version = "0.4.0"
+source = "git+https://github.com/p2pderivatives/rust-dlc?branch=master#35db4caced5d5ce2b97b9c94e4e681282bf8ddc5"
 dependencies = [
  "bitcoin",
  "miniscript 8.0.1",
@@ -1134,22 +1135,6 @@ dependencies = [
 [[package]]
 name = "dlc-manager"
 version = "0.4.0"
-dependencies = [
- "async-trait",
- "bitcoin",
- "dlc 0.4.0",
- "dlc-messages 0.4.0",
- "dlc-trie 0.4.0",
- "lightning",
- "log",
- "secp256k1-zkp",
- "serde",
- "web-sys",
-]
-
-[[package]]
-name = "dlc-manager"
-version = "0.4.0"
 source = "git+https://github.com/p2pderivatives/rust-dlc?tag=v0.4.0#51517f3f6ad764953983b001efc2eac197ddb080"
 dependencies = [
  "async-trait",
@@ -1164,15 +1149,19 @@ dependencies = [
 ]
 
 [[package]]
-name = "dlc-messages"
+name = "dlc-manager"
 version = "0.4.0"
+source = "git+https://github.com/p2pderivatives/rust-dlc?branch=master#35db4caced5d5ce2b97b9c94e4e681282bf8ddc5"
 dependencies = [
+ "async-trait",
  "bitcoin",
- "dlc 0.4.0",
+ "dlc 0.4.0 (git+https://github.com/p2pderivatives/rust-dlc?branch=master)",
+ "dlc-messages 0.4.0 (git+https://github.com/p2pderivatives/rust-dlc?branch=master)",
+ "dlc-trie 0.4.0 (git+https://github.com/p2pderivatives/rust-dlc?branch=master)",
  "lightning",
+ "log",
  "secp256k1-zkp",
  "serde",
- "web-sys",
 ]
 
 [[package]]
@@ -1195,6 +1184,18 @@ source = "git+https://github.com/p2pderivatives/rust-dlc?tag=v0.4.0#51517f3f6ad7
 dependencies = [
  "bitcoin",
  "dlc 0.4.0 (git+https://github.com/p2pderivatives/rust-dlc?tag=v0.4.0)",
+ "lightning",
+ "secp256k1-zkp",
+ "serde",
+]
+
+[[package]]
+name = "dlc-messages"
+version = "0.4.0"
+source = "git+https://github.com/p2pderivatives/rust-dlc?branch=master#35db4caced5d5ce2b97b9c94e4e681282bf8ddc5"
+dependencies = [
+ "bitcoin",
+ "dlc 0.4.0 (git+https://github.com/p2pderivatives/rust-dlc?branch=master)",
  "lightning",
  "secp256k1-zkp",
  "serde",
@@ -1290,9 +1291,10 @@ dependencies = [
 [[package]]
 name = "dlc-trie"
 version = "0.4.0"
+source = "git+https://github.com/p2pderivatives/rust-dlc?tag=v0.4.0#51517f3f6ad764953983b001efc2eac197ddb080"
 dependencies = [
  "bitcoin",
- "dlc 0.4.0",
+ "dlc 0.4.0 (git+https://github.com/p2pderivatives/rust-dlc?tag=v0.4.0)",
  "secp256k1-zkp",
  "serde",
 ]
@@ -1300,10 +1302,10 @@ dependencies = [
 [[package]]
 name = "dlc-trie"
 version = "0.4.0"
-source = "git+https://github.com/p2pderivatives/rust-dlc?tag=v0.4.0#51517f3f6ad764953983b001efc2eac197ddb080"
+source = "git+https://github.com/p2pderivatives/rust-dlc?branch=master#35db4caced5d5ce2b97b9c94e4e681282bf8ddc5"
 dependencies = [
  "bitcoin",
- "dlc 0.4.0 (git+https://github.com/p2pderivatives/rust-dlc?tag=v0.4.0)",
+ "dlc 0.4.0 (git+https://github.com/p2pderivatives/rust-dlc?branch=master)",
  "secp256k1-zkp",
  "serde",
 ]
@@ -1316,9 +1318,9 @@ dependencies = [
  "bitcoin",
  "chrono",
  "console_error_panic_hook",
- "dlc-manager 0.4.0",
- "dlc-messages 0.4.0",
- "dlc-trie 0.4.0",
+ "dlc-manager 0.4.0 (git+https://github.com/p2pderivatives/rust-dlc?branch=master)",
+ "dlc-messages 0.4.0 (git+https://github.com/p2pderivatives/rust-dlc?branch=master)",
+ "dlc-trie 0.4.0 (git+https://github.com/p2pderivatives/rust-dlc?branch=master)",
  "env_logger",
  "esplora-async-blockchain-provider",
  "getrandom",
@@ -1336,7 +1338,6 @@ dependencies = [
  "serde",
  "serde-wasm-bindgen",
  "serde_json",
- "simple-wallet 0.1.0",
  "sled",
  "wasm-bindgen",
  "wasm-bindgen-futures",
@@ -1446,13 +1447,13 @@ version = "0.1.0"
 dependencies = [
  "bdk",
  "bitcoin",
- "dlc-manager 0.4.0",
+ "dlc-manager 0.4.0 (git+https://github.com/p2pderivatives/rust-dlc?branch=master)",
  "futures",
  "lightning",
  "miniscript 9.0.1",
  "reqwest",
  "serde",
- "simple-wallet 0.1.0",
+ "simple-wallet 0.1.0 (git+https://github.com/p2pderivatives/rust-dlc?branch=master)",
  "wasm-bindgen-futures",
 ]
 
@@ -2080,10 +2081,9 @@ name = "js-interface-wallet"
 version = "0.1.0"
 dependencies = [
  "bitcoin",
- "dlc 0.4.0",
- "dlc-manager 0.4.0",
+ "dlc 0.4.0 (git+https://github.com/p2pderivatives/rust-dlc?branch=master)",
+ "dlc-manager 0.4.0 (git+https://github.com/p2pderivatives/rust-dlc?branch=master)",
  "lightning",
- "mocks",
  "rust-bitcoin-coin-selection",
  "secp256k1-zkp",
 ]
@@ -2326,14 +2326,15 @@ dependencies = [
 [[package]]
 name = "mocks"
 version = "0.1.0"
+source = "git+https://github.com/p2pderivatives/rust-dlc?branch=master#35db4caced5d5ce2b97b9c94e4e681282bf8ddc5"
 dependencies = [
  "bitcoin",
- "dlc 0.4.0",
- "dlc-manager 0.4.0",
- "dlc-messages 0.4.0",
+ "dlc 0.4.0 (git+https://github.com/p2pderivatives/rust-dlc?branch=master)",
+ "dlc-manager 0.4.0 (git+https://github.com/p2pderivatives/rust-dlc?branch=master)",
+ "dlc-messages 0.4.0 (git+https://github.com/p2pderivatives/rust-dlc?branch=master)",
  "lightning",
  "secp256k1-zkp",
- "simple-wallet 0.1.0",
+ "simple-wallet 0.1.0 (git+https://github.com/p2pderivatives/rust-dlc?branch=master)",
 ]
 
 [[package]]
@@ -3373,10 +3374,11 @@ checksum = "420acb44afdae038210c99e69aae24109f32f15500aa708e81d46c9f29d55fcf"
 [[package]]
 name = "simple-wallet"
 version = "0.1.0"
+source = "git+https://github.com/p2pderivatives/rust-dlc?tag=v0.4.0#51517f3f6ad764953983b001efc2eac197ddb080"
 dependencies = [
  "bitcoin",
- "dlc 0.4.0",
- "dlc-manager 0.4.0",
+ "dlc 0.4.0 (git+https://github.com/p2pderivatives/rust-dlc?tag=v0.4.0)",
+ "dlc-manager 0.4.0 (git+https://github.com/p2pderivatives/rust-dlc?tag=v0.4.0)",
  "lightning",
  "rust-bitcoin-coin-selection",
  "secp256k1-zkp",
@@ -3385,11 +3387,11 @@ dependencies = [
 [[package]]
 name = "simple-wallet"
 version = "0.1.0"
-source = "git+https://github.com/p2pderivatives/rust-dlc?tag=v0.4.0#51517f3f6ad764953983b001efc2eac197ddb080"
+source = "git+https://github.com/p2pderivatives/rust-dlc?branch=master#35db4caced5d5ce2b97b9c94e4e681282bf8ddc5"
 dependencies = [
  "bitcoin",
- "dlc 0.4.0 (git+https://github.com/p2pderivatives/rust-dlc?tag=v0.4.0)",
- "dlc-manager 0.4.0 (git+https://github.com/p2pderivatives/rust-dlc?tag=v0.4.0)",
+ "dlc 0.4.0 (git+https://github.com/p2pderivatives/rust-dlc?branch=master)",
+ "dlc-manager 0.4.0 (git+https://github.com/p2pderivatives/rust-dlc?branch=master)",
  "lightning",
  "rust-bitcoin-coin-selection",
  "secp256k1-zkp",

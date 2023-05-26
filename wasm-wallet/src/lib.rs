@@ -163,7 +163,6 @@ impl JsDLCInterface {
                 oracles,
                 Arc::new(time_provider),
                 Arc::clone(&blockchain),
-                None,
             )
             .unwrap(),
         ));
