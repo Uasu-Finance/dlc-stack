@@ -117,6 +117,8 @@ fn main() {
         active_network,
     ));
 
+    let static_address = wallet.get_new_address().unwrap();
+
     // Set up Oracle Client
     let p2p_client: P2PDOracleClient = retry!(
         P2PDOracleClient::new(&oracle_url),
@@ -191,7 +193,7 @@ fn main() {
                 },
                 (GET) (/info) => {
                     info!("Call info.");
-                    add_access_control_headers(get_wallet_info(manager.clone(), wallet2.clone()))
+                    add_access_control_headers(get_wallet_info(manager.clone(), wallet2.clone(), static_address.to_string()))
                 },
                 (POST) (/offer) => {
                     info!("Call POST (create) offer {:?}", request);
@@ -235,6 +237,7 @@ fn main() {
 fn get_wallet_info(
     manager: Arc<Mutex<DlcManager>>,
     wallet: Arc<SimpleWallet<Arc<ElectrsBlockchainProvider>, Arc<SledStorageProvider>>>,
+    static_address: String,
 ) -> Response {
     let mut info_response = json!({});
     let mut contracts_json = json!({});
@@ -307,7 +310,7 @@ fn get_wallet_info(
 
     info_response["wallet"] = json!({
         "balance": wallet.get_balance(),
-        "address": wallet.get_new_address().unwrap()
+        "address": static_address
     });
     info_response["contracts"] = contracts_json;
 
@@ -420,20 +423,23 @@ fn create_new_offer(
     };
 
     // check if the oracle has an event with the id of event_id
-   match oracle.get_announcement(&event_id) {
+    match oracle.get_announcement(&event_id) {
         Ok(_announcement) => (),
         Err(e) => {
             info!("Error getting announcement: {}", event_id);
             return Response::json(&ErrorsResponse {
                 status: 400,
                 errors: vec![ErrorResponse {
-                    message: format!("Error: unable to get announcement. Does it exist? -- {}", e.to_string()),
+                    message: format!(
+                        "Error: unable to get announcement. Does it exist? -- {}",
+                        e.to_string()
+                    ),
                     code: None,
                 }],
             })
-            .with_status_code(400)
+            .with_status_code(400);
         }
-   }
+    }
 
     // Some regtest networks have an unreliable fee estimation service
     let fee_rate = match active_network {
