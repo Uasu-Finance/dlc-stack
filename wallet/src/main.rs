@@ -130,6 +130,12 @@ fn main() {
     // Set up time provider
     let time_provider = SystemTimeProvider {};
 
+    retry!(
+        blockchain.get_blockchain_height(),
+        10,
+        "get blockchain height"
+    );
+
     // Create the DLC Manager
     let manager = Arc::new(Mutex::new(
         Manager::new(
@@ -182,6 +188,9 @@ fn main() {
                         info!("Call cleanup contract offers feature disabled.");
                         Response::json(&("Disabled".to_string())).with_status_code(400)
                     }
+                },
+                (GET) (/health) => {
+                    Response::json(&("OK".to_string())).with_status_code(200)
                 },
                 (GET) (/unlockutxos) => {
                     unlock_utxos(wallet2.clone(), Response::json(&("OK".to_string())).with_status_code(200))
@@ -420,25 +429,28 @@ fn create_new_offer(
     };
 
     // check if the oracle has an event with the id of event_id
-   match oracle.get_announcement(&event_id) {
+    match oracle.get_announcement(&event_id) {
         Ok(_announcement) => (),
         Err(e) => {
             info!("Error getting announcement: {}", event_id);
             return Response::json(&ErrorsResponse {
                 status: 400,
                 errors: vec![ErrorResponse {
-                    message: format!("Error: unable to get announcement. Does it exist? -- {}", e.to_string()),
+                    message: format!(
+                        "Error: unable to get announcement. Does it exist? -- {}",
+                        e.to_string()
+                    ),
                     code: None,
                 }],
             })
-            .with_status_code(400)
+            .with_status_code(400);
         }
-   }
+    }
 
     // Some regtest networks have an unreliable fee estimation service
     let fee_rate = match active_network {
         bitcoin::Network::Regtest => 1,
-        _ => blockchain.get_est_sat_per_1000_weight(ConfirmationTarget::Normal) as u64,
+        _ => 21242,
     };
 
     let contract_input = ContractInput {

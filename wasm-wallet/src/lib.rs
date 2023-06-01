@@ -113,6 +113,8 @@ impl JsDLCInterface {
     ) -> JsDLCInterface {
         console_error_panic_hook::set_once();
 
+        clog!("Received JsDLCInterface parameters: privkey={}, address={}, network={}, electrs_url={}, oracle_url={}", privkey, address, network, electrs_url, oracle_url);
+
         let options = JsDLCInterfaceOptions {
             oracle_url,
             network,
@@ -230,6 +232,10 @@ impl JsDLCInterface {
     pub async fn accept_offer(&self, offer_json: String) -> String {
         let dlc_offer_message: OfferDlc = serde_json::from_str(&offer_json).unwrap();
         clog!("Offer to accept: {:?}", dlc_offer_message);
+        
+        clog!("receive_offer - after on_dlc_message");
+        let temporary_contract_id = dlc_offer_message.temporary_contract_id;
+
         match self.manager.lock().unwrap().on_dlc_message(
             &Message::Offer(dlc_offer_message.clone()),
             STATIC_COUNTERPARTY_NODE_ID.parse().unwrap(),
@@ -241,15 +247,13 @@ impl JsDLCInterface {
             }
         }
 
-        clog!("receive_offer - after on_dlc_message");
-        let temporary_contract_id = dlc_offer_message.temporary_contract_id;
 
         clog!("accepting contract with id {:?}", temporary_contract_id);
 
         let (_contract_id, _public_key, accept_msg) = self
             .manager
             .lock()
-            .unwrap()
+        .unwrap()
             .accept_contract_offer(&temporary_contract_id)
             .expect("Error accepting contract offer");
 

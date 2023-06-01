@@ -53,7 +53,7 @@ pub struct EsploraAsyncBlockchainProvider {
 
 impl EsploraAsyncBlockchainProvider {
     pub fn new(host: String, _network: Network) -> Self {
-        let blockchain = EsploraBlockchain::new("https://dev-oracle.dlc.link/electrs", 20);
+        let blockchain = EsploraBlockchain::new(&host, 20);
 
         Self {
             host,
