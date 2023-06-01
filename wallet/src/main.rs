@@ -117,6 +117,8 @@ fn main() {
         active_network,
     ));
 
+    let static_address = wallet.get_new_address().unwrap();
+
     // Set up Oracle Client
     let p2p_client: P2PDOracleClient = retry!(
         P2PDOracleClient::new(&oracle_url),
@@ -200,7 +202,7 @@ fn main() {
                 },
                 (GET) (/info) => {
                     info!("Call info.");
-                    add_access_control_headers(get_wallet_info(manager.clone(), wallet2.clone()))
+                    add_access_control_headers(get_wallet_info(manager.clone(), wallet2.clone(), static_address.to_string()))
                 },
                 (POST) (/offer) => {
                     info!("Call POST (create) offer {:?}", request);
@@ -244,6 +246,7 @@ fn main() {
 fn get_wallet_info(
     manager: Arc<Mutex<DlcManager>>,
     wallet: Arc<SimpleWallet<Arc<ElectrsBlockchainProvider>, Arc<SledStorageProvider>>>,
+    static_address: String,
 ) -> Response {
     let mut info_response = json!({});
     let mut contracts_json = json!({});
@@ -316,7 +319,7 @@ fn get_wallet_info(
 
     info_response["wallet"] = json!({
         "balance": wallet.get_balance(),
-        "address": wallet.get_new_address().unwrap()
+        "address": static_address
     });
     info_response["contracts"] = contracts_json;
 
