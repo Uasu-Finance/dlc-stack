@@ -7,7 +7,11 @@ extern crate rouille;
 use std::{
     cmp,
     collections::HashMap,
-    env, panic,
+    env,
+    fs::File,
+    io::Read,
+    panic,
+    path::PathBuf,
     str::FromStr,
     sync::{Arc, Mutex},
     thread,
@@ -27,8 +31,8 @@ use dlc_manager::{
 use dlc_messages::{AcceptDlc, Message};
 use dlc_sled_storage_provider::SledStorageProvider;
 use electrs_blockchain_provider::ElectrsBlockchainProvider;
-use lightning::chain::chaininterface::{ConfirmationTarget, FeeEstimator};
 use log::{info, warn};
+use secp256k1_zkp::{All, PublicKey, Secp256k1, SecretKey};
 use simple_wallet::SimpleWallet;
 
 use crate::storage::storage_provider::StorageProvider;
@@ -74,6 +78,23 @@ struct ErrorsResponse {
     status: u64,
 }
 
+fn get_or_generate_secret_from_config(
+    secp: &Secp256k1<All>,
+    secret_key_file: std::path::PathBuf,
+) -> SecretKey {
+    let mut secret_key = String::new();
+    info!(
+        "reading secret key from {}",
+        secret_key_file.as_os_str().to_string_lossy()
+    );
+    File::open(secret_key_file)
+        .unwrap()
+        .read_to_string(&mut secret_key)
+        .unwrap();
+    secret_key.retain(|c| !c.is_whitespace());
+    SecretKey::from_str(&secret_key).unwrap()
+}
+
 fn main() {
     env_logger::init();
     let oracle_url: String = env::var("ORACLE_URL").unwrap_or("http://localhost:8080".to_string());
@@ -101,9 +122,6 @@ fn main() {
         electrs_host.to_string(),
         active_network,
     ));
-
-    // Set up DLC store
-    let store = StorageProvider::new();
 
     // Set up wallet store
     let root_sled_path: String = env::var("SLED_WALLET_PATH").unwrap_or("wallet_db".to_string());
@@ -138,12 +156,21 @@ fn main() {
         "get blockchain height"
     );
 
+    let secp: Secp256k1<All> = Secp256k1::new();
+    let secret_key = get_or_generate_secret_from_config(&secp, PathBuf::from("config/secret.key"));
+    let pubkey = PublicKey::from_secret_key(&secp, &secret_key);
+
+    info!("Starting DLC Manager with pubkey: {}", pubkey.to_string());
+
+    // Set up DLC store
+    let dlc_store = StorageProvider::new(pubkey.to_string()).unwrap();
+
     // Create the DLC Manager
     let manager = Arc::new(Mutex::new(
         Manager::new(
             Arc::clone(&wallet),
             Arc::clone(&blockchain),
-            Box::new(store),
+            Box::new(dlc_store),
             oracles,
             Arc::new(time_provider),
             Arc::clone(&blockchain),

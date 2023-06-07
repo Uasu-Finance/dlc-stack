@@ -16,17 +16,18 @@ use super::utils::{deserialize_contract, get_contract_state_str, serialize_contr
 
 pub struct StorageApiProvider {
     client: StorageApiClient,
-
+    key: String,
     runtime: Runtime,
 }
 
 impl StorageApiProvider {
-    pub fn new() -> Self {
+    pub fn new(key: String) -> Self {
         info!("Creating storage API provider");
         let storage_api_endpoint: String =
             env::var("STORAGE_API_ENDPOINT").unwrap_or("http://localhost:8100".to_string());
         Self {
             client: StorageApiClient::new(storage_api_endpoint),
+            key,
             runtime: Runtime::new().unwrap(),
         }
     }
@@ -37,9 +38,10 @@ impl StorageApiProvider {
     }
 
     pub fn get_contracts_by_state(&self, state: String) -> Result<Vec<Contract>, Error> {
-        let contracts_res: Result<Vec<dlc_clients::Contract>, ApiError> = self
-            .runtime
-            .block_on(self.client.get_contracts_by_state(state.clone()));
+        let contracts_res: Result<Vec<dlc_clients::Contract>, ApiError> = self.runtime.block_on(
+            self.client
+                .get_contracts_by_state(state.clone(), self.key.clone()),
+        );
         let mut contents: Vec<String> = vec![];
         let mut contracts: Vec<Contract> = vec![];
         for c in contracts_res.unwrap() {
@@ -58,8 +60,9 @@ impl Storage for StorageApiProvider {
     fn get_contract(&self, id: &ContractId) -> Result<Option<Contract>, Error> {
         let cid = get_contract_id_string(*id);
         info!("Get contract by id - {}", cid.clone());
-        let contract_res: Result<Option<dlc_clients::Contract>, ApiError> =
-            self.runtime.block_on(self.client.get_contract(cid.clone()));
+        let contract_res: Result<Option<dlc_clients::Contract>, ApiError> = self
+            .runtime
+            .block_on(self.client.get_contract(cid.clone(), self.key.clone()));
         if let Some(res) = contract_res.map_err(to_storage_error)? {
             let bytes = base64::decode(res.content).unwrap();
             let contract = deserialize_contract(&bytes)?;
@@ -71,8 +74,9 @@ impl Storage for StorageApiProvider {
     }
 
     fn get_contracts(&self) -> Result<Vec<Contract>, Error> {
-        let contracts_res: Result<Vec<dlc_clients::Contract>, ApiError> =
-            self.runtime.block_on(self.client.get_contracts());
+        let contracts_res: Result<Vec<dlc_clients::Contract>, ApiError> = self
+            .runtime
+            .block_on(self.client.get_contracts(self.key.clone()));
         let mut contents: Vec<String> = vec![];
         let mut contracts: Vec<Contract> = vec![];
         let unpacked_contracts = contracts_res.map_err(to_storage_error)?;
@@ -90,11 +94,16 @@ impl Storage for StorageApiProvider {
     fn create_contract(self: &StorageApiProvider, contract: &OfferedContract) -> Result<(), Error> {
         let data = serialize_contract(&Contract::Offered(contract.clone()))?;
         let uuid = get_contract_id_string(contract.id);
-        info!("Create new contract with contract id {}", uuid.clone());
+        info!(
+            "Create new contract with contract id {} and key {}",
+            uuid.clone(),
+            self.key.clone()
+        );
         let req = NewContract {
             uuid: uuid.clone(),
             state: "offered".to_string(),
             content: base64::encode(&data),
+            key: self.key.clone(),
         };
         let res = self.runtime.block_on(self.client.create_contract(req));
         match res {
@@ -162,9 +171,10 @@ impl Storage for StorageApiProvider {
             contract_id.clone(),
             curr_state.clone()
         );
-        let contract_res: Result<Option<dlc_clients::Contract>, ApiError> = self
-            .runtime
-            .block_on(self.client.get_contract(contract_id.clone()));
+        let contract_res: Result<Option<dlc_clients::Contract>, ApiError> = self.runtime.block_on(
+            self.client
+                .get_contract(contract_id.clone(), self.key.clone()),
+        );
         let unw_contract = match contract_res {
             Ok(res) => {
                 info!(
@@ -224,9 +234,10 @@ impl Storage for StorageApiProvider {
             }
         } else {
             info!(
-                "As contract does not exist with contract id {}, create contract (with state '{}')",
+                "As contract does not exist with contract id {}, create contract (with state '{}' and key {})",
                 contract_id.clone(),
-                curr_state.clone()
+                curr_state.clone(),
+                self.key.clone()
             );
             let create_res = self
                 .runtime
@@ -234,6 +245,7 @@ impl Storage for StorageApiProvider {
                     uuid: contract_id.clone(),
                     state: curr_state.clone(),
                     content: encoded_content,
+                    key: self.key.clone(),
                 }));
             match create_res {
                 Ok(_) => {
