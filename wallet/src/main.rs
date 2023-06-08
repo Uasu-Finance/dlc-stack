@@ -9,7 +9,7 @@ use std::{
     collections::HashMap,
     env,
     fs::File,
-    io::Read,
+    io::{Read, Write},
     panic,
     path::PathBuf,
     str::FromStr,
@@ -32,7 +32,7 @@ use dlc_messages::{AcceptDlc, Message};
 use dlc_sled_storage_provider::SledStorageProvider;
 use electrs_blockchain_provider::ElectrsBlockchainProvider;
 use log::{info, warn};
-use secp256k1_zkp::{All, PublicKey, Secp256k1, SecretKey};
+use secp256k1_zkp::{rand, All, PublicKey, Secp256k1, SecretKey};
 use simple_wallet::SimpleWallet;
 
 use crate::storage::storage_provider::StorageProvider;
@@ -80,19 +80,28 @@ struct ErrorsResponse {
 
 fn get_or_generate_secret_from_config(
     secp: &Secp256k1<All>,
-    secret_key_file: std::path::PathBuf,
+    secret_key_file_path: std::path::PathBuf,
 ) -> SecretKey {
     let mut secret_key = String::new();
-    info!(
-        "reading secret key from {}",
-        secret_key_file.as_os_str().to_string_lossy()
-    );
-    File::open(secret_key_file)
-        .unwrap()
-        .read_to_string(&mut secret_key)
-        .unwrap();
-    secret_key.retain(|c| !c.is_whitespace());
-    SecretKey::from_str(&secret_key).unwrap()
+    if secret_key_file_path.exists() {
+        info!(
+            "reading secret key from {} (default)",
+            secret_key_file_path.file_name().unwrap().to_string_lossy()
+        );
+        File::open(secret_key_file_path)
+            .unwrap()
+            .read_to_string(&mut secret_key)
+            .unwrap();
+        secret_key.retain(|c| !c.is_whitespace());
+        SecretKey::from_str(&secret_key).unwrap()
+    } else {
+        info!("no secret key file was found, generating secret key");
+        let new_key = secp.generate_keypair(&mut rand::thread_rng()).0;
+        let mut file = File::create(secret_key_file_path).unwrap();
+        file.write_all(new_key.display_secret().to_string().as_bytes())
+            .unwrap();
+        new_key
+    }
 }
 
 fn main() {
@@ -157,7 +166,7 @@ fn main() {
     );
 
     let secp: Secp256k1<All> = Secp256k1::new();
-    let secret_key = get_or_generate_secret_from_config(&secp, PathBuf::from("config/secret.key"));
+    let secret_key = get_or_generate_secret_from_config(&secp, PathBuf::from("secret.key"));
     let pubkey = PublicKey::from_secret_key(&secp, &secret_key);
 
     info!("Starting DLC Manager with pubkey: {}", pubkey.to_string());
@@ -242,7 +251,7 @@ fn main() {
                         total_outcomes: u64
                     }
                     let req: OfferRequest = try_or_400!(rouille::input::json_input(request));
-                    add_access_control_headers(create_new_offer(manager.clone(), oracle.clone(), blockchain.clone(), active_network, req.uuid, req.accept_collateral, req.offer_collateral, req.total_outcomes))
+                    add_access_control_headers(create_new_offer(manager.clone(), oracle.clone(), active_network, req.uuid, req.accept_collateral, req.offer_collateral, req.total_outcomes))
                 },
                 (OPTIONS) (/offer) => {
                     add_access_control_headers(Response::empty_204())
@@ -433,7 +442,6 @@ fn periodic_check(
 fn create_new_offer(
     manager: Arc<Mutex<DlcManager>>,
     oracle: Arc<P2PDOracleClient>,
-    blockchain: Arc<ElectrsBlockchainProvider>,
     active_network: bitcoin::Network,
     event_id: String,
     accept_collateral: u64,
@@ -531,7 +539,14 @@ fn accept_offer(accept_dlc: AcceptDlc, manager: Arc<Mutex<DlcManager>>) -> Respo
     } {
         add_access_control_headers(Response::json(&sign))
     } else {
-        panic!();
+        return Response::json(&ErrorsResponse {
+            status: 400,
+            errors: vec![ErrorResponse {
+                message: format!("Error: invalid Sign message for accept_offer function"),
+                code: None,
+            }],
+        })
+        .with_status_code(400);
     }
 }
 
