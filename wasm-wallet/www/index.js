@@ -3,7 +3,7 @@ import { JsDLCInterface } from "dlc_protocol_wallet";
 async function fetchOfferFromProtocolWallet() {
     let body = {
         "uuid": "abc12345",
-        "acceptCollateral": 100000,
+        "acceptCollateral": 10000,
         "offerCollateral": 0,
         "totalOutcomes": 100
     };
@@ -25,14 +25,14 @@ async function sendAcceptedOfferToProtocolWallet(accepted_offer) {
     }).then(res => res.json());
 }
 
-const key = "f8ec31c12b6d014249935f2cb76b543b442ac2325993b44cbed4cdf773fbc8df";
-const address = "bcrt1qatfjgacgqaua975r0cnsqtl09td8636jm3vnp0";
+const key = "bea4ecfec5cfa1e965ee1b3465ca4deff4f04b36a1fb5286a07660d5158789fb";
+const address = "tb1q3tj2fr9scwmcw3rq5m6jslva65f2rqjxt2t0zh";
 
 async function go() {
     console.log("DLC WASM test let's go");
 
     // Create a new dlc manager interface
-    const dlc_man = await JsDLCInterface.new(key, address, "regtest", "https://dev-oracle.dlc.link/electrs", "https://dev-oracle.dlc.link/oracle");
+    const dlc_man = await JsDLCInterface.new(key, address, "testnet", "https://blockstream.info/testnet/api", "https://testnet.dlc.link/oracle");
     console.log("dlc manager interface options: ", dlc_man.get_options());
 
     var balance = 0;
@@ -56,7 +56,7 @@ async function runDLCFlow(dlc_man) {
     const offer_json = await fetchOfferFromProtocolWallet();
     console.log("offer_json: ", offer_json);
 
-    const accepted_contract = await dlc_man.accept_offer(JSON.stringify(offer_json), dlc_man.get_options().address)
+    const accepted_contract = await dlc_man.accept_offer(JSON.stringify(offer_json))
     console.log("Got response from receive_offer_and_accept", accepted_contract);
 
     const signed_contract = await sendAcceptedOfferToProtocolWallet(accepted_contract);

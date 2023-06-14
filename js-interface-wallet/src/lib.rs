@@ -240,7 +240,7 @@ impl Wallet for JSInterfaceWallet {
             .into_iter()
             .map(|x| UtxoWrap { utxo: x })
             .collect::<Vec<_>>();
-
+        
         let selection = select_coins(amount, 20, &mut wrapped_utxos)
             .ok_or_else(|| Error::InvalidState("Not enough fund in utxos".to_string()))?;
 
