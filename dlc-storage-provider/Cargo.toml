@@ -1,0 +1,13 @@
+[package]
+authors = ["Crypto Garage"]
+edition = "2018"
+name = "dlc-storage-provider"
+version = "0.1.0"
+
+[dependencies]
+bitcoin = "0.29"
+dlc = { path = "../../original-rust-dlc/dlc", features = ["use-serde"] }
+dlc-manager = { path = "../../original-rust-dlc/dlc-manager", features = ["use-serde"] }
+dlc-messages = { path = "../../original-rust-dlc/dlc-messages", features = ["use-serde"] }
+lightning = {version = "0.0.113"}
+secp256k1-zkp = {version = "0.7.0", features = ["bitcoin_hashes", "global-context", "rand", "rand-std"]}

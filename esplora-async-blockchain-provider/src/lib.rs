@@ -4,7 +4,7 @@ use dlc_manager::{error::Error, Blockchain, Utxo};
 
 use lightning::chain::chaininterface::FeeEstimator;
 use reqwest::Response;
-use simple_wallet::WalletBlockchainProvider;
+use js_interface_wallet::WalletBlockchainProvider;
 
 use serde::{Deserialize, Serialize};
 
