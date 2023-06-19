@@ -169,10 +169,12 @@ impl JsDLCInterface {
             .unwrap(),
         ));
 
-        clog!("Finished setting up manager");
-
         blockchain.refresh_chain_data(options.address.clone()).await;
 
+        wallet.set_utxos(blockchain.get_utxos().unwrap()).unwrap();
+
+        clog!("Finished setting up manager");
+       
         JsDLCInterface {
             options,
             manager,
@@ -185,14 +187,20 @@ impl JsDLCInterface {
         serde_wasm_bindgen::to_value(&self.options).unwrap()
     }
 
-    pub async fn get_wallet_balance(&self) -> u64 {
+    pub async fn get_wallet_balance(&self, refresh_first: bool) -> u64 {
+        if refresh_first {
+            self.refresh().await;
+        }
+        self.blockchain.get_balance().await.unwrap()
+    }
+
+    pub async fn refresh(&self) {
         self.blockchain
             .refresh_chain_data(self.options.address.clone())
             .await;
         self.wallet
             .set_utxos(self.blockchain.get_utxos().unwrap())
             .unwrap();
-        self.blockchain.get_balance().await.unwrap()
     }
 
     // public async function for fetching all the contracts on the manager

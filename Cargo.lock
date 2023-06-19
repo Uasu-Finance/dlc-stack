@@ -2052,6 +2052,7 @@ dependencies = [
  "lightning",
  "rust-bitcoin-coin-selection",
  "secp256k1-zkp",
+ "web-sys",
 ]
 
 [[package]]

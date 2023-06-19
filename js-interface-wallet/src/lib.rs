@@ -9,6 +9,9 @@ use lightning::chain::chaininterface::{ConfirmationTarget, FeeEstimator};
 use rust_bitcoin_coin_selection::select_coins;
 use secp256k1_zkp::{rand::thread_rng, All, PublicKey, Secp256k1, SecretKey};
 
+#[macro_use]
+mod macros;
+
 type Result<T> = core::result::Result<T, Error>;
 
 /// Trait providing blockchain information to the wallet.
@@ -235,12 +238,17 @@ impl Wallet for JSInterfaceWallet {
         _lock_utxos: bool,
     ) -> Result<Vec<Utxo>> {
         let utxos: Vec<Utxo> = self.utxos.borrow().as_ref().unwrap().clone();
+        let utxos_len = utxos.len();
+        clog!("utxos length: {}", utxos_len);
 
         let mut wrapped_utxos = utxos
             .into_iter()
             .map(|x| UtxoWrap { utxo: x })
             .collect::<Vec<_>>();
-        
+
+        let wrapped_utxos_len = wrapped_utxos.len();
+        clog!("wrapped_utxos length: {}", wrapped_utxos_len);
+
         let selection = select_coins(amount, 20, &mut wrapped_utxos)
             .ok_or_else(|| Error::InvalidState("Not enough fund in utxos".to_string()))?;
 
