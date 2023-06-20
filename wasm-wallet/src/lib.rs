@@ -25,7 +25,7 @@ use dlc_manager::{
 use std::fmt::Write as _;
 
 use log::info;
-use mocks::memory_storage_provider::MemoryStorage;
+use dlc_storage_provider::DlcStorageProvider;
 
 use esplora_async_blockchain_provider::EsploraAsyncBlockchainProvider;
 
@@ -42,7 +42,7 @@ mod macros;
 type DlcManager = Manager<
     Arc<JSInterfaceWallet>,
     Arc<EsploraAsyncBlockchainProvider>,
-    Box<MemoryStorage>,
+    Box<DlcStorageProvider>,
     Arc<P2PDOracleClient>,
     Arc<SystemTimeProvider>,
     Arc<EsploraAsyncBlockchainProvider>,
@@ -132,7 +132,7 @@ impl JsDLCInterface {
         );
 
         // Set up DLC store
-        let store = MemoryStorage::new();
+        let store = DlcStorageProvider::new();
 
         // Generate keypair from secret key
         let seckey = secp256k1_zkp::SecretKey::from_str(&privkey).unwrap();

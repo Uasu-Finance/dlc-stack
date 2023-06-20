@@ -1299,6 +1299,7 @@ dependencies = [
  "console_error_panic_hook",
  "dlc-manager",
  "dlc-messages 0.4.0",
+ "dlc-storage-provider",
  "dlc-trie",
  "env_logger",
  "esplora-async-blockchain-provider",
@@ -2075,6 +2076,7 @@ dependencies = [
 name = "js-interface-wallet"
 version = "0.1.0"
 dependencies = [
+ "bdk",
  "bitcoin",
  "dlc 0.4.0",
  "dlc-manager",

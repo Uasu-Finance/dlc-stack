@@ -19,7 +19,7 @@ dlc-manager = { path = "../../original-rust-dlc/dlc-manager", features = ["use-s
 dlc-messages = { path = "../../original-rust-dlc/dlc-messages", features = ["use-serde"]}
 dlc-trie = { path = "../../original-rust-dlc/dlc-trie", features = ["use-serde"]}
 rust-bitcoin-coin-selection = {version = "0.1.0", git = "https://github.com/p2pderivatives/rust-bitcoin-coin-selection", features = ["rand"]}
-# mocks = { path = "../../original-rust-dlc/mocks" }
+dlc-storage-provider = { path = "../dlc-storage-provider" }
 env_logger = "0.9.0"
 getrandom = { version = "0.2", features = ["js"] }
 lightning = {version = "0.0.113" }

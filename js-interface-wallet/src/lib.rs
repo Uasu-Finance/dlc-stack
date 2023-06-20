@@ -1,15 +1,21 @@
 use std::{cell::RefCell, ops::Deref, str::FromStr};
 
 use bitcoin::{
-    Address, Network, PackedLockTime, PrivateKey, Script, Sequence, Transaction, TxIn, TxOut, Txid,
-    Witness,
+    hashes::Hash, Address, Network, PrivateKey, PackedLockTime, Script, Sequence, Transaction, TxIn, TxOut,
+    Txid, Witness,
 };
 use dlc_manager::{error::Error, Blockchain, Signer, Utxo, Wallet};
 use lightning::chain::chaininterface::{ConfirmationTarget, FeeEstimator};
 use rust_bitcoin_coin_selection::select_coins;
 use secp256k1_zkp::{rand::thread_rng, All, PublicKey, Secp256k1, SecretKey};
-
+use bdk::{
+    database::{BatchOperations, Database},
+    wallet::coin_selection::{BranchAndBoundCoinSelection, CoinSelectionAlgorithm, CoinSelectionResult, decide_change},
+    FeeRate, KeychainKind, LocalUtxo, Utxo as BdkUtxo, WeightedUtxo
+};
 type Result<T> = core::result::Result<T, Error>;
+
+pub(crate) const TXIN_BASE_WEIGHT: usize = (32 + 4 + 4) * 4;
 
 /// Trait providing blockchain information to the wallet.
 pub trait WalletBlockchainProvider: Blockchain + FeeEstimator {
@@ -219,6 +225,51 @@ impl Signer for JSInterfaceWallet {
     }
 }
 
+
+fn select_sorted_utxos(
+    utxos: impl Iterator<Item = (bool, WeightedUtxo)>,
+    fee_rate: FeeRate,
+    target_amount: u64,
+    drain_script: &Script,
+) -> Result<CoinSelectionResult> {
+    let mut selected_amount = 0;
+    let mut fee_amount = 0;
+    let selected = utxos
+        .scan(
+            (&mut selected_amount, &mut fee_amount),
+            |(selected_amount, fee_amount), (must_use, weighted_utxo)| {
+                if must_use || **selected_amount < target_amount + **fee_amount {
+                    **fee_amount +=
+                        fee_rate.fee_wu(TXIN_BASE_WEIGHT + weighted_utxo.satisfaction_weight);
+                    **selected_amount += weighted_utxo.utxo.txout().value;
+
+                    Some(weighted_utxo.utxo)
+                } else {
+                    None
+                }
+            },
+        )
+        .collect::<Vec<_>>();
+
+    let amount_needed_with_fees = target_amount + fee_amount;
+    if selected_amount < amount_needed_with_fees {
+        return Err(InsufficientFunds {
+            needed: amount_needed_with_fees,
+            available: selected_amount,
+        });
+    }
+
+    let remaining_amount = selected_amount - amount_needed_with_fees;
+
+    let excess = decide_change(remaining_amount, fee_rate, drain_script);
+
+    Ok(CoinSelectionResult {
+        selected,
+        fee_amount,
+        excess,
+    })
+}
+
 impl Wallet for JSInterfaceWallet {
     fn get_new_address(&self) -> Result<Address> {
         Ok(self.address.clone())
@@ -231,20 +282,67 @@ impl Wallet for JSInterfaceWallet {
     fn get_utxos_for_amount(
         &self,
         amount: u64,
-        _: Option<u64>,
-        _lock_utxos: bool,
+        fee_rate: Option<u64>,
+        lock_utxos: bool,
     ) -> Result<Vec<Utxo>> {
-        let utxos: Vec<Utxo> = self.utxos.borrow().as_ref().unwrap().clone();
-
-        let mut wrapped_utxos = utxos
-            .into_iter()
-            .map(|x| UtxoWrap { utxo: x })
+        let org_utxos =self.utxos.borrow().as_ref().unwrap().clone();
+        let utxos = org_utxos
+            .iter()
+            .filter(|x| !x.reserved)
+            .map(|x| WeightedUtxo {
+                utxo: BdkUtxo::Local(LocalUtxo {
+                    outpoint: x.outpoint,
+                    txout: x.tx_out.clone(),
+                    keychain: KeychainKind::External,
+                    is_spent: false,
+                }),
+                satisfaction_weight: 107,
+            })
             .collect::<Vec<_>>();
-        
-        let selection = select_coins(amount, 20, &mut wrapped_utxos)
-            .ok_or_else(|| Error::InvalidState("Not enough fund in utxos".to_string()))?;
+        let coin_selection = BranchAndBoundCoinSelection::default();
+        let dummy_pubkey: PublicKey =
+            "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798"
+                .parse()
+                .unwrap();
+        let dummy_drain =
+            Script::new_v0_p2wpkh(&bitcoin::WPubkeyHash::hash(&dummy_pubkey.serialize()));
+        let fee_rate = FeeRate::from_sat_per_vb(fee_rate.unwrap() as f32);
+        // let selection = coin_selection
+        //     .coin_select(self, Vec::new(), utxos, fee_rate, amount, &dummy_drain)
+        //     .map_err(|e| Error::WalletError(Box::new(e)))?;
+        let required_utxos = Vec::new();
+        let drain_script = &dummy_drain;
 
-        Ok(selection.into_iter().map(|x| x.utxo).collect::<Vec<_>>())
+        let temp_utxos = {
+            utxos.sort_unstable_by_key(|wu| wu.utxo.txout().value);
+            required_utxos
+                .into_iter()
+                .map(|utxo| (true, utxo))
+                .chain(utxos.into_iter().rev().map(|utxo| (false, utxo)))
+        };
+
+        let selection = select_sorted_utxos(temp_utxos, fee_rate, amount, drain_script);
+
+        let mut res = Vec::new();
+        if lock_utxos {
+            for utxo in selection.selected {
+                let local_utxo = if let BdkUtxo::Local(l) = utxo {
+                    l
+                } else {
+                    panic!();
+                };
+                let org = org_utxos
+                    .iter()
+                    .find(|x| x.tx_out == local_utxo.txout && x.outpoint == local_utxo.outpoint)
+                    .unwrap();
+                let updated = Utxo {
+                    reserved: true,
+                    ..org.clone()
+                };
+                res.push(org.clone());
+            }
+        }
+        Ok(res)
     }
 
     fn import_address(&self, _: &Address) -> Result<()> {

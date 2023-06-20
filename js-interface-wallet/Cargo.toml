@@ -12,7 +12,7 @@ dlc-manager = { path = "../../original-rust-dlc/dlc-manager", features = ["use-s
 lightning = {version = "0.0.113"}
 rust-bitcoin-coin-selection = {version = "0.1.0", git = "https://github.com/p2pderivatives/rust-bitcoin-coin-selection", features = ["rand"]}
 secp256k1-zkp = {version = "0.7.0"}
+bdk = {version = "0.28.0", default-features = false, features = ["async-interface", "use-esplora-async"]}
 
 [dev-dependencies]
-#mocks = {path = "../../../original-rust-dlc/mocks"}
 secp256k1-zkp = {version = "0.7.0", features = ["global-context"]}
