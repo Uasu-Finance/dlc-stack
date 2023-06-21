@@ -2,9 +2,9 @@ use bitcoin::consensus::Decodable;
 use bitcoin::{Address, Block, Network, OutPoint, Script, Transaction, TxOut, Txid};
 use dlc_manager::{error::Error, Blockchain, Utxo};
 
+use js_interface_wallet::WalletBlockchainProvider;
 use lightning::chain::chaininterface::FeeEstimator;
 use reqwest::Response;
-use js_interface_wallet::WalletBlockchainProvider;
 
 use serde::{Deserialize, Serialize};
 

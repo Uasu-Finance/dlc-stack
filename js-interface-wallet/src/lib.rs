@@ -1,18 +1,20 @@
 use std::{cell::RefCell, ops::Deref, str::FromStr};
 
+use bdk::{
+    database::{BatchOperations, Database},
+    wallet::coin_selection::{
+        decide_change, BranchAndBoundCoinSelection, CoinSelectionAlgorithm, CoinSelectionResult,
+    },
+    FeeRate, KeychainKind, LocalUtxo, Utxo as BdkUtxo, WeightedUtxo,
+};
 use bitcoin::{
-    hashes::Hash, Address, Network, PrivateKey, PackedLockTime, Script, Sequence, Transaction, TxIn, TxOut,
-    Txid, Witness,
+    hashes::Hash, Address, Network, PackedLockTime, PrivateKey, Script, Sequence, Transaction,
+    TxIn, TxOut, Txid, Witness,
 };
 use dlc_manager::{error::Error, Blockchain, Signer, Utxo, Wallet};
 use lightning::chain::chaininterface::{ConfirmationTarget, FeeEstimator};
 use rust_bitcoin_coin_selection::select_coins;
 use secp256k1_zkp::{rand::thread_rng, All, PublicKey, Secp256k1, SecretKey};
-use bdk::{
-    database::{BatchOperations, Database},
-    wallet::coin_selection::{BranchAndBoundCoinSelection, CoinSelectionAlgorithm, CoinSelectionResult, decide_change},
-    FeeRate, KeychainKind, LocalUtxo, Utxo as BdkUtxo, WeightedUtxo
-};
 type Result<T> = core::result::Result<T, Error>;
 
 pub(crate) const TXIN_BASE_WEIGHT: usize = (32 + 4 + 4) * 4;
@@ -225,7 +227,6 @@ impl Signer for JSInterfaceWallet {
     }
 }
 
-
 fn select_sorted_utxos(
     utxos: impl Iterator<Item = (bool, WeightedUtxo)>,
     fee_rate: FeeRate,
@@ -253,10 +254,7 @@ fn select_sorted_utxos(
 
     let amount_needed_with_fees = target_amount + fee_amount;
     if selected_amount < amount_needed_with_fees {
-        return Err(InsufficientFunds {
-            needed: amount_needed_with_fees,
-            available: selected_amount,
-        });
+        panic!("insufficient funds");
     }
 
     let remaining_amount = selected_amount - amount_needed_with_fees;
@@ -285,8 +283,8 @@ impl Wallet for JSInterfaceWallet {
         fee_rate: Option<u64>,
         lock_utxos: bool,
     ) -> Result<Vec<Utxo>> {
-        let org_utxos =self.utxos.borrow().as_ref().unwrap().clone();
-        let utxos = org_utxos
+        let org_utxos = self.utxos.borrow().as_ref().unwrap().clone();
+        let mut utxos = org_utxos
             .iter()
             .filter(|x| !x.reserved)
             .map(|x| WeightedUtxo {
@@ -299,7 +297,7 @@ impl Wallet for JSInterfaceWallet {
                 satisfaction_weight: 107,
             })
             .collect::<Vec<_>>();
-        let coin_selection = BranchAndBoundCoinSelection::default();
+        // let coin_selection = BranchAndBoundCoinSelection::default();
         let dummy_pubkey: PublicKey =
             "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798"
                 .parse()
@@ -325,7 +323,7 @@ impl Wallet for JSInterfaceWallet {
 
         let mut res = Vec::new();
         if lock_utxos {
-            for utxo in selection.selected {
+            for utxo in selection.unwrap().selected {
                 let local_utxo = if let BdkUtxo::Local(l) = utxo {
                     l
                 } else {

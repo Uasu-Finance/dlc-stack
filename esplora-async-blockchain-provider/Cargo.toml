@@ -8,11 +8,11 @@ version = "0.1.0"
 bitcoin = {version = "0.29.2", features=["serde"]}
 futures = {version = "0.3.28", default-features = false }
 lightning = {version = "0.0.113" }
-dlc-manager = { path = "../../original-rust-dlc/dlc-manager", features = ["use-serde"] }
-# simple-wallet = { path = "../../original-rust-dlc/simple-wallet" }
+dlc-manager =  { git = "https://github.com/dlc-link/rust-dlc", branch="fix/fee-comtputation-issue", features = ["use-serde"] }
+# simple-wallet = { path = "../../rust-dlc/simple-wallet" }
 js-interface-wallet = { path = "../js-interface-wallet"}
 serde = {version = "*", features = ["derive"]}
 bdk = {version = "0.28.0", default-features = false, features = ["async-interface", "use-esplora-async"]}
-miniscript = { version = "9.0", features = ["std"] }
+miniscript = { version = "9.0", features = ["serde", "std"], default-features = false }
 reqwest = {version = "0.11", features = ["json"]}
 wasm-bindgen-futures = { version = "0.4.34"}
