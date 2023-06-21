@@ -455,6 +455,7 @@ dependencies = [
 [[package]]
 name = "bitcoin-test-utils"
 version = "0.1.0"
+source = "git+https://github.com/dlc-link/rust-dlc?branch=fix/fee-comtputation-issue#96b30b7d345c5029de58e98f0a6247a35f396bf7"
 dependencies = [
  "bitcoin",
  "bitcoincore-rpc",
@@ -1098,16 +1099,6 @@ dependencies = [
 [[package]]
 name = "dlc"
 version = "0.4.0"
-dependencies = [
- "bitcoin",
- "miniscript 8.0.1",
- "secp256k1-sys",
- "secp256k1-zkp",
-]
-
-[[package]]
-name = "dlc"
-version = "0.4.0"
 source = "git+https://github.com/dlc-link/rust-dlc?branch=fix/fee-comtputation-issue#96b30b7d345c5029de58e98f0a6247a35f396bf7"
 dependencies = [
  "bitcoin",
@@ -1141,27 +1132,13 @@ dependencies = [
 [[package]]
 name = "dlc-manager"
 version = "0.4.0"
-dependencies = [
- "async-trait",
- "bitcoin",
- "dlc 0.4.0",
- "dlc-messages 0.4.0",
- "dlc-trie 0.4.0",
- "lightning",
- "log",
- "secp256k1-zkp",
-]
-
-[[package]]
-name = "dlc-manager"
-version = "0.4.0"
 source = "git+https://github.com/dlc-link/rust-dlc?branch=fix/fee-comtputation-issue#96b30b7d345c5029de58e98f0a6247a35f396bf7"
 dependencies = [
  "async-trait",
  "bitcoin",
- "dlc 0.4.0 (git+https://github.com/dlc-link/rust-dlc?branch=fix/fee-comtputation-issue)",
- "dlc-messages 0.4.0 (git+https://github.com/dlc-link/rust-dlc?branch=fix/fee-comtputation-issue)",
- "dlc-trie 0.4.0 (git+https://github.com/dlc-link/rust-dlc?branch=fix/fee-comtputation-issue)",
+ "dlc",
+ "dlc-messages",
+ "dlc-trie",
  "lightning",
  "log",
  "secp256k1-zkp",
@@ -1171,20 +1148,10 @@ dependencies = [
 [[package]]
 name = "dlc-messages"
 version = "0.4.0"
-dependencies = [
- "bitcoin",
- "dlc 0.4.0",
- "lightning",
- "secp256k1-zkp",
-]
-
-[[package]]
-name = "dlc-messages"
-version = "0.4.0"
 source = "git+https://github.com/dlc-link/rust-dlc?branch=fix/fee-comtputation-issue#96b30b7d345c5029de58e98f0a6247a35f396bf7"
 dependencies = [
  "bitcoin",
- "dlc 0.4.0 (git+https://github.com/dlc-link/rust-dlc?branch=fix/fee-comtputation-issue)",
+ "dlc",
  "lightning",
  "secp256k1-zkp",
  "serde",
@@ -1197,12 +1164,12 @@ dependencies = [
  "base64 0.13.1",
  "bitcoin",
  "chrono",
- "dlc 0.4.0 (git+https://github.com/dlc-link/rust-dlc?branch=fix/fee-comtputation-issue)",
+ "dlc",
  "dlc-clients",
- "dlc-manager 0.4.0 (git+https://github.com/dlc-link/rust-dlc?branch=fix/fee-comtputation-issue)",
- "dlc-messages 0.4.0 (git+https://github.com/dlc-link/rust-dlc?branch=fix/fee-comtputation-issue)",
+ "dlc-manager",
+ "dlc-messages",
  "dlc-sled-storage-provider",
- "dlc-trie 0.4.0 (git+https://github.com/dlc-link/rust-dlc?branch=fix/fee-comtputation-issue)",
+ "dlc-trie",
  "electrs-blockchain-provider",
  "env_logger",
  "hex",
@@ -1214,7 +1181,7 @@ dependencies = [
  "secp256k1-zkp",
  "serde",
  "serde_json",
- "simple-wallet 0.1.0",
+ "simple-wallet",
  "sled",
  "tokio",
  "warp",
@@ -1226,10 +1193,10 @@ version = "0.1.0"
 source = "git+https://github.com/dlc-link/rust-dlc?branch=fix/fee-comtputation-issue#96b30b7d345c5029de58e98f0a6247a35f396bf7"
 dependencies = [
  "bitcoin",
- "dlc-manager 0.4.0 (git+https://github.com/dlc-link/rust-dlc?branch=fix/fee-comtputation-issue)",
+ "dlc-manager",
  "lightning",
  "secp256k1-zkp",
- "simple-wallet 0.1.0 (git+https://github.com/dlc-link/rust-dlc?branch=fix/fee-comtputation-issue)",
+ "simple-wallet",
  "sled",
 ]
 
@@ -1266,9 +1233,9 @@ name = "dlc-storage-provider"
 version = "0.1.0"
 dependencies = [
  "bitcoin",
- "dlc 0.4.0 (git+https://github.com/dlc-link/rust-dlc?branch=fix/fee-comtputation-issue)",
- "dlc-manager 0.4.0 (git+https://github.com/dlc-link/rust-dlc?branch=fix/fee-comtputation-issue)",
- "dlc-messages 0.4.0 (git+https://github.com/dlc-link/rust-dlc?branch=fix/fee-comtputation-issue)",
+ "dlc",
+ "dlc-manager",
+ "dlc-messages",
  "lightning",
  "secp256k1-zkp",
 ]
@@ -1292,19 +1259,10 @@ dependencies = [
 [[package]]
 name = "dlc-trie"
 version = "0.4.0"
-dependencies = [
- "bitcoin",
- "dlc 0.4.0",
- "secp256k1-zkp",
-]
-
-[[package]]
-name = "dlc-trie"
-version = "0.4.0"
 source = "git+https://github.com/dlc-link/rust-dlc?branch=fix/fee-comtputation-issue#96b30b7d345c5029de58e98f0a6247a35f396bf7"
 dependencies = [
  "bitcoin",
- "dlc 0.4.0 (git+https://github.com/dlc-link/rust-dlc?branch=fix/fee-comtputation-issue)",
+ "dlc",
  "secp256k1-zkp",
  "serde",
 ]
@@ -1317,10 +1275,10 @@ dependencies = [
  "bitcoin",
  "chrono",
  "console_error_panic_hook",
- "dlc-manager 0.4.0 (git+https://github.com/dlc-link/rust-dlc?branch=fix/fee-comtputation-issue)",
- "dlc-messages 0.4.0 (git+https://github.com/dlc-link/rust-dlc?branch=fix/fee-comtputation-issue)",
+ "dlc-manager",
+ "dlc-messages",
  "dlc-storage-provider",
- "dlc-trie 0.4.0 (git+https://github.com/dlc-link/rust-dlc?branch=fix/fee-comtputation-issue)",
+ "dlc-trie",
  "env_logger",
  "esplora-async-blockchain-provider",
  "getrandom",
@@ -1376,16 +1334,17 @@ checksum = "7fcaabb2fef8c910e7f4c7ce9f67a1283a1715879a7c230ca9d6d1ae31f16d91"
 [[package]]
 name = "electrs-blockchain-provider"
 version = "0.1.0"
+source = "git+https://github.com/dlc-link/rust-dlc?branch=fix/fee-comtputation-issue#96b30b7d345c5029de58e98f0a6247a35f396bf7"
 dependencies = [
  "bitcoin",
  "bitcoin-test-utils",
- "dlc-manager 0.4.0",
+ "dlc-manager",
  "lightning",
  "lightning-block-sync",
  "reqwest",
  "rust-bitcoin-coin-selection",
  "serde",
- "simple-wallet 0.1.0",
+ "simple-wallet",
  "tokio",
 ]
 
@@ -1444,7 +1403,7 @@ version = "0.1.0"
 dependencies = [
  "bdk",
  "bitcoin",
- "dlc-manager 0.4.0 (git+https://github.com/dlc-link/rust-dlc?branch=fix/fee-comtputation-issue)",
+ "dlc-manager",
  "futures",
  "js-interface-wallet",
  "lightning",
@@ -2079,8 +2038,8 @@ version = "0.1.0"
 dependencies = [
  "bdk",
  "bitcoin",
- "dlc 0.4.0 (git+https://github.com/dlc-link/rust-dlc?branch=fix/fee-comtputation-issue)",
- "dlc-manager 0.4.0 (git+https://github.com/dlc-link/rust-dlc?branch=fix/fee-comtputation-issue)",
+ "dlc",
+ "dlc-manager",
  "lightning",
  "miniscript 9.0.1",
  "rust-bitcoin-coin-selection",
@@ -3314,9 +3273,9 @@ dependencies = [
  "clokwerk",
  "config",
  "displaydoc",
- "dlc 0.4.0 (git+https://github.com/dlc-link/rust-dlc?branch=fix/fee-comtputation-issue)",
+ "dlc",
  "dlc-clients",
- "dlc-messages 0.4.0 (git+https://github.com/dlc-link/rust-dlc?branch=fix/fee-comtputation-issue)",
+ "dlc-messages",
  "env_logger",
  "futures",
  "gethostname",
@@ -3355,24 +3314,12 @@ checksum = "420acb44afdae038210c99e69aae24109f32f15500aa708e81d46c9f29d55fcf"
 [[package]]
 name = "simple-wallet"
 version = "0.1.0"
-dependencies = [
- "bdk",
- "bitcoin",
- "dlc 0.4.0",
- "dlc-manager 0.4.0",
- "lightning",
- "secp256k1-zkp",
-]
-
-[[package]]
-name = "simple-wallet"
-version = "0.1.0"
 source = "git+https://github.com/dlc-link/rust-dlc?branch=fix/fee-comtputation-issue#96b30b7d345c5029de58e98f0a6247a35f396bf7"
 dependencies = [
  "bdk",
  "bitcoin",
- "dlc 0.4.0 (git+https://github.com/dlc-link/rust-dlc?branch=fix/fee-comtputation-issue)",
- "dlc-manager 0.4.0 (git+https://github.com/dlc-link/rust-dlc?branch=fix/fee-comtputation-issue)",
+ "dlc",
+ "dlc-manager",
  "lightning",
  "secp256k1-zkp",
 ]
