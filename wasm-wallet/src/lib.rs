@@ -2,7 +2,8 @@
 extern crate console_error_panic_hook;
 extern crate log;
 
-use bitcoin::{Network, PrivateKey};
+use bdk::blockchain::EsploraBlockchain;
+use bitcoin::Network;
 use dlc_messages::{Message, OfferDlc, SignDlc};
 use wasm_bindgen::prelude::*;
 
@@ -14,20 +15,21 @@ use core::panic;
 use std::{
     collections::HashMap,
     io::Cursor,
-    str::FromStr,
     sync::{Arc, Mutex},
 };
 
 use dlc_manager::{
-    contract::{Contract, signed_contract::SignedContract}, manager::Manager, ContractId, Oracle, Storage, SystemTimeProvider,
+    contract::{signed_contract::SignedContract, Contract},
+    manager::Manager,
+    ContractId, Oracle, Storage, SystemTimeProvider,
 };
 
 use std::fmt::Write as _;
 
-use log::info;
 use dlc_storage_provider::DlcStorageProvider;
+use log::info;
 
-use esplora_async_blockchain_provider::EsploraAsyncBlockchainProvider;
+use dlc_blockchain_provider::DlcBlockchainProvider;
 
 use js_interface_wallet::JSInterfaceWallet;
 
@@ -35,17 +37,16 @@ use oracle_client::P2PDOracleClient;
 use serde::{Deserialize, Serialize};
 
 mod oracle_client;
-mod utils;
 #[macro_use]
 mod macros;
 
 type DlcManager = Manager<
     Arc<JSInterfaceWallet>,
-    Arc<EsploraAsyncBlockchainProvider>,
+    Arc<DlcBlockchainProvider>,
     Box<DlcStorageProvider>,
     Arc<P2PDOracleClient>,
     Arc<SystemTimeProvider>,
-    Arc<EsploraAsyncBlockchainProvider>,
+    Arc<DlcBlockchainProvider>,
 >;
 
 // The contracts in dlc-manager expect a node id, but web extensions often don't have this, so hardcode it for now. Should not have any ramifications.
@@ -78,7 +79,6 @@ pub struct JsDLCInterface {
     options: JsDLCInterfaceOptions,
     manager: Arc<Mutex<DlcManager>>,
     wallet: Arc<JSInterfaceWallet>,
-    blockchain: Arc<EsploraAsyncBlockchainProvider>,
 }
 
 // #[wasm_bindgen]
@@ -127,25 +127,26 @@ impl JsDLCInterface {
             .parse::<Network>()
             .expect("Must use a valid bitcoin network");
 
-        let blockchain: Arc<EsploraAsyncBlockchainProvider> = Arc::new(
-            EsploraAsyncBlockchainProvider::new(options.electrs_url.to_string(), active_network),
-        );
-
         // Set up DLC store
         let store = DlcStorageProvider::new();
-
-        // Generate keypair from secret key
-        let seckey = secp256k1_zkp::SecretKey::from_str(&privkey).unwrap();
 
         // Set up wallet
         let wallet = Arc::new(JSInterfaceWallet::new(
             options.address.to_string(),
+            options.electrs_url.to_string(),
+            privkey,
             active_network,
-            PrivateKey::new(seckey, active_network),
         ));
 
+        let esplora_blockchain = EsploraBlockchain::new(&options.electrs_url.clone(), 20);
+        wallet
+            .sync(&esplora_blockchain, options.address.clone())
+            .await;
+
+        let dlc_blockchain = Arc::new(DlcBlockchainProvider::new(Arc::clone(&wallet)));
+
         // Set up Oracle Client
-        let p2p_client: P2PDOracleClient = P2PDOracleClient::new(&options.oracle_url)
+        let p2p_client: P2PDOracleClient = P2PDOracleClient::new(&options.oracle_url.clone())
             .await
             .expect("To be able to connect to the oracle");
 
@@ -160,24 +161,20 @@ impl JsDLCInterface {
         let manager = Arc::new(Mutex::new(
             Manager::new(
                 Arc::clone(&wallet),
-                Arc::clone(&blockchain),
+                Arc::clone(&dlc_blockchain),
                 Box::new(store),
                 oracles,
                 Arc::new(time_provider),
-                Arc::clone(&blockchain),
+                Arc::clone(&dlc_blockchain),
             )
             .unwrap(),
         ));
-
         clog!("Finished setting up manager");
-
-        blockchain.refresh_chain_data(options.address.clone()).await;
 
         JsDLCInterface {
             options,
             manager,
             wallet,
-            blockchain,
         }
     }
 
@@ -186,13 +183,8 @@ impl JsDLCInterface {
     }
 
     pub async fn get_wallet_balance(&self) -> u64 {
-        self.blockchain
-            .refresh_chain_data(self.options.address.clone())
-            .await;
-        self.wallet
-            .set_utxos(self.blockchain.get_utxos().unwrap())
-            .unwrap();
-        self.blockchain.get_balance().await.unwrap()
+        // make sure to call sync for an updated value
+        self.wallet.get_balance()
     }
 
     // public async function for fetching all the contracts on the manager
@@ -232,7 +224,7 @@ impl JsDLCInterface {
     pub async fn accept_offer(&self, offer_json: String) -> String {
         let dlc_offer_message: OfferDlc = serde_json::from_str(&offer_json).unwrap();
         clog!("Offer to accept: {:?}", dlc_offer_message);
-        
+
         clog!("receive_offer - after on_dlc_message");
         let temporary_contract_id = dlc_offer_message.temporary_contract_id;
 
@@ -247,13 +239,12 @@ impl JsDLCInterface {
             }
         }
 
-
         clog!("accepting contract with id {:?}", temporary_contract_id);
 
         let (_contract_id, _public_key, accept_msg) = self
             .manager
             .lock()
-        .unwrap()
+            .unwrap()
             .accept_contract_offer(&temporary_contract_id)
             .expect("Error accepting contract offer");
 
@@ -285,7 +276,12 @@ impl JsDLCInterface {
             .filter(|c| c.accepted_contract.get_contract_id() == dlc_sign_message.contract_id)
             .next()
             .unwrap();
-        contract.accepted_contract.dlc_transactions.fund.txid().to_string()
+        contract
+            .accepted_contract
+            .dlc_transactions
+            .fund
+            .txid()
+            .to_string()
     }
 
     pub async fn reject_offer(&self, contract_id: String) -> () {

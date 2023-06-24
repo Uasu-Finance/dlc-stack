@@ -13,6 +13,7 @@ default = ["console_error_panic_hook"]
 
 [dependencies]
 base64 = "0.13.1"
+bdk = {version = "0.28.0", default-features = false, features = ["async-interface", "use-esplora-async"]}
 bitcoin = {version = "0.29.2", features=["serde"]}
 chrono = {version = "0.4.19", features = ["serde"]}
 dlc-manager = { git = "https://github.com/dlc-link/rust-dlc", branch="fix/fee-comtputation-issue", features = ["use-serde"] }
@@ -47,7 +48,7 @@ wasm-bindgen = { version = "0.2.84", features = ["serde-serialize"] }
 console_error_panic_hook = { version = "0.1.6", optional = true }
 js-sys = "0.3.61"
 
-esplora-async-blockchain-provider = { path = "../esplora-async-blockchain-provider" }
+dlc-blockchain-provider = { path = "../dlc-blockchain-provider" }
 
 [dev-dependencies]
 mockito = "0.31.0"

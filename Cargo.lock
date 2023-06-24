@@ -1109,6 +1109,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "dlc-blockchain-provider"
+version = "0.1.0"
+dependencies = [
+ "bdk",
+ "bitcoin",
+ "dlc-manager",
+ "futures",
+ "js-interface-wallet",
+ "lightning",
+ "miniscript 9.0.1",
+ "reqwest",
+ "serde",
+ "wasm-bindgen-futures",
+]
+
+[[package]]
 name = "dlc-clients"
 version = "0.1.0"
 dependencies = [
@@ -1272,15 +1288,16 @@ name = "dlc-wasm-wallet"
 version = "0.4.0"
 dependencies = [
  "base64 0.13.1",
+ "bdk",
  "bitcoin",
  "chrono",
  "console_error_panic_hook",
+ "dlc-blockchain-provider",
  "dlc-manager",
  "dlc-messages",
  "dlc-storage-provider",
  "dlc-trie",
  "env_logger",
- "esplora-async-blockchain-provider",
  "getrandom",
  "gloo-utils",
  "hex",
@@ -1395,22 +1412,6 @@ checksum = "aa68f1b12764fab894d2755d2518754e71b4fd80ecfb822714a1206c2aab39bf"
 dependencies = [
  "cc",
  "libc",
-]
-
-[[package]]
-name = "esplora-async-blockchain-provider"
-version = "0.1.0"
-dependencies = [
- "bdk",
- "bitcoin",
- "dlc-manager",
- "futures",
- "js-interface-wallet",
- "lightning",
- "miniscript 9.0.1",
- "reqwest",
- "serde",
- "wasm-bindgen-futures",
 ]
 
 [[package]]
@@ -2044,6 +2045,7 @@ dependencies = [
  "miniscript 9.0.1",
  "rust-bitcoin-coin-selection",
  "secp256k1-zkp",
+ "serde",
 ]
 
 [[package]]

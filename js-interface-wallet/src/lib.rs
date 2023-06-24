@@ -1,26 +1,29 @@
+use std::vec;
 use std::{cell::RefCell, ops::Deref, str::FromStr};
 
+use bdk::blockchain::{GetHeight, WalletSync};
+use bdk::TransactionDetails;
+
+use bdk::esplora_client::{AsyncClient, Builder};
+use bdk::{database::MemoryDatabase, template::Bip84, SyncOptions, Wallet};
 use bdk::{
-    database::{BatchOperations, Database},
-    wallet::coin_selection::{
-        decide_change, BranchAndBoundCoinSelection, CoinSelectionAlgorithm, CoinSelectionResult,
-    },
-    FeeRate, KeychainKind, LocalUtxo, Utxo as BdkUtxo, WeightedUtxo,
+    wallet::coin_selection::{BranchAndBoundCoinSelection, CoinSelectionAlgorithm},
+    FeeRate, KeychainKind, Utxo as BdkUtxo,
 };
-use bitcoin::{
-    hashes::Hash, Address, Network, PackedLockTime, PrivateKey, Script, Sequence, Transaction,
-    TxIn, TxOut, Txid, Witness,
-};
-use dlc_manager::{error::Error, Blockchain, Signer, Utxo, Wallet};
-use lightning::chain::chaininterface::{ConfirmationTarget, FeeEstimator};
-use rust_bitcoin_coin_selection::select_coins;
-use secp256k1_zkp::{rand::thread_rng, All, PublicKey, Secp256k1, SecretKey};
+
+use bitcoin::util::bip32::ExtendedPrivKey;
+use bitcoin::OutPoint;
+use bitcoin::{hashes::Hash, Address, Network, PrivateKey, Script, TxOut, Txid};
+use dlc_manager::{error::Error, Blockchain as DLCBlockchain, Signer, Utxo, Wallet as DLCWallet};
+use lightning::chain::chaininterface::FeeEstimator;
+
+use secp256k1_zkp::{All, PublicKey, Secp256k1, SecretKey};
+use serde::{Deserialize, Serialize};
+
 type Result<T> = core::result::Result<T, Error>;
 
-pub(crate) const TXIN_BASE_WEIGHT: usize = (32 + 4 + 4) * 4;
-
 /// Trait providing blockchain information to the wallet.
-pub trait WalletBlockchainProvider: Blockchain + FeeEstimator {
+pub trait WalletBlockchainProvider: DLCBlockchain + FeeEstimator {
     fn get_utxos_for_address(&self, address: &Address) -> Result<Vec<Utxo>>;
     fn is_output_spent(&self, txid: &Txid, vout: u32) -> Result<bool>;
 }
@@ -40,161 +43,177 @@ pub trait WalletStorage {
     fn unreserve_utxo(&self, txid: &Txid, vout: u32) -> Result<()>;
 }
 
-/// Basic wallet mainly meant for testing purposes.
-// pub struct JSInterfaceWallet<B: Deref, W: Deref>
-// where
-//     B::Target: WalletBlockchainProvider,
-//     W::Target: WalletStorage,
-// {
-//     blockchain: B,
-//     storage: W,
-//     secp_ctx: Secp256k1<All>,
-//     network: Network,
-// }
+#[derive(Serialize, Deserialize, Debug, Clone)]
+struct UTXOSpent {
+    spent: bool,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(untagged)]
+pub enum UtxoStatus {
+    Confirmed {
+        confirmed: bool,
+        block_height: u64,
+        block_hash: String,
+        block_time: u64,
+    },
+    Unconfirmed {
+        confirmed: bool,
+    },
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+struct UtxoResp {
+    txid: String,
+    vout: u32,
+    value: u64,
+    status: UtxoStatus,
+}
 
 pub struct JSInterfaceWallet {
     address: Address,
+    client: AsyncClient,
+    bdk_wallet: Wallet<MemoryDatabase>,
+    height: RefCell<Option<u64>>,
     secp_ctx: Secp256k1<All>,
     seckey: SecretKey,
-    network: Network,
     utxos: RefCell<Option<Vec<Utxo>>>,
 }
 
 impl JSInterfaceWallet {
-    pub fn new(address_str: String, network: Network, privkey: PrivateKey) -> Self {
+    pub fn new(address_str: String, base_url: String, privkey: String, network: Network) -> Self {
+        // Even though the esplora blockchain provider has it's own client, we need one of our own to get some additional data
+        let client = Builder::new(&base_url)
+            .build_async()
+            .expect("Should never fail with no proxy and timeout");
+
+        // Generate keypair from secret key
+        let seckey = secp256k1_zkp::SecretKey::from_str(&privkey).unwrap();
+
+        let epkey = ExtendedPrivKey::from_str(&privkey.to_string()).unwrap();
         // let secp_ctx = Secp256k1::new();
+        let bdk_wallet = Wallet::new(
+            Bip84(epkey, KeychainKind::External),
+            Some(Bip84(epkey, KeychainKind::Internal)),
+            network,
+            MemoryDatabase::default(),
+        )
+        .unwrap();
 
         Self {
             address: Address::from_str(&address_str).unwrap(),
-            // address: Address::p2wpkh(
-            //     &bitcoin::PublicKey::from_private_key(&secp_ctx, &privkey),
-            //     network,
-            // )
-            // .unwrap(),
+            client,
+            height: Some(0).into(),
             secp_ctx: Secp256k1::new(),
-            seckey: privkey.inner,
-            network,
+            seckey: PrivateKey::new(seckey, network).inner,
             utxos: Some(vec![]).into(),
+            bdk_wallet,
         }
     }
 
-    pub fn set_utxos(&self, mut utxos: Vec<Utxo>) -> Result<()> {
-        self.utxos.borrow_mut().as_mut().unwrap().clear();
-        self.utxos.borrow_mut().as_mut().unwrap().append(&mut utxos);
-        Ok(())
+    async fn get_from_json<T>(&self, path: &str) -> Result<T>
+    where
+        T: serde::de::DeserializeOwned,
+    {
+        self.client
+            .client()
+            .get(path)
+            .send()
+            .await
+            .unwrap()
+            .json::<T>()
+            .await
+            .map_err(|e| Error::BlockchainError(e.to_string()))
     }
 
-    // where
-    //     B::Target: WalletBlockchainProvider,
-    //     W::Target: WalletStorage,
-    // {
-    //     /// Create a new wallet instance.
-    //     pub fn new(blockchain: B, storage: W, network: Network) -> Self {
-    //         Self {
-    //             blockchain,
-    //             storage,
-    //             secp_ctx: Secp256k1::new(),
-    //             network,
-    //         }
-    //     }
+    pub async fn sync<B: WalletSync + GetHeight>(&self, blockchain: &B, address: String) -> () {
+        self.bdk_wallet
+            .sync(blockchain, SyncOptions::default())
+            .await
+            .unwrap();
+        self.height
+            .replace(Some(blockchain.get_height().await.unwrap().into()));
+        self.set_utxos_for_address(address).await;
+    }
 
-    // Refresh the wallet checking and updating the UTXO states.
-    // pub fn refresh(&self) -> Result<()> {
-    //     let utxos: Vec<Utxo> = self.storage.get_utxos()?;
+    pub fn get_height(&self) -> u64 {
+        self.height.borrow().unwrap().clone()
+    }
 
-    //     for utxo in &utxos {
-    //         let is_spent = self
-    //             .blockchain
-    //             .is_output_spent(&utxo.outpoint.txid, utxo.outpoint.vout)?;
-    //         if is_spent {
-    //             self.storage.delete_utxo(utxo)?;
-    //         }
-    //     }
+    pub fn get_tx(&self, txid: &Txid) -> Result<Option<TransactionDetails>> {
+        Ok(self.bdk_wallet.get_tx(txid, false).unwrap())
+    }
 
-    //     let addresses = self.storage.get_addresses()?;
+    pub fn get_utxos(&self) -> Result<Vec<Utxo>> {
+        Ok(self.utxos.borrow().as_ref().unwrap().clone())
+    }
 
-    //     for address in &addresses {
-    //         let utxos = self.blockchain.get_utxos_for_address(address)?;
+    pub fn network(&self) -> Network {
+        self.bdk_wallet.network()
+    }
 
-    //         for utxo in &utxos {
-    //             if !self.storage.has_utxo(utxo)? {
-    //                 self.storage.upsert_utxo(utxo)?;
-    //             }
-    //         }
-    //     }
+    pub fn client(&self) -> &AsyncClient {
+        &self.client
+    }
 
-    //     Ok(())
-    // }
+    // gets all the utxos and txs and height of chain for one address only.
+    // This does not support multiple addresses
+    async fn set_utxos_for_address(&self, address: String) -> () {
+        let utxos: Vec<UtxoResp> = self
+            .get_from_json(&format!("address/{address}/utxo"))
+            .await
+            .unwrap();
+
+        let address = Address::from_str(&address).unwrap();
+        let mut utxos = utxos
+            .into_iter()
+            .map(|x| Utxo {
+                address: address.clone(),
+                outpoint: OutPoint {
+                    txid: x
+                        .txid
+                        .parse()
+                        .map_err(|e: <bitcoin::Txid as FromStr>::Err| {
+                            Error::BlockchainError(e.to_string())
+                        })
+                        .unwrap(),
+                    vout: x.vout,
+                },
+                redeem_script: Script::default(),
+                reserved: false,
+                tx_out: TxOut {
+                    value: x.value,
+                    script_pubkey: address.script_pubkey(),
+                },
+            })
+            .collect::<Vec<Utxo>>();
+
+        let mut utxo_spent_pairs = Vec::new();
+        for utxo in utxos.clone() {
+            let is_spent: UTXOSpent = self
+                .get_from_json::<UTXOSpent>(&format!(
+                    "tx/{0}/outspend/{1}",
+                    &utxo.outpoint.txid, utxo.outpoint.vout
+                ))
+                .await
+                .unwrap();
+            utxo_spent_pairs.push((utxo, is_spent.spent));
+        }
+
+        self.utxos
+            .try_borrow_mut()
+            .unwrap() // FIXME this blows up sometimes!
+            .as_mut()
+            .unwrap()
+            .clear();
+        self.utxos.borrow_mut().as_mut().unwrap().append(&mut utxos);
+    }
 
     // Returns the sum of all UTXOs value.
     pub fn get_balance(&self) -> u64 {
-        self.utxos
-            .borrow()
-            .as_ref()
-            .unwrap()
-            .iter()
-            .map(|x| x.tx_out.value)
-            .sum()
+        // self.bdk_wallet.get_balance().unwrap().get_spendable()
+        self.bdk_wallet.get_balance().unwrap().get_total()
     }
-
-    // Mark all UTXOs as unreserved.
-    // pub fn unreserve_all_utxos(&self) {
-    //     let utxos = self.storage.get_utxos().unwrap();
-    //     for utxo in utxos {
-    //         self.storage
-    //             .unreserve_utxo(&utxo.outpoint.txid, utxo.outpoint.vout)
-    //             .unwrap();
-    //     }
-    // }
-
-    // / Creates a transaction with all wallet UTXOs as inputs and a single output
-    // / sending everything to the given address.
-    // pub fn empty_to_address(&self, address: &Address) -> Result<()> {
-    //     let utxos = self
-    //         .storage
-    //         .get_utxos()
-    //         .expect("to be able to retrieve all utxos");
-    //     if utxos.is_empty() {
-    //         return Err(Error::InvalidState("No utxo in wallet".to_string()));
-    //     }
-
-    //     let mut total_value = 0;
-    //     let input = utxos
-    //         .iter()
-    //         .map(|x| {
-    //             total_value += x.tx_out.value;
-    //             TxIn {
-    //                 previous_output: x.outpoint,
-    //                 script_sig: Script::default(),
-    //                 sequence: Sequence::MAX,
-    //                 witness: Witness::default(),
-    //             }
-    //         })
-    //         .collect::<Vec<_>>();
-    //     let output = vec![TxOut {
-    //         value: total_value,
-    //         script_pubkey: address.script_pubkey(),
-    //     }];
-    //     let mut tx = Transaction {
-    //         version: 2,
-    //         lock_time: PackedLockTime::ZERO,
-    //         input,
-    //         output,
-    //     };
-    //     // Signature + pubkey size assuming P2WPKH.
-    //     let weight = (tx.weight() + tx.input.len() * (74 + 33)) as u64;
-    //     let fee_rate = self
-    //         .blockchain
-    //         .get_est_sat_per_1000_weight(ConfirmationTarget::Normal) as u64;
-    //     let fee = (weight * fee_rate) / 1000;
-    //     tx.output[0].value -= fee;
-
-    //     for (i, utxo) in utxos.iter().enumerate().take(tx.input.len()) {
-    //         self.sign_tx_input(&mut tx, i, &utxo.tx_out, None)?;
-    //     }
-
-    //     self.blockchain.send_transaction(&tx)
-    // }
 }
 
 impl Signer for JSInterfaceWallet {
@@ -205,12 +224,6 @@ impl Signer for JSInterfaceWallet {
         tx_out: &bitcoin::TxOut,
         _: Option<bitcoin::Script>,
     ) -> Result<()> {
-        // let address = Address::from_script(&tx_out.script_pubkey, self.network)
-        //     .expect("a valid scriptpubkey");
-        // let seckey = self
-        //     .storage
-        //     .get_priv_key_for_address(&address)?
-        //     .expect("to have the requested private key");
         dlc::util::sign_p2wpkh_input(
             &self.secp_ctx,
             &self.seckey,
@@ -222,53 +235,12 @@ impl Signer for JSInterfaceWallet {
         Ok(())
     }
 
-    fn get_secret_key_for_pubkey(&self, pubkey: &PublicKey) -> Result<SecretKey> {
+    fn get_secret_key_for_pubkey(&self, _pubkey: &PublicKey) -> Result<SecretKey> {
         Ok(self.seckey)
     }
 }
 
-fn select_sorted_utxos(
-    utxos: impl Iterator<Item = (bool, WeightedUtxo)>,
-    fee_rate: FeeRate,
-    target_amount: u64,
-    drain_script: &Script,
-) -> Result<CoinSelectionResult> {
-    let mut selected_amount = 0;
-    let mut fee_amount = 0;
-    let selected = utxos
-        .scan(
-            (&mut selected_amount, &mut fee_amount),
-            |(selected_amount, fee_amount), (must_use, weighted_utxo)| {
-                if must_use || **selected_amount < target_amount + **fee_amount {
-                    **fee_amount +=
-                        fee_rate.fee_wu(TXIN_BASE_WEIGHT + weighted_utxo.satisfaction_weight);
-                    **selected_amount += weighted_utxo.utxo.txout().value;
-
-                    Some(weighted_utxo.utxo)
-                } else {
-                    None
-                }
-            },
-        )
-        .collect::<Vec<_>>();
-
-    let amount_needed_with_fees = target_amount + fee_amount;
-    if selected_amount < amount_needed_with_fees {
-        panic!("insufficient funds");
-    }
-
-    let remaining_amount = selected_amount - amount_needed_with_fees;
-
-    let excess = decide_change(remaining_amount, fee_rate, drain_script);
-
-    Ok(CoinSelectionResult {
-        selected,
-        fee_amount,
-        excess,
-    })
-}
-
-impl Wallet for JSInterfaceWallet {
+impl DLCWallet for JSInterfaceWallet {
     fn get_new_address(&self) -> Result<Address> {
         Ok(self.address.clone())
     }
@@ -277,27 +249,15 @@ impl Wallet for JSInterfaceWallet {
         Ok(self.seckey)
     }
 
+    // This code is copied and modified from rust-dlc simple-wallet, please reference that
     fn get_utxos_for_amount(
         &self,
         amount: u64,
         fee_rate: Option<u64>,
-        lock_utxos: bool,
+        _lock_utxos: bool,
     ) -> Result<Vec<Utxo>> {
-        let org_utxos = self.utxos.borrow().as_ref().unwrap().clone();
-        let mut utxos = org_utxos
-            .iter()
-            .filter(|x| !x.reserved)
-            .map(|x| WeightedUtxo {
-                utxo: BdkUtxo::Local(LocalUtxo {
-                    outpoint: x.outpoint,
-                    txout: x.tx_out.clone(),
-                    keychain: KeychainKind::External,
-                    is_spent: false,
-                }),
-                satisfaction_weight: 107,
-            })
-            .collect::<Vec<_>>();
-        // let coin_selection = BranchAndBoundCoinSelection::default();
+        let org_utxos = self.get_utxos().unwrap();
+        let coin_selection = BranchAndBoundCoinSelection::default();
         let dummy_pubkey: PublicKey =
             "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798"
                 .parse()
@@ -305,46 +265,35 @@ impl Wallet for JSInterfaceWallet {
         let dummy_drain =
             Script::new_v0_p2wpkh(&bitcoin::WPubkeyHash::hash(&dummy_pubkey.serialize()));
         let fee_rate = FeeRate::from_sat_per_vb(fee_rate.unwrap() as f32);
-        // let selection = coin_selection
-        //     .coin_select(self, Vec::new(), utxos, fee_rate, amount, &dummy_drain)
-        //     .map_err(|e| Error::WalletError(Box::new(e)))?;
-        let required_utxos = Vec::new();
-        let drain_script = &dummy_drain;
-
-        let temp_utxos = {
-            utxos.sort_unstable_by_key(|wu| wu.utxo.txout().value);
-            required_utxos
-                .into_iter()
-                .map(|utxo| (true, utxo))
-                .chain(utxos.into_iter().rev().map(|utxo| (false, utxo)))
-        };
-
-        let selection = select_sorted_utxos(temp_utxos, fee_rate, amount, drain_script);
-
+        let selection = coin_selection
+            .coin_select(
+                self.bdk_wallet.database().deref(),
+                Vec::new(),
+                vec![], // could be "utxos" converted from org_utxos if we don't want to use the build in wallet db
+                fee_rate,
+                amount,
+                &dummy_drain,
+            )
+            .map_err(|e| Error::WalletError(Box::new(e)))?;
         let mut res = Vec::new();
-        if lock_utxos {
-            for utxo in selection.unwrap().selected {
-                let local_utxo = if let BdkUtxo::Local(l) = utxo {
-                    l
-                } else {
-                    panic!();
-                };
-                let org = org_utxos
-                    .iter()
-                    .find(|x| x.tx_out == local_utxo.txout && x.outpoint == local_utxo.outpoint)
-                    .unwrap();
-                let updated = Utxo {
-                    reserved: true,
-                    ..org.clone()
-                };
-                res.push(org.clone());
-            }
+        for utxo in selection.selected {
+            let local_utxo = if let BdkUtxo::Local(l) = utxo {
+                l
+            } else {
+                panic!();
+            };
+            let org = org_utxos
+                .iter()
+                .find(|x| x.tx_out == local_utxo.txout && x.outpoint == local_utxo.outpoint)
+                .unwrap();
+            res.push(org.clone());
         }
+
         Ok(res)
     }
 
     fn import_address(&self, _: &Address) -> Result<()> {
-        // unimplemented!()
+        // Ask what this is for
         Ok(())
     }
 }
