@@ -26,7 +26,7 @@ use dlc_manager::{
 
 use std::fmt::Write as _;
 
-use dlc_storage_provider::DlcStorageProvider;
+use dlc_memory_storage_provider::DlcMemoryStorageProvider;
 use log::info;
 
 use dlc_blockchain_provider::DlcBlockchainProvider;
@@ -43,7 +43,7 @@ mod macros;
 type DlcManager = Manager<
     Arc<JSInterfaceWallet>,
     Arc<DlcBlockchainProvider>,
-    Box<DlcStorageProvider>,
+    Box<DlcMemoryStorageProvider>,
     Arc<P2PDOracleClient>,
     Arc<SystemTimeProvider>,
     Arc<DlcBlockchainProvider>,
@@ -128,7 +128,7 @@ impl JsDLCInterface {
             .expect("Must use a valid bitcoin network");
 
         // Set up DLC store
-        let store = DlcStorageProvider::new();
+        let store = DlcMemoryStorageProvider::new();
 
         // Set up wallet
         let wallet = Arc::new(JSInterfaceWallet::new(

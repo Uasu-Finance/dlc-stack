@@ -14,7 +14,7 @@ use secp256k1_zkp::{PublicKey, SecretKey};
 use std::collections::HashMap;
 use std::sync::{Mutex, RwLock};
 
-pub struct DlcStorageProvider {
+pub struct DlcMemoryStorageProvider {
     contracts: RwLock<HashMap<ContractId, Contract>>,
     channels: RwLock<HashMap<ChannelId, Channel>>,
     contracts_saved: Mutex<Option<HashMap<ContractId, Contract>>>,
@@ -24,9 +24,9 @@ pub struct DlcStorageProvider {
     key_pairs: RwLock<HashMap<PublicKey, SecretKey>>,
 }
 
-impl DlcStorageProvider {
+impl DlcMemoryStorageProvider {
     pub fn new() -> Self {
-        DlcStorageProvider {
+        DlcMemoryStorageProvider {
             contracts: RwLock::new(HashMap::new()),
             channels: RwLock::new(HashMap::new()),
             contracts_saved: Mutex::new(None),
@@ -70,13 +70,13 @@ impl DlcStorageProvider {
     }
 }
 
-impl Default for DlcStorageProvider {
+impl Default for DlcMemoryStorageProvider {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl Storage for DlcStorageProvider {
+impl Storage for DlcMemoryStorageProvider {
     fn get_contract(&self, id: &ContractId) -> Result<Option<Contract>, DaemonError> {
         let map = self.contracts.read().expect("Could not get read lock");
         Ok(map.get(id).cloned())
