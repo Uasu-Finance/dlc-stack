@@ -19,6 +19,9 @@
 **/wallet_db_regtest
 **/secret.key
 
+# For internal node projects
+**/node_modules/*
+
 .vscode
 .env
 !.env.tempalte
