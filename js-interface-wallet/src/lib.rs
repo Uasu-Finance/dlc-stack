@@ -26,19 +26,19 @@ pub trait WalletBlockchainProvider: Blockchain + FeeEstimator {
 }
 
 /// Trait enabling the wallet to persist data.
-pub trait WalletStorage {
-    fn upsert_address(&self, address: &Address, privkey: &SecretKey) -> Result<()>;
-    fn delete_address(&self, address: &Address) -> Result<()>;
-    fn get_addresses(&self) -> Result<Vec<Address>>;
-    fn get_priv_key_for_address(&self, address: &Address) -> Result<Option<SecretKey>>;
-    fn upsert_key_pair(&self, public_key: &PublicKey, privkey: &SecretKey) -> Result<()>;
-    fn get_priv_key_for_pubkey(&self, public_key: &PublicKey) -> Result<Option<SecretKey>>;
-    fn upsert_utxo(&self, utxo: &Utxo) -> Result<()>;
-    fn has_utxo(&self, utxo: &Utxo) -> Result<bool>;
-    fn delete_utxo(&self, utxo: &Utxo) -> Result<()>;
-    fn get_utxos(&self) -> Result<Vec<Utxo>>;
-    fn unreserve_utxo(&self, txid: &Txid, vout: u32) -> Result<()>;
-}
+// pub trait WalletStorage {
+//     fn upsert_address(&self, address: &Address, privkey: &SecretKey) -> Result<()>;
+//     fn delete_address(&self, address: &Address) -> Result<()>;
+//     fn get_addresses(&self) -> Result<Vec<Address>>;
+//     fn get_priv_key_for_address(&self, address: &Address) -> Result<Option<SecretKey>>;
+//     fn upsert_key_pair(&self, public_key: &PublicKey, privkey: &SecretKey) -> Result<()>;
+//     fn get_priv_key_for_pubkey(&self, public_key: &PublicKey) -> Result<Option<SecretKey>>;
+//     fn upsert_utxo(&self, utxo: &Utxo) -> Result<()>;
+//     fn has_utxo(&self, utxo: &Utxo) -> Result<bool>;
+//     fn delete_utxo(&self, utxo: &Utxo) -> Result<()>;
+//     fn get_utxos(&self) -> Result<Vec<Utxo>>;
+//     fn unreserve_utxo(&self, txid: &Txid, vout: u32) -> Result<()>;
+// }
 
 /// Basic wallet mainly meant for testing purposes.
 // pub struct JSInterfaceWallet<B: Deref, W: Deref>
@@ -297,7 +297,6 @@ impl Wallet for JSInterfaceWallet {
                 satisfaction_weight: 107,
             })
             .collect::<Vec<_>>();
-        // let coin_selection = BranchAndBoundCoinSelection::default();
         let dummy_pubkey: PublicKey =
             "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798"
                 .parse()
@@ -305,9 +304,6 @@ impl Wallet for JSInterfaceWallet {
         let dummy_drain =
             Script::new_v0_p2wpkh(&bitcoin::WPubkeyHash::hash(&dummy_pubkey.serialize()));
         let fee_rate = FeeRate::from_sat_per_vb(fee_rate.unwrap() as f32);
-        // let selection = coin_selection
-        //     .coin_select(self, Vec::new(), utxos, fee_rate, amount, &dummy_drain)
-        //     .map_err(|e| Error::WalletError(Box::new(e)))?;
         let required_utxos = Vec::new();
         let drain_script = &dummy_drain;
 
@@ -319,26 +315,20 @@ impl Wallet for JSInterfaceWallet {
                 .chain(utxos.into_iter().rev().map(|utxo| (false, utxo)))
         };
 
-        let selection = select_sorted_utxos(temp_utxos, fee_rate, amount, drain_script);
+        let selection = select_sorted_utxos(temp_utxos, fee_rate, amount, drain_script).unwrap();
 
         let mut res = Vec::new();
-        if lock_utxos {
-            for utxo in selection.unwrap().selected {
-                let local_utxo = if let BdkUtxo::Local(l) = utxo {
-                    l
-                } else {
-                    panic!();
-                };
-                let org = org_utxos
-                    .iter()
-                    .find(|x| x.tx_out == local_utxo.txout && x.outpoint == local_utxo.outpoint)
-                    .unwrap();
-                let updated = Utxo {
-                    reserved: true,
-                    ..org.clone()
-                };
-                res.push(org.clone());
-            }
+        for utxo in selection.selected {
+            let local_utxo = if let BdkUtxo::Local(l) = utxo {
+                l
+            } else {
+                panic!();
+            };
+            let org = org_utxos
+                .iter()
+                .find(|x| x.tx_out == local_utxo.txout && x.outpoint == local_utxo.outpoint)
+                .unwrap();
+            res.push(org.clone());
         }
         Ok(res)
     }
