@@ -370,6 +370,7 @@ where
             &contract.accepted_contract.dlc_transactions.fund.txid(),
         )?;
         if confirmations >= NB_CONFIRMATIONS {
+            // Here can call to the thing?
             self.store
                 .update_contract(&Contract::Confirmed(contract.clone()))?;
         }
@@ -535,6 +536,10 @@ where
         let confirmations = self
             .blockchain
             .get_transaction_confirmations(&signed_cet.txid())?;
+
+        // Put it here for post-close, and here's the btc txid too.
+        // But perhaps we'd rather have it in the final close place, and
+        // only set it after 6 confirmations
 
         if confirmations < 1 {
             // TODO(tibo): if this fails because another tx is already in
