@@ -1,8 +1,9 @@
 [workspace]
 members = [
     "dlc-blockchain-provider",
-    "js-interface-wallet",
+    "dlc-link-manager",
     "dlc-memory-storage-provider",
+    "js-interface-wallet",
     "oracle",
     "oracle-discovery",
     "wallet",

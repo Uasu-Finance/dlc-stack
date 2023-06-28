@@ -20,12 +20,12 @@ use std::{
 };
 
 use bitcoin::Address;
+use dlc_link_manager::Manager;
 use dlc_manager::{
     contract::{
         contract_input::{ContractInput, ContractInputInfo, OracleInput},
         Contract,
     },
-    manager::Manager,
     Blockchain, Oracle, Storage, SystemTimeProvider, Wallet,
 };
 use dlc_messages::{AcceptDlc, Message};
@@ -55,7 +55,6 @@ type DlcManager<'a> = Manager<
     Box<StorageProvider>,
     Arc<P2PDOracleClient>,
     Arc<SystemTimeProvider>,
-    Arc<ElectrsBlockchainProvider>,
 >;
 
 const NUM_CONFIRMATIONS: u32 = 2;
@@ -182,7 +181,6 @@ fn main() {
             Box::new(dlc_store),
             oracles,
             Arc::new(time_provider),
-            Arc::clone(&blockchain),
         )
         .unwrap(),
     ));
@@ -399,6 +397,9 @@ fn periodic_check(
             .oracle_event
             .event_id
             .clone();
+            // Do I still need to check if it's already been marked as funded, if the JS side is taking care of that?
+            // Probably yes or else I will send the message to JS over and over
+            // Or I can just return a state of all contracts and let JS figure it out
             if !funded_uuids.contains(&uuid) {
                 debug!("Contract is funded, setting funded to true: {}", uuid);
                 let mut post_body = HashMap::new();
