@@ -1,18 +1,13 @@
 import dotenv from 'dotenv';
-import { Chain, ConfigSet, validChains } from './models.js';
-
 dotenv.config();
-
-export default (): ConfigSet => {
-    let chain = process.env.CHAIN as Chain;
-    let version = process.env.VERSION as string;
+export default () => {
+    let chain = process.env.CHAIN;
+    let version = process.env.VERSION;
     let privateKey = process.env.PRIVATE_KEY;
-    let apiKey = process.env.API_KEY as string;
-
+    let apiKey = process.env.API_KEY;
     // Throw an error if one of the set is missing
     if (!chain || !version || !privateKey || !apiKey)
         throw new Error(`CHAIN, VERSION, PRIVATE_KEY, or API_KEY is missing.`);
-
     return {
         chain: chain,
         version: version,

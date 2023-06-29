@@ -1,22 +1,15 @@
-import { Chain } from '../config/models.js';
 import readEnvConfigs from '../config/read-env-configs.js';
 import getETHConfig from '../chains/ethereum/get-config.js';
-import { WrappedContract } from '../chains/shared/models/wrapped-contract.interface.js';
-import { TransactionReceipt } from '@ethersproject/abstract-provider';
-
 export default class BlockchainWriterService {
-    private static blockchainWriter: BlockchainWriterService;
-
-    private constructor() {}
-
-    public static async getBlockchainWriter(): Promise<BlockchainWriterService> {
-        if (!this.blockchainWriter) this.blockchainWriter = new BlockchainWriterService();
+    static blockchainWriter;
+    constructor() { }
+    static async getBlockchainWriter() {
+        if (!this.blockchainWriter)
+            this.blockchainWriter = new BlockchainWriterService();
         return this.blockchainWriter;
     }
-
-    public async getConfig(): Promise<WrappedContract> {
+    async getConfig() {
         let configSet = readEnvConfigs();
-
         switch (configSet.chain) {
             case 'ETH_MAINNET':
             case 'ETH_SEPOLIA':
@@ -32,13 +25,11 @@ export default class BlockchainWriterService {
                 throw new Error(`${configSet.chain} is not a valid chain.`);
         }
     }
-
-    public async setStatusFunded(uuid: string): Promise<TransactionReceipt> {
+    async setStatusFunded(uuid) {
         const contractConfig = await this.getConfig();
         return await contractConfig.setStatusFunded(uuid);
     }
-
-    public async postCloseDLC(uuid: string, btcTxId: string): Promise<TransactionReceipt> {
+    async postCloseDLC(uuid, btcTxId) {
         const contractConfig = await this.getConfig();
         return await contractConfig.postCloseDLC(uuid, btcTxId);
     }

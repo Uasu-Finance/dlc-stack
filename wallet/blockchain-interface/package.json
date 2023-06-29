@@ -7,7 +7,7 @@
     "scripts": {
         "build": "tsc -p .",
         "start": "node dist/src/index.js",
-        "dev": "tsc-watch --noClear -p ./tsconfig.json --onSuccess \"npm run run\"",
+        "dev": "tsc-watch --noClear -p ./tsconfig.json --onSuccess \"npm run start\"",
         "lint": "npx prettier . --write",
         "test": "jest"
     },

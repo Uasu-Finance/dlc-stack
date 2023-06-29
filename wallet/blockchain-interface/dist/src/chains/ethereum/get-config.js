@@ -1,39 +1,32 @@
-import { ConfigSet } from '../../config/models.js';
 import fetch from 'cross-fetch';
 import { ethers } from 'ethers';
 import { WebSocketProvider } from './utilities/websocket-provider.js';
-import { DeploymentInfo } from '../shared/models/deployment-info.interface.js';
 import fs from 'fs';
-import { WrappedContract } from '../shared/models/wrapped-contract.interface.js';
-
-async function fetchDeploymentInfo(subchain: string, version: string): Promise<DeploymentInfo> {
+async function fetchDeploymentInfo(subchain, version) {
     // TODO: versioning the deployment files
     const contract = 'DlcManager';
     try {
-        const response = await fetch(
-            `https://raw.githubusercontent.com/DLC-link/dlc-solidity/master/deploymentFiles/${subchain}/${contract}.json`
-        );
+        const response = await fetch(`https://raw.githubusercontent.com/DLC-link/dlc-solidity/master/deploymentFiles/${subchain}/${contract}.json`);
         return await response.json();
-    } catch (error) {
+    }
+    catch (error) {
         throw new Error(`Could not fetch deployment info for ${contract} on ${subchain}`);
     }
 }
-
-async function getLocalDeploymentInfo(path: string, contract: string, version: string): Promise<DeploymentInfo> {
+async function getLocalDeploymentInfo(path, contract, version) {
     try {
         let dp = JSON.parse(fs.readFileSync(`${path}/v${version}/${contract}.json`, 'utf-8'));
         return dp;
-    } catch (error) {
+    }
+    catch (error) {
         console.log(error);
         throw new Error(`Could not fetch deployment info for ${contract} on local`);
     }
 }
-
-export default async (config: ConfigSet): Promise<WrappedContract> => {
-    let deploymentInfo: DeploymentInfo = {} as DeploymentInfo;
-    let provider: ethers.providers.WebSocketProvider | ethers.providers.JsonRpcProvider;
-    let wallet: ethers.Wallet;
-
+export default async (config) => {
+    let deploymentInfo = {};
+    let provider;
+    let wallet;
     switch (config.chain) {
         case 'ETH_MAINNET':
             deploymentInfo = await fetchDeploymentInfo('mainnet', config.version);
@@ -59,13 +52,7 @@ export default async (config: ConfigSet): Promise<WrappedContract> => {
             throw new Error(`Chain ${config.chain} is not supported.`);
             break;
     }
-
-    const contract = new ethers.Contract(
-        deploymentInfo.contract.address,
-        deploymentInfo.contract.abi,
-        provider
-    ).connect(wallet);
-
+    const contract = new ethers.Contract(deploymentInfo.contract.address, deploymentInfo.contract.abi, provider).connect(wallet);
     return {
         setStatusFunded: async (uuid) => {
             try {
@@ -76,7 +63,8 @@ export default async (config: ConfigSet): Promise<WrappedContract> => {
                 const txReceipt = await transaction.wait();
                 console.log('Funded request transaction receipt: ', txReceipt);
                 return txReceipt;
-            } catch (error) {
+            }
+            catch (error) {
                 console.log(error);
                 return error;
             }
@@ -90,7 +78,8 @@ export default async (config: ConfigSet): Promise<WrappedContract> => {
                 const txReceipt = await transaction.wait();
                 console.log('PostCloseDLC transaction receipt: ', txReceipt);
                 return txReceipt;
-            } catch (error) {
+            }
+            catch (error) {
                 console.log(error);
                 return error;
             }
