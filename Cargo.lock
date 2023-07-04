@@ -1316,6 +1316,7 @@ dependencies = [
  "bitcoin",
  "chrono",
  "console_error_panic_hook",
+ "dlc-link-manager",
  "dlc-manager",
  "dlc-messages",
  "dlc-storage-provider",

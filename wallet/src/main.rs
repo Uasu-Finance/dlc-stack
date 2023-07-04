@@ -20,12 +20,13 @@ use std::{
 };
 
 use bitcoin::Address;
-use dlc_link_manager::Manager;
+// use dlc_link_manager::Manager;
 use dlc_manager::{
     contract::{
         contract_input::{ContractInput, ContractInputInfo, OracleInput},
         Contract,
     },
+    manager::Manager,
     Blockchain, Oracle, Storage, SystemTimeProvider, Wallet,
 };
 use dlc_messages::{AcceptDlc, Message};
@@ -55,6 +56,7 @@ type DlcManager<'a> = Manager<
     Box<StorageProvider>,
     Arc<P2PDOracleClient>,
     Arc<SystemTimeProvider>,
+    Arc<ElectrsBlockchainProvider>,
 >;
 
 const NUM_CONFIRMATIONS: u32 = 2;
@@ -181,6 +183,7 @@ fn main() {
             Box::new(dlc_store),
             oracles,
             Arc::new(time_provider),
+            Arc::clone(&blockchain),
         )
         .unwrap(),
     ));

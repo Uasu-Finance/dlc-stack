@@ -15,6 +15,7 @@ default = ["console_error_panic_hook"]
 base64 = "0.13.1"
 bitcoin = {version = "0.29.2", features=["serde"]}
 chrono = {version = "0.4.19", features = ["serde"]}
+dlc-link-manager = { path = "../dlc-link-manager" }
 dlc-manager = { git = "https://github.com/dlc-link/rust-dlc", branch="fix/fee-comtputation-issue", features = ["use-serde"] }
 dlc-messages = { git = "https://github.com/dlc-link/rust-dlc", branch="fix/fee-comtputation-issue", features = ["use-serde"]}
 dlc-trie = { git = "https://github.com/dlc-link/rust-dlc", branch="fix/fee-comtputation-issue", features = ["use-serde"]}

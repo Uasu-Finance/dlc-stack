@@ -19,13 +19,16 @@ use std::{
 };
 
 use dlc_manager::{
-    contract::{Contract, signed_contract::SignedContract}, manager::Manager, ContractId, Oracle, Storage, SystemTimeProvider,
+    contract::{signed_contract::SignedContract, Contract},
+    ContractId, Oracle, SystemTimeProvider,
 };
+
+use dlc_link_manager::{AsyncStorage, Manager};
 
 use std::fmt::Write as _;
 
-use log::info;
 use dlc_storage_provider::DlcStorageProvider;
+use log::info;
 
 use esplora_async_blockchain_provider::EsploraAsyncBlockchainProvider;
 
@@ -45,7 +48,6 @@ type DlcManager = Manager<
     Box<DlcStorageProvider>,
     Arc<P2PDOracleClient>,
     Arc<SystemTimeProvider>,
-    Arc<EsploraAsyncBlockchainProvider>,
 >;
 
 // The contracts in dlc-manager expect a node id, but web extensions often don't have this, so hardcode it for now. Should not have any ramifications.
@@ -164,7 +166,6 @@ impl JsDLCInterface {
                 Box::new(store),
                 oracles,
                 Arc::new(time_provider),
-                Arc::clone(&blockchain),
             )
             .unwrap(),
         ));
@@ -232,7 +233,7 @@ impl JsDLCInterface {
     pub async fn accept_offer(&self, offer_json: String) -> String {
         let dlc_offer_message: OfferDlc = serde_json::from_str(&offer_json).unwrap();
         clog!("Offer to accept: {:?}", dlc_offer_message);
-        
+
         clog!("receive_offer - after on_dlc_message");
         let temporary_contract_id = dlc_offer_message.temporary_contract_id;
 
@@ -247,13 +248,12 @@ impl JsDLCInterface {
             }
         }
 
-
         clog!("accepting contract with id {:?}", temporary_contract_id);
 
         let (_contract_id, _public_key, accept_msg) = self
             .manager
             .lock()
-        .unwrap()
+            .unwrap()
             .accept_contract_offer(&temporary_contract_id)
             .expect("Error accepting contract offer");
 
@@ -285,7 +285,12 @@ impl JsDLCInterface {
             .filter(|c| c.accepted_contract.get_contract_id() == dlc_sign_message.contract_id)
             .next()
             .unwrap();
-        contract.accepted_contract.dlc_transactions.fund.txid().to_string()
+        contract
+            .accepted_contract
+            .dlc_transactions
+            .fund
+            .txid()
+            .to_string()
     }
 
     pub async fn reject_offer(&self, contract_id: String) -> () {

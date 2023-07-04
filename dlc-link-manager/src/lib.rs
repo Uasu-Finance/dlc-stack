@@ -1,3 +1,4 @@
+#![feature(async_fn_in_trait)]
 //! #Manager a component to create and update DLCs.
 
 extern crate dlc_manager;
@@ -42,26 +43,26 @@ type ClosableContractInfo<'a> = Option<(
     Vec<(usize, OracleAttestation)>,
 )>;
 
-pub trait Storage {
+pub trait AsyncStorage {
     /// Returns the contract with given id if found.
-    fn get_contract(&self, id: &ContractId) -> Result<Option<Contract>, Error>;
+    async fn get_contract(&self, id: &ContractId) -> Result<Option<Contract>, Error>;
     /// Return all contracts
-    fn get_contracts(&self) -> Result<Vec<Contract>, Error>;
+    async fn get_contracts(&self) -> Result<Vec<Contract>, Error>;
     /// Create a record for the given contract.
-    fn create_contract(&self, contract: &OfferedContract) -> Result<(), Error>;
+    async fn create_contract(&self, contract: &OfferedContract) -> Result<(), Error>;
     /// Delete the record for the contract with the given id.
-    fn delete_contract(&self, id: &ContractId) -> Result<(), Error>;
+    async fn delete_contract(&self, id: &ContractId) -> Result<(), Error>;
     /// Update the given contract.
-    fn update_contract(&self, contract: &Contract) -> Result<(), Error>;
+    async fn update_contract(&self, contract: &Contract) -> Result<(), Error>;
     /// Returns the set of contracts in offered state.
-    fn get_contract_offers(&self) -> Result<Vec<OfferedContract>, Error>;
+    async fn get_contract_offers(&self) -> Result<Vec<OfferedContract>, Error>;
     /// Returns the set of contracts in signed state.
-    fn get_signed_contracts(&self) -> Result<Vec<SignedContract>, Error>;
+    async fn get_signed_contracts(&self) -> Result<Vec<SignedContract>, Error>;
     /// Returns the set of confirmed contracts.
-    fn get_confirmed_contracts(&self) -> Result<Vec<SignedContract>, Error>;
+    async fn get_confirmed_contracts(&self) -> Result<Vec<SignedContract>, Error>;
     /// Returns the set of contracts whos broadcasted cet has not been verified to be confirmed on
     /// blockchain
-    fn get_preclosed_contracts(&self) -> Result<Vec<PreClosedContract>, Error>;
+    async fn get_preclosed_contracts(&self) -> Result<Vec<PreClosedContract>, Error>;
 }
 
 /// Used to create and update DLCs.
@@ -69,7 +70,7 @@ pub struct Manager<W: Deref, B: Deref, S: Deref, O: Deref, T: Deref>
 where
     W::Target: Wallet,
     B::Target: Blockchain,
-    S::Target: Storage,
+    S::Target: AsyncStorage,
     O::Target: Oracle,
     T::Target: Time,
 {
@@ -83,7 +84,7 @@ where
 
 macro_rules! get_object_in_state {
     ($manager: ident, $id: expr, $state: ident, $peer_id: expr, $object_type: ident, $get_call: ident) => {{
-        let object = $manager.store.$get_call($id)?;
+        let object = $manager.store.$get_call($id).await?;
         match object {
             Some(c) => {
                 if let Some(p) = $peer_id as Option<PublicKey> {
@@ -128,7 +129,7 @@ impl<W: Deref, B: Deref, S: Deref, O: Deref, T: Deref> Manager<W, B, S, O, T>
 where
     W::Target: Wallet,
     B::Target: Blockchain,
-    S::Target: Storage,
+    S::Target: AsyncStorage,
     O::Target: Oracle,
     T::Target: Time,
 {
@@ -161,19 +162,19 @@ where
     }
 
     /// Function called to pass a DlcMessage to the Manager.
-    pub fn on_dlc_message(
+    pub async fn on_dlc_message(
         &mut self,
         msg: &DlcMessage,
         counter_party: PublicKey,
     ) -> Result<Option<DlcMessage>, Error> {
         match msg {
             DlcMessage::Offer(o) => {
-                self.on_offer_message(o, counter_party)?;
+                self.on_offer_message(o, counter_party).await?;
                 Ok(None)
             }
-            DlcMessage::Accept(a) => Ok(Some(self.on_accept_message(a, &counter_party)?)),
+            DlcMessage::Accept(a) => Ok(Some(self.on_accept_message(a, &counter_party).await?)),
             DlcMessage::Sign(s) => {
-                self.on_sign_message(s, &counter_party)?;
+                self.on_sign_message(s, &counter_party).await?;
                 Ok(None)
             }
             _ => Err(Error::InvalidState("Invalid message type.".to_string())),
@@ -182,7 +183,7 @@ where
 
     /// Function called to create a new DLC. The offered contract will be stored
     /// and an OfferDlc message returned.
-    pub fn send_offer(
+    pub async fn send_offer(
         &mut self,
         contract_input: &ContractInput,
         counter_party: PublicKey,
@@ -208,13 +209,13 @@ where
 
         offered_contract.validate()?;
 
-        self.store.create_contract(&offered_contract)?;
+        self.store.create_contract(&offered_contract).await?;
 
         Ok(offer_msg)
     }
 
     /// Function to call to accept a DLC for which an offer was received.
-    pub fn accept_contract_offer(
+    pub async fn accept_contract_offer(
         &mut self,
         contract_id: &ContractId,
     ) -> Result<(ContractId, PublicKey, AcceptDlc), Error> {
@@ -238,22 +239,23 @@ where
         let contract_id = accepted_contract.get_contract_id();
 
         self.store
-            .update_contract(&Contract::Accepted(accepted_contract))?;
+            .update_contract(&Contract::Accepted(accepted_contract))
+            .await?;
 
         Ok((contract_id, counter_party, accept_msg))
     }
 
     /// Function to call to check the state of the currently executing DLCs and
     /// update them if possible.
-    pub fn periodic_check(&mut self) -> Result<(), Error> {
-        self.check_signed_contracts()?;
-        self.check_confirmed_contracts()?;
-        self.check_preclosed_contracts()?;
+    pub async fn periodic_check(&mut self) -> Result<(), Error> {
+        self.check_signed_contracts().await?;
+        self.check_confirmed_contracts().await?;
+        self.check_preclosed_contracts().await?;
 
         Ok(())
     }
 
-    fn on_offer_message(
+    async fn on_offer_message(
         &mut self,
         offered_message: &OfferDlc,
         counter_party: PublicKey,
@@ -263,18 +265,18 @@ where
             OfferedContract::try_from_offer_dlc(offered_message, counter_party)?;
         contract.validate()?;
 
-        if self.store.get_contract(&contract.id)?.is_some() {
+        if self.store.get_contract(&contract.id).await?.is_some() {
             return Err(Error::InvalidParameters(
                 "Contract with identical id already exists".to_string(),
             ));
         }
 
-        self.store.create_contract(&contract)?;
+        self.store.create_contract(&contract).await?;
 
         Ok(())
     }
 
-    fn on_accept_message(
+    async fn on_accept_message(
         &mut self,
         accept_msg: &AcceptDlc,
         counter_party: &PublicKey,
@@ -293,7 +295,11 @@ where
             &self.wallet,
         ) {
             Ok(contract) => contract,
-            Err(e) => return self.accept_fail_on_error(offered_contract, accept_msg.clone(), e),
+            Err(e) => {
+                return self
+                    .accept_fail_on_error(offered_contract, accept_msg.clone(), e)
+                    .await
+            }
         };
 
         self.wallet.import_address(&Address::p2wsh(
@@ -305,12 +311,13 @@ where
         ))?;
 
         self.store
-            .update_contract(&Contract::Signed(signed_contract))?;
+            .update_contract(&Contract::Signed(signed_contract))
+            .await?;
 
         Ok(DlcMessage::Sign(signed_msg))
     }
 
-    fn on_sign_message(
+    async fn on_sign_message(
         &mut self,
         sign_message: &SignDlc,
         peer_id: &PublicKey,
@@ -327,12 +334,15 @@ where
             ) {
                 Ok(contract) => contract,
                 Err(e) => {
-                    return self.sign_fail_on_error(accepted_contract, sign_message.clone(), e)
+                    return self
+                        .sign_fail_on_error(accepted_contract, sign_message.clone(), e)
+                        .await
                 }
             };
 
         self.store
-            .update_contract(&Contract::Signed(signed_contract))?;
+            .update_contract(&Contract::Signed(signed_contract))
+            .await?;
 
         self.blockchain.send_transaction(&fund_tx)?;
 
@@ -355,7 +365,7 @@ where
         Ok(announcements)
     }
 
-    fn sign_fail_on_error<R>(
+    async fn sign_fail_on_error<R>(
         &mut self,
         accepted_contract: AcceptedContract,
         sign_message: SignDlc,
@@ -367,11 +377,12 @@ where
                 accepted_contract,
                 sign_message,
                 error_message: e.to_string(),
-            }))?;
+            }))
+            .await?;
         Err(e)
     }
 
-    fn accept_fail_on_error<R>(
+    async fn accept_fail_on_error<R>(
         &mut self,
         offered_contract: OfferedContract,
         accept_message: AcceptDlc,
@@ -383,25 +394,27 @@ where
                 offered_contract,
                 accept_message,
                 error_message: e.to_string(),
-            }))?;
+            }))
+            .await?;
         Err(e)
     }
 
-    fn check_signed_contract(&mut self, contract: &SignedContract) -> Result<(), Error> {
+    async fn check_signed_contract(&mut self, contract: &SignedContract) -> Result<(), Error> {
         let confirmations = self.blockchain.get_transaction_confirmations(
             &contract.accepted_contract.dlc_transactions.fund.txid(),
         )?;
         if confirmations >= NB_CONFIRMATIONS {
             // Here can call to the thing?
             self.store
-                .update_contract(&Contract::Confirmed(contract.clone()))?;
+                .update_contract(&Contract::Confirmed(contract.clone()))
+                .await?;
         }
         Ok(())
     }
 
-    fn check_signed_contracts(&mut self) -> Result<(), Error> {
-        for c in self.store.get_signed_contracts()? {
-            if let Err(e) = self.check_signed_contract(&c) {
+    async fn check_signed_contracts(&mut self) -> Result<(), Error> {
+        for c in self.store.get_signed_contracts().await? {
+            if let Err(e) = self.check_signed_contract(&c).await {
                 error!(
                     "Error checking confirmed contract {}: {}",
                     c.accepted_contract.get_contract_id_string(),
@@ -413,13 +426,13 @@ where
         Ok(())
     }
 
-    fn check_confirmed_contracts(&mut self) -> Result<(), Error> {
-        for c in self.store.get_confirmed_contracts()? {
+    async fn check_confirmed_contracts(&mut self) -> Result<(), Error> {
+        for c in self.store.get_confirmed_contracts().await? {
             // Confirmed contracts from channel are processed in channel specific methods.
             if c.channel_id.is_some() {
                 continue;
             }
-            if let Err(e) = self.check_confirmed_contract(&c) {
+            if let Err(e) = self.check_confirmed_contract(&c).await {
                 error!(
                     "Error checking confirmed contract {}: {}",
                     c.accepted_contract.get_contract_id_string(),
@@ -467,7 +480,7 @@ where
         None
     }
 
-    fn check_confirmed_contract(&mut self, contract: &SignedContract) -> Result<(), Error> {
+    async fn check_confirmed_contract(&mut self, contract: &SignedContract) -> Result<(), Error> {
         let closable_contract_info = self.get_closable_contract_info(contract);
         if let Some((contract_info, adaptor_info, attestations)) = closable_contract_info {
             let cet = crate::dlc_manager::contract_updater::get_signed_cet(
@@ -484,7 +497,7 @@ where
                 attestations.iter().map(|x| x.1.clone()).collect(),
             ) {
                 Ok(closed_contract) => {
-                    self.store.update_contract(&closed_contract)?;
+                    self.store.update_contract(&closed_contract).await?;
                     return Ok(());
                 }
                 Err(e) => {
@@ -498,14 +511,14 @@ where
             }
         }
 
-        self.check_refund(contract)?;
+        self.check_refund(contract).await?;
 
         Ok(())
     }
 
-    fn check_preclosed_contracts(&mut self) -> Result<(), Error> {
-        for c in self.store.get_preclosed_contracts()? {
-            if let Err(e) = self.check_preclosed_contract(&c) {
+    async fn check_preclosed_contracts(&mut self) -> Result<(), Error> {
+        for c in self.store.get_preclosed_contracts().await? {
+            if let Err(e) = self.check_preclosed_contract(&c).await {
                 error!(
                     "Error checking pre-closed contract {}: {}",
                     c.signed_contract.accepted_contract.get_contract_id_string(),
@@ -517,7 +530,10 @@ where
         Ok(())
     }
 
-    fn check_preclosed_contract(&mut self, contract: &PreClosedContract) -> Result<(), Error> {
+    async fn check_preclosed_contract(
+        &mut self,
+        contract: &PreClosedContract,
+    ) -> Result<(), Error> {
         let broadcasted_txid = contract.signed_cet.txid();
         let confirmations = self
             .blockchain
@@ -543,7 +559,8 @@ where
                     .compute_pnl(&contract.signed_cet),
             };
             self.store
-                .update_contract(&Contract::Closed(closed_contract))?;
+                .update_contract(&Contract::Closed(closed_contract))
+                .await?;
         }
 
         Ok(())
@@ -599,7 +616,7 @@ where
         Ok(Contract::Closed(closed_contract))
     }
 
-    fn check_refund(&mut self, contract: &SignedContract) -> Result<(), Error> {
+    async fn check_refund(&mut self, contract: &SignedContract) -> Result<(), Error> {
         // TODO(tibo): should check for confirmation of refund before updating state
         if contract
             .accepted_contract
@@ -624,7 +641,8 @@ where
             }
 
             self.store
-                .update_contract(&Contract::Refunded(contract.clone()))?;
+                .update_contract(&Contract::Refunded(contract.clone()))
+                .await?;
         }
 
         Ok(())
