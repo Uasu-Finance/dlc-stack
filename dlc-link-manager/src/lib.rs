@@ -10,7 +10,7 @@ use crate::dlc_manager::contract::{
 };
 use crate::dlc_manager::contract_updater::{accept_contract, verify_accepted_and_sign_contract};
 use crate::dlc_manager::error::Error;
-use crate::dlc_manager::{Blockchain, Storage, Time, Wallet};
+use crate::dlc_manager::{Blockchain, Time, Wallet};
 
 use bitcoin::Address;
 use bitcoin::Transaction;
@@ -41,6 +41,28 @@ type ClosableContractInfo<'a> = Option<(
     &'a AdaptorInfo,
     Vec<(usize, OracleAttestation)>,
 )>;
+
+pub trait Storage {
+    /// Returns the contract with given id if found.
+    fn get_contract(&self, id: &ContractId) -> Result<Option<Contract>, Error>;
+    /// Return all contracts
+    fn get_contracts(&self) -> Result<Vec<Contract>, Error>;
+    /// Create a record for the given contract.
+    fn create_contract(&self, contract: &OfferedContract) -> Result<(), Error>;
+    /// Delete the record for the contract with the given id.
+    fn delete_contract(&self, id: &ContractId) -> Result<(), Error>;
+    /// Update the given contract.
+    fn update_contract(&self, contract: &Contract) -> Result<(), Error>;
+    /// Returns the set of contracts in offered state.
+    fn get_contract_offers(&self) -> Result<Vec<OfferedContract>, Error>;
+    /// Returns the set of contracts in signed state.
+    fn get_signed_contracts(&self) -> Result<Vec<SignedContract>, Error>;
+    /// Returns the set of confirmed contracts.
+    fn get_confirmed_contracts(&self) -> Result<Vec<SignedContract>, Error>;
+    /// Returns the set of contracts whos broadcasted cet has not been verified to be confirmed on
+    /// blockchain
+    fn get_preclosed_contracts(&self) -> Result<Vec<PreClosedContract>, Error>;
+}
 
 /// Used to create and update DLCs.
 pub struct Manager<W: Deref, B: Deref, S: Deref, O: Deref, T: Deref>
