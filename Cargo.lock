@@ -455,7 +455,6 @@ dependencies = [
 [[package]]
 name = "bitcoin-test-utils"
 version = "0.1.0"
-source = "git+https://github.com/dlc-link/rust-dlc?branch=fix/fee-comtputation-issue#800bc0b6ccc4bd55779b377ae2e6c7a871f3cca5"
 dependencies = [
  "bitcoin",
  "bitcoincore-rpc",
@@ -1099,7 +1098,6 @@ dependencies = [
 [[package]]
 name = "dlc"
 version = "0.4.0"
-source = "git+https://github.com/dlc-link/rust-dlc?branch=fix/fee-comtputation-issue#800bc0b6ccc4bd55779b377ae2e6c7a871f3cca5"
 dependencies = [
  "bitcoin",
  "miniscript",
@@ -1132,7 +1130,6 @@ dependencies = [
 [[package]]
 name = "dlc-manager"
 version = "0.4.0"
-source = "git+https://github.com/dlc-link/rust-dlc?branch=fix/fee-comtputation-issue#800bc0b6ccc4bd55779b377ae2e6c7a871f3cca5"
 dependencies = [
  "async-trait",
  "bitcoin",
@@ -1148,7 +1145,6 @@ dependencies = [
 [[package]]
 name = "dlc-messages"
 version = "0.4.0"
-source = "git+https://github.com/dlc-link/rust-dlc?branch=fix/fee-comtputation-issue#800bc0b6ccc4bd55779b377ae2e6c7a871f3cca5"
 dependencies = [
  "bitcoin",
  "dlc",
@@ -1190,7 +1186,6 @@ dependencies = [
 [[package]]
 name = "dlc-sled-storage-provider"
 version = "0.1.0"
-source = "git+https://github.com/dlc-link/rust-dlc?branch=fix/fee-comtputation-issue#800bc0b6ccc4bd55779b377ae2e6c7a871f3cca5"
 dependencies = [
  "bitcoin",
  "dlc-manager",
@@ -1259,7 +1254,6 @@ dependencies = [
 [[package]]
 name = "dlc-trie"
 version = "0.4.0"
-source = "git+https://github.com/dlc-link/rust-dlc?branch=fix/fee-comtputation-issue#800bc0b6ccc4bd55779b377ae2e6c7a871f3cca5"
 dependencies = [
  "bitcoin",
  "dlc",
@@ -1334,7 +1328,6 @@ checksum = "7fcaabb2fef8c910e7f4c7ce9f67a1283a1715879a7c230ca9d6d1ae31f16d91"
 [[package]]
 name = "electrs-blockchain-provider"
 version = "0.1.0"
-source = "git+https://github.com/dlc-link/rust-dlc?branch=fix/fee-comtputation-issue#800bc0b6ccc4bd55779b377ae2e6c7a871f3cca5"
 dependencies = [
  "bitcoin",
  "bitcoin-test-utils",
@@ -3327,7 +3320,6 @@ checksum = "420acb44afdae038210c99e69aae24109f32f15500aa708e81d46c9f29d55fcf"
 [[package]]
 name = "simple-wallet"
 version = "0.1.0"
-source = "git+https://github.com/dlc-link/rust-dlc?branch=fix/fee-comtputation-issue#800bc0b6ccc4bd55779b377ae2e6c7a871f3cca5"
 dependencies = [
  "bdk",
  "bitcoin",
