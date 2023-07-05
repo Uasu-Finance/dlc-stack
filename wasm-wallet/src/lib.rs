@@ -27,7 +27,7 @@ use dlc_link_manager::{AsyncStorage, Manager};
 
 use std::fmt::Write as _;
 
-use dlc_storage_provider::DlcStorageProvider;
+use dlc_memory_storage_provider::DlcMemoryStorageProvider;
 use log::info;
 
 use esplora_async_blockchain_provider::EsploraAsyncBlockchainProvider;
@@ -45,7 +45,7 @@ mod macros;
 type DlcManager = Manager<
     Arc<JSInterfaceWallet>,
     Arc<EsploraAsyncBlockchainProvider>,
-    Box<DlcStorageProvider>,
+    Box<DlcMemoryStorageProvider>,
     Arc<P2PDOracleClient>,
     Arc<SystemTimeProvider>,
 >;
@@ -134,7 +134,7 @@ impl JsDLCInterface {
         );
 
         // Set up DLC store
-        let store = DlcStorageProvider::new();
+        let store = DlcMemoryStorageProvider::new();
 
         // Generate keypair from secret key
         let seckey = secp256k1_zkp::SecretKey::from_str(&privkey).unwrap();
@@ -204,6 +204,7 @@ impl JsDLCInterface {
             .unwrap()
             .get_store()
             .get_contracts()
+            .await
             .unwrap()
             .into_iter()
             .map(|contract| JsContract::from_contract(contract))
@@ -221,6 +222,7 @@ impl JsDLCInterface {
             .unwrap()
             .get_store()
             .get_contract(&contract_id)
+            .await
             .unwrap();
         match contract {
             Some(contract) => {
@@ -237,10 +239,16 @@ impl JsDLCInterface {
         clog!("receive_offer - after on_dlc_message");
         let temporary_contract_id = dlc_offer_message.temporary_contract_id;
 
-        match self.manager.lock().unwrap().on_dlc_message(
-            &Message::Offer(dlc_offer_message.clone()),
-            STATIC_COUNTERPARTY_NODE_ID.parse().unwrap(),
-        ) {
+        match self
+            .manager
+            .lock()
+            .unwrap()
+            .on_dlc_message(
+                &Message::Offer(dlc_offer_message.clone()),
+                STATIC_COUNTERPARTY_NODE_ID.parse().unwrap(),
+            )
+            .await
+        {
             Ok(_) => (),
             Err(e) => {
                 clog!("DLC manager - receive offer error: {}", e.to_string());
@@ -255,6 +263,7 @@ impl JsDLCInterface {
             .lock()
             .unwrap()
             .accept_contract_offer(&temporary_contract_id)
+            .await
             .expect("Error accepting contract offer");
 
         clog!("receive_offer - after accept_contract_offer");
@@ -265,10 +274,16 @@ impl JsDLCInterface {
         clog!("sign_offer - before on_dlc_message");
         let dlc_sign_message: SignDlc = serde_json::from_str(&dlc_sign_message).unwrap();
         clog!("dlc_sign_message: {:?}", dlc_sign_message);
-        match self.manager.lock().unwrap().on_dlc_message(
-            &Message::Sign(dlc_sign_message.clone()),
-            STATIC_COUNTERPARTY_NODE_ID.parse().unwrap(),
-        ) {
+        match self
+            .manager
+            .lock()
+            .unwrap()
+            .on_dlc_message(
+                &Message::Sign(dlc_sign_message.clone()),
+                STATIC_COUNTERPARTY_NODE_ID.parse().unwrap(),
+            )
+            .await
+        {
             Ok(_) => (),
             Err(e) => {
                 info!("DLC manager - sign offer error: {}", e.to_string());
@@ -280,6 +295,7 @@ impl JsDLCInterface {
         let store = manager.get_store();
         let contract: SignedContract = store
             .get_signed_contracts()
+            .await
             .unwrap()
             .into_iter()
             .filter(|c| c.accepted_contract.get_contract_id() == dlc_sign_message.contract_id)
@@ -301,6 +317,7 @@ impl JsDLCInterface {
             .unwrap()
             .get_store()
             .get_contract(&contract_id)
+            .await
             .unwrap();
 
         match contract {
@@ -310,6 +327,7 @@ impl JsDLCInterface {
                     .unwrap()
                     .get_store()
                     .update_contract(&Contract::Rejected(c))
+                    .await
                     .unwrap();
             }
             _ => (),

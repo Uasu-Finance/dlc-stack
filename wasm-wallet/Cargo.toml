@@ -20,7 +20,7 @@ dlc-manager = { git = "https://github.com/dlc-link/rust-dlc", branch="fix/fee-co
 dlc-messages = { git = "https://github.com/dlc-link/rust-dlc", branch="fix/fee-comtputation-issue", features = ["use-serde"]}
 dlc-trie = { git = "https://github.com/dlc-link/rust-dlc", branch="fix/fee-comtputation-issue", features = ["use-serde"]}
 # rust-bitcoin-coin-selection = {version = "0.1.0", git = "https://github.com/p2pderivatives/rust-bitcoin-coin-selection", features = ["rand"]}
-dlc-storage-provider = { path = "../dlc-storage-provider" }
+dlc-memory-storage-provider = { path = "../dlc-memory-storage-provider" }
 env_logger = "0.9.0"
 getrandom = { version = "0.2", features = ["js"] }
 lightning = {version = "0.0.113" }

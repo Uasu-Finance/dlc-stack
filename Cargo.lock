@@ -1186,6 +1186,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "dlc-memory-storage-provider"
+version = "0.1.0"
+dependencies = [
+ "bitcoin",
+ "dlc",
+ "dlc-link-manager",
+ "dlc-manager",
+ "dlc-messages",
+ "lightning",
+ "secp256k1-zkp",
+]
+
+[[package]]
 name = "dlc-messages"
 version = "0.4.0"
 source = "git+https://github.com/dlc-link/rust-dlc?branch=fix/fee-comtputation-issue#5128b817deca2ce92e80204d0bdb8f9e8d609ec8"
@@ -1270,18 +1283,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "dlc-storage-provider"
-version = "0.1.0"
-dependencies = [
- "bitcoin",
- "dlc",
- "dlc-manager",
- "dlc-messages",
- "lightning",
- "secp256k1-zkp",
-]
-
-[[package]]
 name = "dlc-storage-reader"
 version = "0.1.0"
 dependencies = [
@@ -1318,8 +1319,8 @@ dependencies = [
  "console_error_panic_hook",
  "dlc-link-manager",
  "dlc-manager",
+ "dlc-memory-storage-provider",
  "dlc-messages",
- "dlc-storage-provider",
  "dlc-trie",
  "env_logger",
  "esplora-async-blockchain-provider",
