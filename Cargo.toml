@@ -1,5 +1,6 @@
 [workspace]
 members = [
+    "attestor",
     "esplora-async-blockchain-provider",
     "js-interface-wallet",
     "dlc-memory-storage-provider",

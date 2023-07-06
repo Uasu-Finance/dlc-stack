@@ -373,6 +373,40 @@ dependencies = [
 ]
 
 [[package]]
+name = "attestor"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "base64 0.13.1",
+ "bitcoin",
+ "clap 3.2.25",
+ "config",
+ "console_error_panic_hook",
+ "displaydoc",
+ "dlc 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "dlc-clients",
+ "dlc-messages 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "futures",
+ "getrandom",
+ "hex",
+ "js-sys",
+ "lightning",
+ "log",
+ "parking_lot 0.12.1",
+ "queues",
+ "secp256k1-zkp",
+ "serde",
+ "serde-wasm-bindgen",
+ "serde_json",
+ "thiserror",
+ "time 0.3.22",
+ "wasm-bindgen",
+ "wasm-bindgen-futures",
+ "web-sys",
+]
+
+[[package]]
 name = "atty"
 version = "0.2.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -439,7 +473,7 @@ dependencies = [
  "getrandom",
  "js-sys",
  "log",
- "miniscript",
+ "miniscript 9.0.1",
  "rand",
  "serde",
  "serde_json",
@@ -1123,10 +1157,23 @@ dependencies = [
 [[package]]
 name = "dlc"
 version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "19c812e884d551a686e5c8d0273e6e2232a6a1665bc5ea07d9ca9f84d3b02fb5"
+dependencies = [
+ "bitcoin",
+ "miniscript 8.0.1",
+ "secp256k1-sys",
+ "secp256k1-zkp",
+ "serde",
+]
+
+[[package]]
+name = "dlc"
+version = "0.4.0"
 source = "git+https://github.com/dlc-link/rust-dlc?branch=fix/fee-comtputation-issue#5128b817deca2ce92e80204d0bdb8f9e8d609ec8"
 dependencies = [
  "bitcoin",
- "miniscript",
+ "miniscript 9.0.1",
  "secp256k1-sys",
  "secp256k1-zkp",
  "serde",
@@ -1158,9 +1205,9 @@ name = "dlc-link-manager"
 version = "0.4.0"
 dependencies = [
  "bitcoin",
- "dlc",
+ "dlc 0.4.0 (git+https://github.com/dlc-link/rust-dlc?branch=fix/fee-comtputation-issue)",
  "dlc-manager",
- "dlc-messages",
+ "dlc-messages 0.4.0 (git+https://github.com/dlc-link/rust-dlc?branch=fix/fee-comtputation-issue)",
  "dlc-trie",
  "lightning",
  "log",
@@ -1176,8 +1223,8 @@ source = "git+https://github.com/dlc-link/rust-dlc?branch=fix/fee-comtputation-i
 dependencies = [
  "async-trait",
  "bitcoin",
- "dlc",
- "dlc-messages",
+ "dlc 0.4.0 (git+https://github.com/dlc-link/rust-dlc?branch=fix/fee-comtputation-issue)",
+ "dlc-messages 0.4.0 (git+https://github.com/dlc-link/rust-dlc?branch=fix/fee-comtputation-issue)",
  "dlc-trie",
  "lightning",
  "log",
@@ -1190,12 +1237,25 @@ name = "dlc-memory-storage-provider"
 version = "0.1.0"
 dependencies = [
  "bitcoin",
- "dlc",
+ "dlc 0.4.0 (git+https://github.com/dlc-link/rust-dlc?branch=fix/fee-comtputation-issue)",
  "dlc-link-manager",
  "dlc-manager",
- "dlc-messages",
+ "dlc-messages 0.4.0 (git+https://github.com/dlc-link/rust-dlc?branch=fix/fee-comtputation-issue)",
  "lightning",
  "secp256k1-zkp",
+]
+
+[[package]]
+name = "dlc-messages"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "179aeea57514dad634802716f6759febd88f78f111979747ddcb7d9afc9c9048"
+dependencies = [
+ "bitcoin",
+ "dlc 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "lightning",
+ "secp256k1-zkp",
+ "serde",
 ]
 
 [[package]]
@@ -1204,7 +1264,7 @@ version = "0.4.0"
 source = "git+https://github.com/dlc-link/rust-dlc?branch=fix/fee-comtputation-issue#5128b817deca2ce92e80204d0bdb8f9e8d609ec8"
 dependencies = [
  "bitcoin",
- "dlc",
+ "dlc 0.4.0 (git+https://github.com/dlc-link/rust-dlc?branch=fix/fee-comtputation-issue)",
  "lightning",
  "secp256k1-zkp",
  "serde",
@@ -1217,11 +1277,11 @@ dependencies = [
  "base64 0.13.1",
  "bitcoin",
  "chrono",
- "dlc",
+ "dlc 0.4.0 (git+https://github.com/dlc-link/rust-dlc?branch=fix/fee-comtputation-issue)",
  "dlc-clients",
  "dlc-link-manager",
  "dlc-manager",
- "dlc-messages",
+ "dlc-messages 0.4.0 (git+https://github.com/dlc-link/rust-dlc?branch=fix/fee-comtputation-issue)",
  "dlc-sled-storage-provider",
  "dlc-trie",
  "electrs-blockchain-provider",
@@ -1304,7 +1364,7 @@ version = "0.4.0"
 source = "git+https://github.com/dlc-link/rust-dlc?branch=fix/fee-comtputation-issue#5128b817deca2ce92e80204d0bdb8f9e8d609ec8"
 dependencies = [
  "bitcoin",
- "dlc",
+ "dlc 0.4.0 (git+https://github.com/dlc-link/rust-dlc?branch=fix/fee-comtputation-issue)",
  "secp256k1-zkp",
  "serde",
 ]
@@ -1320,7 +1380,7 @@ dependencies = [
  "dlc-link-manager",
  "dlc-manager",
  "dlc-memory-storage-provider",
- "dlc-messages",
+ "dlc-messages 0.4.0 (git+https://github.com/dlc-link/rust-dlc?branch=fix/fee-comtputation-issue)",
  "dlc-trie",
  "env_logger",
  "esplora-async-blockchain-provider",
@@ -1456,7 +1516,7 @@ dependencies = [
  "futures",
  "js-interface-wallet",
  "lightning",
- "miniscript",
+ "miniscript 9.0.1",
  "reqwest",
  "serde",
  "wasm-bindgen-futures",
@@ -2109,10 +2169,10 @@ version = "0.1.0"
 dependencies = [
  "bdk",
  "bitcoin",
- "dlc",
+ "dlc 0.4.0 (git+https://github.com/dlc-link/rust-dlc?branch=fix/fee-comtputation-issue)",
  "dlc-manager",
  "lightning",
- "miniscript",
+ "miniscript 9.0.1",
  "rust-bitcoin-coin-selection",
  "secp256k1-zkp",
 ]
@@ -2290,6 +2350,15 @@ name = "minimal-lexical"
 version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "68354c5c6bd36d73ff3feceb05efa59b6acb7626617f4962be322a825e61f79a"
+
+[[package]]
+name = "miniscript"
+version = "8.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0fe8d0ee3580c650aadd33400cfe2a3004462dca6b921ca9e9cef4e654ebc404"
+dependencies = [
+ "bitcoin",
+]
 
 [[package]]
 name = "miniscript"
@@ -3359,9 +3428,9 @@ dependencies = [
  "clokwerk",
  "config",
  "displaydoc",
- "dlc",
+ "dlc 0.4.0 (git+https://github.com/dlc-link/rust-dlc?branch=fix/fee-comtputation-issue)",
  "dlc-clients",
- "dlc-messages",
+ "dlc-messages 0.4.0 (git+https://github.com/dlc-link/rust-dlc?branch=fix/fee-comtputation-issue)",
  "env_logger",
  "futures",
  "gethostname",
@@ -3404,7 +3473,7 @@ source = "git+https://github.com/dlc-link/rust-dlc?branch=fix/fee-comtputation-i
 dependencies = [
  "bdk",
  "bitcoin",
- "dlc",
+ "dlc 0.4.0 (git+https://github.com/dlc-link/rust-dlc?branch=fix/fee-comtputation-issue)",
  "dlc-manager",
  "lightning",
  "secp256k1-zkp",
