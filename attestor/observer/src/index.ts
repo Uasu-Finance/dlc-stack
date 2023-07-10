@@ -2,16 +2,7 @@ import AttestorService from './services/attestor.service.js';
 import getObservers from './config/get-observers.js';
 import { Observer } from './chains/shared/models/observer.interface.js';
 import startServer from './http/server.js';
-
-// import fetch from 'cross-fetch';
-// // @ts-ignore
-// global.fetch = fetch;
-// // @ts-ignore
-// global.Headers = fetch.Headers;
-// // @ts-ignore
-// global.Request = fetch.Request;
-// // @ts-ignore
-// global.Response = fetch.Response;
+import setupPolyfills from './polyfills.js';
 
 function startObservers(observers: Observer[]) {
   observers.forEach((observer) => observer.start());
@@ -25,6 +16,9 @@ async function testAttestorService() {
 }
 
 async function main() {
+  // Set up necessary polyfills
+  setupPolyfills();
+
   // Set up server with routes
   startServer();
 

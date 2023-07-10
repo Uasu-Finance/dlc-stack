@@ -34,7 +34,7 @@ extern crate web_sys;
 // A macro to provide `println!(..)`-style syntax for `console.log` logging.
 macro_rules! clog {
     ( $( $t:tt )* ) => {
-        web_sys::console::log_1(&format!( $( $t )* ).into());
+        web_sys::console::log_1(&format!( $( $t )* ).into())
     }
 }
 
@@ -45,13 +45,18 @@ pub struct Attestor {
 
 #[wasm_bindgen]
 impl Attestor {
-    pub async fn new() -> Attestor {
+    pub async fn new(storage_api_enabled: bool, storage_api_endpoint: String) -> Attestor {
+        clog!(
+            "[WASM-ATTESTOR]: Creating new attestor with storage_api_enabled: {}, storage_api_endpoint: {}",
+            storage_api_enabled,
+            storage_api_endpoint
+        );
         let secp = Secp256k1::new();
         let new_key = secp.generate_keypair(&mut rand::thread_rng()).0;
         let key_pair = KeyPair::from_secret_key(&secp, &new_key);
-        let oracle = Oracle::new(key_pair, secp).unwrap();
+        let oracle =
+            Oracle::new(key_pair, secp, storage_api_enabled, storage_api_endpoint).unwrap();
         Attestor { oracle }
-        // Attestor {}
     }
 
     pub async fn create_event(&mut self, uuid: &str, maturation: &str) -> Result<(), JsValue> {
@@ -60,7 +65,7 @@ impl Attestor {
             .unwrap();
 
         clog!(
-            "Creating event for uuid:{} and maturation_time :{}",
+            "Creating event for uuid: {} and maturation_time : {}",
             uuid,
             maturation
         );
@@ -82,24 +87,17 @@ impl Attestor {
         );
 
         let new_event = serde_json::to_string(&db_value).unwrap().into_bytes();
-        if self.oracle.event_handler.storage_api.is_some() {
-            self.oracle
-                .event_handler
-                .storage_api
-                .as_ref()
-                .unwrap()
+
+        if let Some(storage_api) = &self.oracle.event_handler.storage_api {
+            storage_api
                 .insert(uuid.to_string(), new_event.clone())
                 .await
-                .unwrap();
-        } else {
-            self.oracle
-                .event_handler
-                .memory_api
-                .as_mut()
-                .unwrap()
+                .expect("Failed to insert to storage api");
+        } else if let Some(memory_api) = &mut self.oracle.event_handler.memory_api {
+            memory_api
                 .insert(uuid.to_string(), new_event.clone())
                 .await
-                .unwrap();
+                .expect("Failed to insert to memory api");
         }
 
         Ok(())

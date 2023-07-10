@@ -24,8 +24,13 @@ pub struct Oracle {
 }
 
 impl Oracle {
-    pub fn new(key_pair: KeyPair, secp: Secp256k1<All>) -> Result<Oracle> {
-        let event_handler = EventHandler::new();
+    pub fn new(
+        key_pair: KeyPair,
+        secp: Secp256k1<All>,
+        storage_api_enabled: bool,
+        storage_api_endpoint: String,
+    ) -> Result<Oracle> {
+        let event_handler = EventHandler::new(storage_api_enabled, storage_api_endpoint);
 
         Ok(Oracle {
             event_handler,

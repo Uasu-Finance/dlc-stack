@@ -7,6 +7,7 @@
   "scripts": {
     "build": "./build_all.sh",
     "build:ts": "tsc -p .",
+    "build:wasm": "AR=/opt/homebrew/opt/llvm/bin/llvm-ar CC=/opt/homebrew/opt/llvm/bin/clang wasm-pack build --target bundler ..",
     "run": "NODE_OPTIONS=--experimental-wasm-modules node dist/src/index.js",
     "dev": "tsc-watch --noClear -p ./tsconfig.json --onSuccess \"npm run run\"",
     "dev2": "PORT=3001 npm run dev",

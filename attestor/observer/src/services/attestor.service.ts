@@ -1,5 +1,6 @@
 import { Attestor } from 'attestor';
 import strftime from 'strftime';
+import { getEnv } from '../config/read-env-configs.js';
 
 export default class AttestorService {
   private static attestor: Attestor;
@@ -7,7 +8,8 @@ export default class AttestorService {
   private constructor() {}
 
   public static async getAttestor(): Promise<Attestor> {
-    if (!this.attestor) this.attestor = await Attestor.new();
+    if (!this.attestor)
+      this.attestor = await Attestor.new(getEnv('STORAGE_API_ENABLED') === 'true', getEnv('STORAGE_API_ENDPOINT'));
     return this.attestor;
   }
 
