@@ -33,14 +33,14 @@ use dlc_manager::{
 use dlc_messages::{AcceptDlc, Message};
 use dlc_sled_storage_provider::SledStorageProvider;
 use electrs_blockchain_provider::ElectrsBlockchainProvider;
-use log::{debug, info, warn};
+use log::{debug, error, info, warn};
 use secp256k1_zkp::{rand, All, PublicKey, Secp256k1, SecretKey};
 use simple_wallet::SimpleWallet;
 
 use crate::storage::storage_provider::StorageProvider;
 use oracle_client::P2PDOracleClient;
 use rouille::Response;
-use serde::{Deserialize, Serialize};
+use serde::{de::IntoDeserializer, Deserialize, Serialize};
 use serde_json::json;
 use std::fmt::Write as _;
 use utils::get_numerical_contract_info;
@@ -59,8 +59,6 @@ type DlcManager<'a> = Manager<
     Arc<SystemTimeProvider>,
     Arc<ElectrsBlockchainProvider>,
 >;
-
-const NUM_CONFIRMATIONS: u32 = 2;
 
 // The contracts in dlc-manager expect a node id, but web extensions often don't have this, so hardcode it for now. Should not have any ramifications.
 const STATIC_COUNTERPARTY_NODE_ID: &str =
@@ -111,7 +109,7 @@ fn main() {
     let oracle_url: String = env::var("ORACLE_URL").unwrap_or("http://localhost:8080".to_string());
 
     let funded_url: String = env::var("FUNDED_URL")
-        .unwrap_or("https://stacks-observer-mocknet.herokuapp.com/funded".to_string());
+        .unwrap_or("http://stacks-observer-mocknet.herokuapp.com/funded".to_string());
     let wallet_backend_port: String = env::var("WALLET_BACKEND_PORT").unwrap_or("8085".to_string());
     let mut funded_uuids: Vec<String> = vec![];
 
@@ -196,17 +194,11 @@ fn main() {
         .unwrap_or(10);
 
     let manager2 = manager.clone();
-    let blockchain2 = blockchain.clone();
     let wallet2 = wallet.clone();
     info!("Please query '/info' endpoint to get wallet info");
     info!("periodic_check loop thread starting");
     thread::spawn(move || loop {
-        periodic_check(
-            manager2.clone(),
-            blockchain2.clone(),
-            funded_url.clone(),
-            &mut funded_uuids,
-        );
+        periodic_check(manager2.clone(), funded_url.clone(), &mut funded_uuids);
         wallet
             .refresh()
             .unwrap_or_else(|e| warn!("Error refreshing wallet {e}"));
@@ -366,44 +358,52 @@ fn get_wallet_info(
 
 fn periodic_check(
     manager: Arc<Mutex<DlcManager>>,
-    blockchain: Arc<dyn Blockchain>,
     funded_url: String,
     funded_uuids: &mut Vec<String>,
 ) -> () {
     let mut man = manager.lock().unwrap();
 
-    match man.periodic_check() {
-        Ok(_) => (),
+    let updated_contract_ids = match man.periodic_check() {
+        Ok(updated_contract_ids) => updated_contract_ids,
         Err(e) => {
             info!("Error in periodic_check, will retry: {}", e.to_string());
-            ()
+            vec![]
         }
     };
 
     let store = man.get_store();
 
-    let mut contracts = store.get_signed_contracts().unwrap_or(vec![]);
-    contracts.append(&mut store.get_confirmed_contracts().unwrap_or(vec![]));
-
-    let checked_contracts_must_use = contracts.iter().map(|c| {
-        let confirmations = match blockchain
-            .get_transaction_confirmations(&c.accepted_contract.dlc_transactions.fund.txid())
-        {
-            Ok(confirms) => confirms,
+    for id in updated_contract_ids {
+        let contract = match store.get_contract(&id) {
+            Ok(Some(contract)) => contract,
+            Ok(None) => {
+                error!("Error retrieving contract: {:?}", id);
+                continue;
+            }
             Err(e) => {
-                info!("Error checking confirmations: {}", e.to_string());
-                0
+                error!("Error retrieving contract: {}", e.to_string());
+                continue;
             }
         };
-        if confirmations >= NUM_CONFIRMATIONS {
-            let uuid = c.accepted_contract.offered_contract.contract_info[0].oracle_announcements
-                [0]
-            .oracle_event
-            .event_id
-            .clone();
-            // Do I still need to check if it's already been marked as funded, if the JS side is taking care of that?
-            // Probably yes or else I will send the message to JS over and over
-            // Or I can just return a state of all contracts and let JS figure it out
+
+        let newly_confirmed_uuids = match contract {
+            Contract::Confirmed(c) => c
+                .accepted_contract
+                .offered_contract
+                .contract_info
+                .iter()
+                .map(|ci| {
+                    ci.oracle_announcements
+                        .iter()
+                        .map(|oa| oa.oracle_event.event_id.clone())
+                        .collect::<Vec<String>>() // May include duplicates as multiple oracles will each have the same uuid for the same event
+                })
+                .flatten()
+                .collect::<Vec<String>>(),
+            _ => vec![],
+        };
+
+        for uuid in newly_confirmed_uuids {
             if !funded_uuids.contains(&uuid) {
                 debug!("Contract is funded, setting funded to true: {}", uuid);
                 let mut post_body = HashMap::new();
@@ -436,12 +436,7 @@ fn periodic_check(
                 }
             }
         }
-        c.accepted_contract.get_contract_id_string()
-    });
-
-    // Oddly, this line of code is required otherwise the above code doesn't run, likely due to lazy evaluation
-    // This is even true when assigning with a let statement and _ variable
-    let _ = checked_contracts_must_use.collect::<Vec<String>>();
+    }
 }
 
 fn create_new_offer(
