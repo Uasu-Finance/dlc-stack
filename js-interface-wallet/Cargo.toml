@@ -12,7 +12,7 @@ dlc-manager =  { git = "https://github.com/dlc-link/rust-dlc", branch="fix/fee-c
 lightning = {version = "0.0.113"}
 rust-bitcoin-coin-selection = {version = "0.1.0", git = "https://github.com/p2pderivatives/rust-bitcoin-coin-selection", features = ["rand"]}
 secp256k1-zkp = {version = "0.7.0"}
-miniscript = { version = "9.0", features = ["serde", "std"], default-features = false }
+miniscript = { version = "10.0", features = ["serde", "std"], default-features = false }
 bdk = {version = "0.28.0", default-features = false, features = ["async-interface", "use-esplora-async"]}
 
 [dev-dependencies]

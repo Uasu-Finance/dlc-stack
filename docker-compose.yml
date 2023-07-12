@@ -1,0 +1,73 @@
+version: '3.9'
+services:
+  blockchain-interface:
+    container_name: blockchain-interface
+    hostname: blockchain-interface
+    build: ./wallet-blockchain-interface
+    volumes:
+      - ./wallet-blockchain-interface:/usr/src/app
+    ports:
+      - 3000:3000
+    depends_on:
+      - rust-wallet
+
+  rust-wallet:
+    container_name: rust-wallet
+    hostname: rust-wallet
+    build:
+      context: .
+      dockerfile: Dockerfile.wallet
+    volumes:
+      - ./wallet:/usr/src/app
+    ports:
+      - 8085:8085
+    environment:
+      - "ORACLE_URL=https://dev-oracle.dlc.link/oracle"
+      # For Internal DLC.Link Bitcoin Mocknet
+      # ELECTRUM_API_URL="https://dev-oracle.dlc.link/electrs/"
+      # For Bitcoin Testnet
+      - "ELECTRUM_API_URL=https://blockstream.info/testnet/api/"
+      # For Bitcoin Mainnet
+      # ELECTRUM_API_URL="https://blockstream.info/api/"
+      - "BITCOIN_CHECK_INTERVAL_SECONDS=10"
+      - "BITCOIN_NETWORK=testnet"
+      - "FUNDED_URL=http://blockchain-interface:3000/set-status-funded"
+      - "RUST_LOG=warn,dlc_protocol_wallet=debug"
+      - "RUST_BACKTRACE=full"
+      - "STORAGE_API_ENABLED=true"
+      - "STORAGE_API_ENDPOINT=http://storageapi:8100"
+      - "CONTRACT_CLEANUP_ENABLED=false"
+    depends_on:
+        - postgresdlc
+        - storageapi
+
+  storageapi:
+    container_name: storageapi
+    hostname: storageapi
+    image: dlc-link-storage-api
+    environment:
+      RUST_LOG: "debug"
+      DATABASE_URL: "postgresql://postgres:changeme@postgresdlc:5432/postgres"
+      MIGRATE: "true"
+    ports:
+      - "8100:8100"
+    entrypoint: "/app/storage-api"
+    depends_on:
+      postgresdlc:
+        condition: service_healthy
+
+  postgresdlc:
+    container_name: postgresdlc
+    image: postgres:12
+    hostname: postgresdlc
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: changeme
+      PGDATA: /data/postgres
+    ports:
+      - "5431:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5

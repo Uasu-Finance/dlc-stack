@@ -1,8 +1,9 @@
-FROM rust:1.65 AS build
+FROM rust:1.70 AS build
 
 COPY . /app/dlc-stack/
 WORKDIR /app/dlc-stack/
 
+RUN rustup override set nightly
 RUN cargo build --release
 
 FROM debian:buster-slim AS dlc-link-stack
