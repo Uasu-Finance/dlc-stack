@@ -533,7 +533,7 @@ checksum = "73290177011694f38ec25e165d0387ab7ea749a4b81cd4c80dae5988229f7a57"
 [[package]]
 name = "bitcoin-test-utils"
 version = "0.1.0"
-source = "git+https://github.com/dlc-link/rust-dlc?branch=fix/fee-comtputation-issue#5128b817deca2ce92e80204d0bdb8f9e8d609ec8"
+source = "git+https://github.com/dlc-link/rust-dlc?rev=e59ed0ce2a7d10ab974b5890f8c0d0fb103c761a#e59ed0ce2a7d10ab974b5890f8c0d0fb103c761a"
 dependencies = [
  "bitcoin 0.29.2",
  "bitcoincore-rpc",
@@ -1200,7 +1200,7 @@ dependencies = [
 [[package]]
 name = "dlc"
 version = "0.4.0"
-source = "git+https://github.com/dlc-link/rust-dlc?branch=fix/fee-comtputation-issue#5128b817deca2ce92e80204d0bdb8f9e8d609ec8"
+source = "git+https://github.com/dlc-link/rust-dlc?rev=e59ed0ce2a7d10ab974b5890f8c0d0fb103c761a#e59ed0ce2a7d10ab974b5890f8c0d0fb103c761a"
 dependencies = [
  "bitcoin 0.29.2",
  "miniscript 9.0.1",
@@ -1235,9 +1235,9 @@ name = "dlc-link-manager"
 version = "0.4.0"
 dependencies = [
  "bitcoin 0.29.2",
- "dlc 0.4.0 (git+https://github.com/dlc-link/rust-dlc?branch=fix/fee-comtputation-issue)",
+ "dlc 0.4.0 (git+https://github.com/dlc-link/rust-dlc?rev=e59ed0ce2a7d10ab974b5890f8c0d0fb103c761a)",
  "dlc-manager",
- "dlc-messages 0.4.0 (git+https://github.com/dlc-link/rust-dlc?branch=fix/fee-comtputation-issue)",
+ "dlc-messages 0.4.0 (git+https://github.com/dlc-link/rust-dlc?rev=e59ed0ce2a7d10ab974b5890f8c0d0fb103c761a)",
  "dlc-trie",
  "lightning",
  "log",
@@ -1249,12 +1249,12 @@ dependencies = [
 [[package]]
 name = "dlc-manager"
 version = "0.4.0"
-source = "git+https://github.com/dlc-link/rust-dlc?branch=fix/fee-comtputation-issue#5128b817deca2ce92e80204d0bdb8f9e8d609ec8"
+source = "git+https://github.com/dlc-link/rust-dlc?rev=e59ed0ce2a7d10ab974b5890f8c0d0fb103c761a#e59ed0ce2a7d10ab974b5890f8c0d0fb103c761a"
 dependencies = [
  "async-trait",
  "bitcoin 0.29.2",
- "dlc 0.4.0 (git+https://github.com/dlc-link/rust-dlc?branch=fix/fee-comtputation-issue)",
- "dlc-messages 0.4.0 (git+https://github.com/dlc-link/rust-dlc?branch=fix/fee-comtputation-issue)",
+ "dlc 0.4.0 (git+https://github.com/dlc-link/rust-dlc?rev=e59ed0ce2a7d10ab974b5890f8c0d0fb103c761a)",
+ "dlc-messages 0.4.0 (git+https://github.com/dlc-link/rust-dlc?rev=e59ed0ce2a7d10ab974b5890f8c0d0fb103c761a)",
  "dlc-trie",
  "lightning",
  "log",
@@ -1267,10 +1267,10 @@ name = "dlc-memory-storage-provider"
 version = "0.1.0"
 dependencies = [
  "bitcoin 0.29.2",
- "dlc 0.4.0 (git+https://github.com/dlc-link/rust-dlc?branch=fix/fee-comtputation-issue)",
+ "dlc 0.4.0 (git+https://github.com/dlc-link/rust-dlc?rev=e59ed0ce2a7d10ab974b5890f8c0d0fb103c761a)",
  "dlc-link-manager",
  "dlc-manager",
- "dlc-messages 0.4.0 (git+https://github.com/dlc-link/rust-dlc?branch=fix/fee-comtputation-issue)",
+ "dlc-messages 0.4.0 (git+https://github.com/dlc-link/rust-dlc?rev=e59ed0ce2a7d10ab974b5890f8c0d0fb103c761a)",
  "lightning",
  "secp256k1-zkp",
 ]
@@ -1291,10 +1291,10 @@ dependencies = [
 [[package]]
 name = "dlc-messages"
 version = "0.4.0"
-source = "git+https://github.com/dlc-link/rust-dlc?branch=fix/fee-comtputation-issue#5128b817deca2ce92e80204d0bdb8f9e8d609ec8"
+source = "git+https://github.com/dlc-link/rust-dlc?rev=e59ed0ce2a7d10ab974b5890f8c0d0fb103c761a#e59ed0ce2a7d10ab974b5890f8c0d0fb103c761a"
 dependencies = [
  "bitcoin 0.29.2",
- "dlc 0.4.0 (git+https://github.com/dlc-link/rust-dlc?branch=fix/fee-comtputation-issue)",
+ "dlc 0.4.0 (git+https://github.com/dlc-link/rust-dlc?rev=e59ed0ce2a7d10ab974b5890f8c0d0fb103c761a)",
  "lightning",
  "secp256k1-zkp",
  "serde",
@@ -1307,11 +1307,11 @@ dependencies = [
  "base64 0.13.1",
  "bitcoin 0.29.2",
  "chrono",
- "dlc 0.4.0 (git+https://github.com/dlc-link/rust-dlc?branch=fix/fee-comtputation-issue)",
+ "dlc 0.4.0 (git+https://github.com/dlc-link/rust-dlc?rev=e59ed0ce2a7d10ab974b5890f8c0d0fb103c761a)",
  "dlc-clients",
  "dlc-link-manager",
  "dlc-manager",
- "dlc-messages 0.4.0 (git+https://github.com/dlc-link/rust-dlc?branch=fix/fee-comtputation-issue)",
+ "dlc-messages 0.4.0 (git+https://github.com/dlc-link/rust-dlc?rev=e59ed0ce2a7d10ab974b5890f8c0d0fb103c761a)",
  "dlc-sled-storage-provider",
  "dlc-trie",
  "electrs-blockchain-provider",
@@ -1334,7 +1334,7 @@ dependencies = [
 [[package]]
 name = "dlc-sled-storage-provider"
 version = "0.1.0"
-source = "git+https://github.com/dlc-link/rust-dlc?branch=fix/fee-comtputation-issue#5128b817deca2ce92e80204d0bdb8f9e8d609ec8"
+source = "git+https://github.com/dlc-link/rust-dlc?rev=e59ed0ce2a7d10ab974b5890f8c0d0fb103c761a#e59ed0ce2a7d10ab974b5890f8c0d0fb103c761a"
 dependencies = [
  "bitcoin 0.29.2",
  "dlc-manager",
@@ -1391,10 +1391,10 @@ dependencies = [
 [[package]]
 name = "dlc-trie"
 version = "0.4.0"
-source = "git+https://github.com/dlc-link/rust-dlc?branch=fix/fee-comtputation-issue#5128b817deca2ce92e80204d0bdb8f9e8d609ec8"
+source = "git+https://github.com/dlc-link/rust-dlc?rev=e59ed0ce2a7d10ab974b5890f8c0d0fb103c761a#e59ed0ce2a7d10ab974b5890f8c0d0fb103c761a"
 dependencies = [
  "bitcoin 0.29.2",
- "dlc 0.4.0 (git+https://github.com/dlc-link/rust-dlc?branch=fix/fee-comtputation-issue)",
+ "dlc 0.4.0 (git+https://github.com/dlc-link/rust-dlc?rev=e59ed0ce2a7d10ab974b5890f8c0d0fb103c761a)",
  "secp256k1-zkp",
  "serde",
 ]
@@ -1410,7 +1410,7 @@ dependencies = [
  "dlc-link-manager",
  "dlc-manager",
  "dlc-memory-storage-provider",
- "dlc-messages 0.4.0 (git+https://github.com/dlc-link/rust-dlc?branch=fix/fee-comtputation-issue)",
+ "dlc-messages 0.4.0 (git+https://github.com/dlc-link/rust-dlc?rev=e59ed0ce2a7d10ab974b5890f8c0d0fb103c761a)",
  "dlc-trie",
  "env_logger",
  "esplora-async-blockchain-provider",
@@ -1467,7 +1467,7 @@ checksum = "7fcaabb2fef8c910e7f4c7ce9f67a1283a1715879a7c230ca9d6d1ae31f16d91"
 [[package]]
 name = "electrs-blockchain-provider"
 version = "0.1.0"
-source = "git+https://github.com/dlc-link/rust-dlc?branch=fix/fee-comtputation-issue#5128b817deca2ce92e80204d0bdb8f9e8d609ec8"
+source = "git+https://github.com/dlc-link/rust-dlc?rev=e59ed0ce2a7d10ab974b5890f8c0d0fb103c761a#e59ed0ce2a7d10ab974b5890f8c0d0fb103c761a"
 dependencies = [
  "bitcoin 0.29.2",
  "bitcoin-test-utils",
@@ -2205,7 +2205,7 @@ version = "0.1.0"
 dependencies = [
  "bdk",
  "bitcoin 0.29.2",
- "dlc 0.4.0 (git+https://github.com/dlc-link/rust-dlc?branch=fix/fee-comtputation-issue)",
+ "dlc 0.4.0 (git+https://github.com/dlc-link/rust-dlc?rev=e59ed0ce2a7d10ab974b5890f8c0d0fb103c761a)",
  "dlc-manager",
  "lightning",
  "miniscript 10.0.0",
@@ -3495,9 +3495,9 @@ dependencies = [
  "clokwerk",
  "config",
  "displaydoc",
- "dlc 0.4.0 (git+https://github.com/dlc-link/rust-dlc?branch=fix/fee-comtputation-issue)",
+ "dlc 0.4.0 (git+https://github.com/dlc-link/rust-dlc?rev=e59ed0ce2a7d10ab974b5890f8c0d0fb103c761a)",
  "dlc-clients",
- "dlc-messages 0.4.0 (git+https://github.com/dlc-link/rust-dlc?branch=fix/fee-comtputation-issue)",
+ "dlc-messages 0.4.0 (git+https://github.com/dlc-link/rust-dlc?rev=e59ed0ce2a7d10ab974b5890f8c0d0fb103c761a)",
  "env_logger",
  "futures",
  "gethostname",
@@ -3536,11 +3536,11 @@ checksum = "420acb44afdae038210c99e69aae24109f32f15500aa708e81d46c9f29d55fcf"
 [[package]]
 name = "simple-wallet"
 version = "0.1.0"
-source = "git+https://github.com/dlc-link/rust-dlc?branch=fix/fee-comtputation-issue#5128b817deca2ce92e80204d0bdb8f9e8d609ec8"
+source = "git+https://github.com/dlc-link/rust-dlc?rev=e59ed0ce2a7d10ab974b5890f8c0d0fb103c761a#e59ed0ce2a7d10ab974b5890f8c0d0fb103c761a"
 dependencies = [
  "bdk",
  "bitcoin 0.29.2",
- "dlc 0.4.0 (git+https://github.com/dlc-link/rust-dlc?branch=fix/fee-comtputation-issue)",
+ "dlc 0.4.0 (git+https://github.com/dlc-link/rust-dlc?rev=e59ed0ce2a7d10ab974b5890f8c0d0fb103c761a)",
  "dlc-manager",
  "lightning",
  "secp256k1-zkp",
