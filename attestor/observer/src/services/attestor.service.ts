@@ -53,4 +53,15 @@ export default class AttestorService {
       return null;
     }
   }
+
+  public static async getPublicKey() {
+    const attestor = await this.getAttestor();
+    try {
+      const publicKey = await attestor.get_pubkey();
+      return publicKey;
+    } catch (error) {
+      console.error(error);
+      return null;
+    }
+  }
 }
