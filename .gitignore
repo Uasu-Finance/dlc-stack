@@ -23,3 +23,6 @@
 .env
 !.env.tempalte
 docker/data
+
+# Ingore Mac OS files
+.DS_Store

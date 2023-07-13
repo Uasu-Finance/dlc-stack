@@ -1,0 +1,21 @@
+version: "3.9"
+services:
+  dlc-protocol-wallet:
+    image: "${DOCKER_PUBLIC_REGISTRY_PREFIX}dlc-protocol-wallet:latest"
+    env_file: .env
+    hostname: dlc-protocol-wallet
+    container_name: dlc-protocol-wallet
+    entrypoint: "/app/dlc-protocol-wallet"
+    ports:
+      - "8085:8085"
+    environment:
+      - "ORACLE_URL=$ORACLE_URL"
+      - "ELECTRUM_API_URL=$ELECTRUM_API_URL"
+      - "BITCOIN_CHECK_INTERVAL_SECONDS=$BITCOIN_CHECK_INTERVAL_SECONDS"
+      - "BITCOIN_NETWORK=$BITCOIN_NETWORK"
+      - "FUNDED_URL=$FUNDED_URL"
+      - "RUST_LOG=$RUST_LOG"
+      - "RUST_BACKTRACE=$RUST_BACKTRACE"
+      - "STORAGE_API_ENABLED=$STORAGE_API_ENABLED"
+      - "STORAGE_API_ENDPOINT=$STORAGE_API_ENDPOINT"
+      - "CONTRACT_CLEANUP_ENABLED=$CONTRACT_CLEANUP_ENABLED"
