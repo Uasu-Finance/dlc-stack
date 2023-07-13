@@ -13,12 +13,35 @@ const oracleURLs = [
     "https://testnet.dlc.link/oracle",
 ];
 
+const handleAttestors = true;
+const successful = false;
+
 const joinedOracleURLs = oracleURLs.join(',');
 
+const testUUID = `test${Math.floor(Math.random() * 1000)}`;
+
+function createMaturationDate() {
+    const maturationDate = new Date();
+    maturationDate.setMinutes(maturationDate.getMinutes() + 1);
+    return maturationDate.toISOString();
+}
+
+async function createEvent(oracleURL, uuid) {
+    const maturationDate = createMaturationDate();
+    const response = await fetch(`${oracleURL}/v1/create_event/${uuid}?maturation=${maturationDate}`);
+    const event = await response.json();
+    return event;
+}
+
+async function attest(oracleURL, uuid, outcome) {
+    const response = await fetch(`${oracleURL}/v1/attest/${uuid}?outcome=${outcome}`);
+    const event = await response.json();
+    return event;
+}
 
 async function fetchOfferFromProtocolWallet(oracleUrls) {
     let body = {
-        "uuid": "test14",
+        "uuid": testUUID,
         "acceptCollateral": 10000,
         "offerCollateral": 0,
         "totalOutcomes": 100,
@@ -61,7 +84,7 @@ async function go() {
         return balance;
     }
     
-    waitForBalance(dlcManager).then(balance => {
+    waitForBalance(dlcManager).then(() => {
         runDLCFlow(dlcManager);
     });
 }
@@ -69,6 +92,12 @@ async function go() {
 async function runDLCFlow(dlcManager) {
     console.log("Starting DLC flow");
 
+    if (handleAttestors) {
+        console.log("Creating Events");
+        const events = await Promise.all(oracleURLs.map(oracleURL => createEvent(oracleURL, testUUID)))
+        console.log("Created Events: ", events);
+    }
+    
     const offer_json = await fetchOfferFromProtocolWallet(dlcManager.get_options().oracle_urls);
     console.log("Offer (JSON): ", offer_json);
 
@@ -80,6 +109,12 @@ async function runDLCFlow(dlcManager) {
 
     const tx_id = await dlcManager.countersign_and_broadcast(JSON.stringify(signed_contract))
     console.log(`Broadcast funding transaction with TX ID: ${tx_id}`);
+
+    if (handleAttestors) {
+        console.log("Attesting to Events");
+        const attestations = await Promise.all(oracleURLs.map((oracleURL, index) => attest(oracleURL, testUUID, successful ? 100 : index === 0 ? 0 : 100 )))
+        console.log("Attestation received: ", attestations);
+    }
 
     const contracts = await dlcManager.get_contracts();
     console.log("Contracts: ", contracts);
