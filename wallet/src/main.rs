@@ -31,7 +31,7 @@ use dlc_manager::{
 use dlc_messages::{AcceptDlc, Message};
 use dlc_sled_storage_provider::SledStorageProvider;
 use electrs_blockchain_provider::ElectrsBlockchainProvider;
-use log::{info, warn};
+use log::{debug, info, warn};
 use secp256k1_zkp::{rand, All, PublicKey, Secp256k1, SecretKey};
 use simple_wallet::SimpleWallet;
 
@@ -383,7 +383,7 @@ fn periodic_check(
     let mut contracts = store.get_signed_contracts().unwrap_or(vec![]);
     contracts.append(&mut store.get_confirmed_contracts().unwrap_or(vec![]));
 
-    let _ = contracts.iter().map(|c| {
+    let checked_contracts_must_use = contracts.iter().map(|c| {
         let confirmations = match blockchain
             .get_transaction_confirmations(&c.accepted_contract.dlc_transactions.fund.txid())
         {
@@ -400,6 +400,7 @@ fn periodic_check(
             .event_id
             .clone();
             if !funded_uuids.contains(&uuid) {
+                debug!("Contract is funded, setting funded to true: {}", uuid);
                 let mut post_body = HashMap::new();
                 post_body.insert("uuid", &uuid);
 
@@ -432,6 +433,10 @@ fn periodic_check(
         }
         c.accepted_contract.get_contract_id_string()
     });
+
+    // Oddly, this line of code is required otherwise the above code doesn't run, likely due to lazy evaluation
+    // This is even true when assigning with a let statement and _ variable
+    let _ = checked_contracts_must_use.collect::<Vec<String>>();
 }
 
 fn create_new_offer(
