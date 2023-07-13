@@ -2,8 +2,8 @@
 extern crate console_error_panic_hook;
 extern crate log;
 
-use bitcoin::{Network, PrivateKey};
-use dlc_messages::{Message, OfferDlc, SignDlc};
+use bitcoin::{ Network, PrivateKey };
+use dlc_messages::{ Message, OfferDlc, SignDlc };
 use wasm_bindgen::prelude::*;
 
 use lightning::util::ser::Readable;
@@ -11,15 +11,15 @@ use lightning::util::ser::Readable;
 use secp256k1_zkp::hashes::*;
 
 use core::panic;
-use std::{
-    collections::HashMap,
-    io::Cursor,
-    str::FromStr,
-    sync::{Arc, Mutex},
-};
+use std::{ collections::HashMap, io::Cursor, str::FromStr, sync::{ Arc, Mutex } };
 
 use dlc_manager::{
-    contract::{Contract, signed_contract::SignedContract}, manager::Manager, ContractId, Oracle, Storage, SystemTimeProvider,
+    contract::{ Contract, signed_contract::SignedContract },
+    manager::Manager,
+    ContractId,
+    Oracle,
+    Storage,
+    SystemTimeProvider,
 };
 
 use std::fmt::Write as _;
@@ -32,7 +32,7 @@ use esplora_async_blockchain_provider::EsploraAsyncBlockchainProvider;
 use js_interface_wallet::JSInterfaceWallet;
 
 use oracle_client::P2PDOracleClient;
-use serde::{Deserialize, Serialize};
+use serde::{ Deserialize, Serialize };
 
 mod oracle_client;
 mod utils;
@@ -45,7 +45,7 @@ type DlcManager = Manager<
     Box<DlcStorageProvider>,
     Arc<P2PDOracleClient>,
     Arc<SystemTimeProvider>,
-    Arc<EsploraAsyncBlockchainProvider>,
+    Arc<EsploraAsyncBlockchainProvider>
 >;
 
 // The contracts in dlc-manager expect a node id, but web extensions often don't have this, so hardcode it for now. Should not have any ramifications.
@@ -84,7 +84,7 @@ pub struct JsDLCInterface {
 // #[wasm_bindgen]
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct JsDLCInterfaceOptions {
-    oracle_url: String,
+    joined_oracle_urls: String,
     network: String,
     electrs_url: String,
     address: String,
@@ -94,7 +94,7 @@ impl Default for JsDLCInterfaceOptions {
     // Default values for Manager Options
     fn default() -> Self {
         Self {
-            oracle_url: "https://dev-oracle.dlc.link/oracle".to_string(),
+            joined_oracle_urls: "https://dev-oracle.dlc.link/oracle".to_string(),
             network: "regtest".to_string(),
             electrs_url: "https://dev-oracle.dlc.link/electrs".to_string(),
             address: "".to_string(),
@@ -109,26 +109,32 @@ impl JsDLCInterface {
         address: String,
         network: String,
         electrs_url: String,
-        oracle_url: String,
+        joined_oracle_urls: String
     ) -> JsDLCInterface {
         console_error_panic_hook::set_once();
 
-        clog!("Received JsDLCInterface parameters: privkey={}, address={}, network={}, electrs_url={}, oracle_url={}", privkey, address, network, electrs_url, oracle_url);
+        clog!(
+            "Received JsDLCInterface parameters: privkey={}, address={}, network={}, electrs_url={}, oracle_urls={}",
+            privkey,
+            address,
+            network,
+            electrs_url,
+            joined_oracle_urls
+        );
 
         let options = JsDLCInterfaceOptions {
-            oracle_url,
+            joined_oracle_urls,
             network,
             electrs_url,
             address,
         };
 
-        let active_network: Network = options
-            .network
+        let active_network: Network = options.network
             .parse::<Network>()
             .expect("Must use a valid bitcoin network");
 
         let blockchain: Arc<EsploraAsyncBlockchainProvider> = Arc::new(
-            EsploraAsyncBlockchainProvider::new(options.electrs_url.to_string(), active_network),
+            EsploraAsyncBlockchainProvider::new(options.electrs_url.to_string(), active_network)
         );
 
         // Set up DLC store
@@ -138,36 +144,43 @@ impl JsDLCInterface {
         let seckey = secp256k1_zkp::SecretKey::from_str(&privkey).unwrap();
 
         // Set up wallet
-        let wallet = Arc::new(JSInterfaceWallet::new(
-            options.address.to_string(),
-            active_network,
-            PrivateKey::new(seckey, active_network),
-        ));
+        let wallet = Arc::new(
+            JSInterfaceWallet::new(
+                options.address.to_string(),
+                active_network,
+                PrivateKey::new(seckey, active_network)
+            )
+        );
 
-        // Set up Oracle Client
-        let p2p_client: P2PDOracleClient = P2PDOracleClient::new(&options.oracle_url)
-            .await
-            .expect("To be able to connect to the oracle");
+        let oracle_urls: Vec<&str> = options.joined_oracle_urls.split(',').collect();
 
-        let oracle = Arc::new(p2p_client);
-        let oracles: HashMap<bitcoin::XOnlyPublicKey, _> =
-            HashMap::from([(oracle.get_public_key(), oracle.clone())]);
+        // Set up Oracle Clients
+        let mut oracles: HashMap<bitcoin::XOnlyPublicKey, Arc<P2PDOracleClient>> = HashMap::new();
 
+        for url in oracle_urls {
+            let p2p_client: P2PDOracleClient = P2PDOracleClient::new(url).await.expect(
+                "To be able to connect to the oracle"
+            );
+
+            let oracle = Arc::new(p2p_client);
+            oracles.insert(oracle.get_public_key(), oracle.clone());
+        }
         // Set up time provider
         let time_provider = SystemTimeProvider {};
 
         // Create the DLC Manager
-        let manager = Arc::new(Mutex::new(
-            Manager::new(
-                Arc::clone(&wallet),
-                Arc::clone(&blockchain),
-                Box::new(store),
-                oracles,
-                Arc::new(time_provider),
-                Arc::clone(&blockchain),
+        let manager = Arc::new(
+            Mutex::new(
+                Manager::new(
+                    Arc::clone(&wallet),
+                    Arc::clone(&blockchain),
+                    Box::new(store),
+                    oracles,
+                    Arc::new(time_provider),
+                    Arc::clone(&blockchain)
+                ).unwrap()
             )
-            .unwrap(),
-        ));
+        );
 
         clog!("Finished setting up manager");
 
@@ -186,19 +199,14 @@ impl JsDLCInterface {
     }
 
     pub async fn get_wallet_balance(&self) -> u64 {
-        self.blockchain
-            .refresh_chain_data(self.options.address.clone())
-            .await;
-        self.wallet
-            .set_utxos(self.blockchain.get_utxos().unwrap())
-            .unwrap();
+        self.blockchain.refresh_chain_data(self.options.address.clone()).await;
+        self.wallet.set_utxos(self.blockchain.get_utxos().unwrap()).unwrap();
         self.blockchain.get_balance().await.unwrap()
     }
 
     // public async function for fetching all the contracts on the manager
     pub async fn get_contracts(&self) -> JsValue {
-        let contracts: Vec<JsContract> = self
-            .manager
+        let contracts: Vec<JsContract> = self.manager
             .lock()
             .unwrap()
             .get_store()
@@ -214,13 +222,7 @@ impl JsDLCInterface {
     // public async function for fetching one contract as a JsContract type
     pub async fn get_contract(&self, contract_str: String) -> JsValue {
         let contract_id = ContractId::read(&mut Cursor::new(&contract_str)).unwrap();
-        let contract = self
-            .manager
-            .lock()
-            .unwrap()
-            .get_store()
-            .get_contract(&contract_id)
-            .unwrap();
+        let contract = self.manager.lock().unwrap().get_store().get_contract(&contract_id).unwrap();
         match contract {
             Some(contract) => {
                 serde_wasm_bindgen::to_value(&JsContract::from_contract(contract)).unwrap()
@@ -232,28 +234,31 @@ impl JsDLCInterface {
     pub async fn accept_offer(&self, offer_json: String) -> String {
         let dlc_offer_message: OfferDlc = serde_json::from_str(&offer_json).unwrap();
         clog!("Offer to accept: {:?}", dlc_offer_message);
-        
+
         clog!("receive_offer - after on_dlc_message");
         let temporary_contract_id = dlc_offer_message.temporary_contract_id;
 
-        match self.manager.lock().unwrap().on_dlc_message(
-            &Message::Offer(dlc_offer_message.clone()),
-            STATIC_COUNTERPARTY_NODE_ID.parse().unwrap(),
-        ) {
+        match
+            self.manager
+                .lock()
+                .unwrap()
+                .on_dlc_message(
+                    &Message::Offer(dlc_offer_message.clone()),
+                    STATIC_COUNTERPARTY_NODE_ID.parse().unwrap()
+                )
+        {
             Ok(_) => (),
             Err(e) => {
-                clog!("DLC manager - receive offer error: {}", e.to_string());
+                clog!("DLC manager - receive offer error: {:?}", e);
                 return "".to_string();
             }
         }
 
-
         clog!("accepting contract with id {:?}", temporary_contract_id);
 
-        let (_contract_id, _public_key, accept_msg) = self
-            .manager
+        let (_contract_id, _public_key, accept_msg) = self.manager
             .lock()
-        .unwrap()
+            .unwrap()
             .accept_contract_offer(&temporary_contract_id)
             .expect("Error accepting contract offer");
 
@@ -265,14 +270,19 @@ impl JsDLCInterface {
         clog!("sign_offer - before on_dlc_message");
         let dlc_sign_message: SignDlc = serde_json::from_str(&dlc_sign_message).unwrap();
         clog!("dlc_sign_message: {:?}", dlc_sign_message);
-        match self.manager.lock().unwrap().on_dlc_message(
-            &Message::Sign(dlc_sign_message.clone()),
-            STATIC_COUNTERPARTY_NODE_ID.parse().unwrap(),
-        ) {
+        match
+            self.manager
+                .lock()
+                .unwrap()
+                .on_dlc_message(
+                    &Message::Sign(dlc_sign_message.clone()),
+                    STATIC_COUNTERPARTY_NODE_ID.parse().unwrap()
+                )
+        {
             Ok(_) => (),
             Err(e) => {
                 info!("DLC manager - sign offer error: {}", e.to_string());
-                panic!()
+                panic!();
             }
         }
         clog!("sign_offer - after on_dlc_message");
@@ -290,13 +300,7 @@ impl JsDLCInterface {
 
     pub async fn reject_offer(&self, contract_id: String) -> () {
         let contract_id = ContractId::read(&mut Cursor::new(&contract_id)).unwrap();
-        let contract = self
-            .manager
-            .lock()
-            .unwrap()
-            .get_store()
-            .get_contract(&contract_id)
-            .unwrap();
+        let contract = self.manager.lock().unwrap().get_store().get_contract(&contract_id).unwrap();
 
         match contract {
             Some(Contract::Offered(c)) => {
@@ -308,7 +312,7 @@ impl JsDLCInterface {
                     .unwrap();
             }
             _ => (),
-        };
+        }
     }
 
     // fn accept_offer(&self, offer_json: String, utxos: String) -> String {

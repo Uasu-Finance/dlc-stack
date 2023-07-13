@@ -1104,6 +1104,7 @@ dependencies = [
  "secp256k1-sys",
  "secp256k1-zkp",
  "serde",
+ "web-sys",
 ]
 
 [[package]]
@@ -1140,6 +1141,7 @@ dependencies = [
  "log",
  "secp256k1-zkp",
  "serde",
+ "web-sys",
 ]
 
 [[package]]
@@ -1151,6 +1153,7 @@ dependencies = [
  "lightning",
  "secp256k1-zkp",
  "serde",
+ "web-sys",
 ]
 
 [[package]]
@@ -1259,6 +1262,7 @@ dependencies = [
  "dlc",
  "secp256k1-zkp",
  "serde",
+ "web-sys",
 ]
 
 [[package]]
