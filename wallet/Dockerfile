@@ -1,4 +1,4 @@
-FROM rust:1.65 AS build
+FROM rust:1.70 AS build
 
 COPY . /app/dlc-protocol-wallet/
 WORKDIR /app/dlc-protocol-wallet/

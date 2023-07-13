@@ -2,6 +2,7 @@ extern crate base64;
 extern crate tokio;
 use super::storage_api::StorageApiProvider;
 use crate::storage::memory_storage::MemoryStorage;
+use dlc_link_manager::AsyncStorage;
 use dlc_manager::contract::offered_contract::OfferedContract;
 use dlc_manager::contract::signed_contract::SignedContract;
 use dlc_manager::contract::{Contract, PreClosedContract};
@@ -76,6 +77,44 @@ impl StorageProvider {
 impl Default for StorageProvider {
     fn default() -> Self {
         Self::new("".to_string()).unwrap()
+    }
+}
+
+impl AsyncStorage for StorageProvider {
+    async fn get_contract(&self, id: &ContractId) -> Result<Option<Contract>, Error> {
+        todo!()
+    }
+
+    async fn get_contracts(&self) -> Result<Vec<Contract>, Error> {
+        todo!()
+    }
+
+    async fn create_contract(&self, contract: &OfferedContract) -> Result<(), Error> {
+        todo!()
+    }
+
+    async fn delete_contract(&self, id: &ContractId) -> Result<(), Error> {
+        todo!()
+    }
+
+    async fn update_contract(&self, contract: &Contract) -> Result<(), Error> {
+        todo!()
+    }
+
+    async fn get_contract_offers(&self) -> Result<Vec<OfferedContract>, Error> {
+        todo!()
+    }
+
+    async fn get_signed_contracts(&self) -> Result<Vec<SignedContract>, Error> {
+        todo!()
+    }
+
+    async fn get_confirmed_contracts(&self) -> Result<Vec<SignedContract>, Error> {
+        todo!()
+    }
+
+    async fn get_preclosed_contracts(&self) -> Result<Vec<PreClosedContract>, Error> {
+        todo!()
     }
 }
 

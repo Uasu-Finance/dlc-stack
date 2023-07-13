@@ -22,8 +22,8 @@ clap = { version = "3.2.5", features = ["derive"] }
 clokwerk = "0.4.0-rc1"
 config = "0.13.1"
 displaydoc = "0.2"
-dlc = {path = "../../rust-dlc/dlc", features = ["use-serde"]}
-dlc-messages =  {path = "../../rust-dlc/dlc-messages", features = ["use-serde"]}
+dlc = { git = "https://github.com/dlc-link/rust-dlc", rev="e59ed0ce2a7d10ab974b5890f8c0d0fb103c761a", features = ["use-serde"] }
+dlc-messages =  { git = "https://github.com/dlc-link/rust-dlc", rev="e59ed0ce2a7d10ab974b5890f8c0d0fb103c761a", features = ["use-serde"] }
 env_logger = "0.9.0"
 futures = "0.3.21"
 gethostname = "0.3.0"

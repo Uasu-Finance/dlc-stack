@@ -1,3 +1,4 @@
+#![feature(async_fn_in_trait)]
 #![allow(unreachable_code)]
 extern crate log;
 
@@ -9,37 +10,37 @@ use std::{
     collections::HashMap,
     env,
     fs::File,
-    io::{ Read, Write },
+    io::{Read, Write},
     panic,
     path::PathBuf,
     str::FromStr,
-    sync::{ Arc, Mutex },
+    sync::{Arc, Mutex},
     thread,
     time::Duration,
     vec,
 };
 
 use bitcoin::Address;
+// use dlc_link_manager::Manager;
 use dlc_manager::{
-    contract::{ contract_input::{ ContractInput, ContractInputInfo, OracleInput }, Contract },
+    contract::{
+        contract_input::{ContractInput, ContractInputInfo, OracleInput},
+        Contract,
+    },
     manager::Manager,
-    Blockchain,
-    Oracle,
-    Storage,
-    SystemTimeProvider,
-    Wallet,
+    Blockchain, Oracle, Storage, SystemTimeProvider, Wallet,
 };
-use dlc_messages::{ AcceptDlc, Message };
+use dlc_messages::{AcceptDlc, Message};
 use dlc_sled_storage_provider::SledStorageProvider;
 use electrs_blockchain_provider::ElectrsBlockchainProvider;
-use log::{ debug, info, warn };
-use secp256k1_zkp::{ rand, All, PublicKey, Secp256k1, SecretKey };
+use log::{debug, error, info, warn};
+use secp256k1_zkp::{rand, All, PublicKey, Secp256k1, SecretKey};
 use simple_wallet::SimpleWallet;
 
 use crate::storage::storage_provider::StorageProvider;
 use oracle_client::P2PDOracleClient;
 use rouille::Response;
-use serde::{ Deserialize, Serialize };
+use serde::{de::IntoDeserializer, Deserialize, Serialize};
 use serde_json::json;
 use std::fmt::Write as _;
 use utils::get_numerical_contract_info;
@@ -56,10 +57,8 @@ type DlcManager<'a> = Manager<
     Box<StorageProvider>,
     Arc<P2PDOracleClient>,
     Arc<SystemTimeProvider>,
-    Arc<ElectrsBlockchainProvider>
+    Arc<ElectrsBlockchainProvider>,
 >;
-
-const NUM_CONFIRMATIONS: u32 = 2;
 
 // The contracts in dlc-manager expect a node id, but web extensions often don't have this, so hardcode it for now. Should not have any ramifications.
 const STATIC_COUNTERPARTY_NODE_ID: &str =
@@ -81,7 +80,7 @@ struct ErrorsResponse {
 
 fn get_or_generate_secret_from_config(
     secp: &Secp256k1<All>,
-    secret_key_file_path: std::path::PathBuf
+    secret_key_file_path: std::path::PathBuf,
 ) -> SecretKey {
     let mut secret_key = String::new();
     if secret_key_file_path.exists() {
@@ -89,31 +88,32 @@ fn get_or_generate_secret_from_config(
             "reading secret key from {} (default)",
             secret_key_file_path.file_name().unwrap().to_string_lossy()
         );
-        File::open(secret_key_file_path).unwrap().read_to_string(&mut secret_key).unwrap();
+        File::open(secret_key_file_path)
+            .unwrap()
+            .read_to_string(&mut secret_key)
+            .unwrap();
         secret_key.retain(|c| !c.is_whitespace());
         SecretKey::from_str(&secret_key).unwrap()
     } else {
         info!("no secret key file was found, generating secret key");
         let new_key = secp.generate_keypair(&mut rand::thread_rng()).0;
         let mut file = File::create(secret_key_file_path).unwrap();
-        file.write_all(new_key.display_secret().to_string().as_bytes()).unwrap();
+        file.write_all(new_key.display_secret().to_string().as_bytes())
+            .unwrap();
         new_key
     }
 }
 
 fn main() {
     env_logger::init();
-    let oracle_url_1: String = env
-        ::var("ORACLE_URL")
-        .unwrap_or("http://localhost:8080".to_string());
-    let oracle_url_2: String = env
-        ::var("ORACLE_URL_2")
-        .unwrap_or("http://localhost:8080".to_string());
+    let oracle_url_1: String =
+        env::var("ORACLE_URL").unwrap_or("http://localhost:8080".to_string());
+    let oracle_url_2: String =
+        env::var("ORACLE_URL_2").unwrap_or("http://localhost:8080".to_string());
 
     let oracle_urls: Vec<String> = vec![oracle_url_1.clone(), oracle_url_2.clone()];
 
-    let funded_url: String = env
-        ::var("FUNDED_URL")
+    let funded_url: String = env::var("FUNDED_URL")
         .unwrap_or("https://stacks-observer-mocknet.herokuapp.com/funded".to_string());
     let wallet_backend_port: String = env::var("WALLET_BACKEND_PORT").unwrap_or("8085".to_string());
     let mut funded_uuids: Vec<String> = vec![];
@@ -124,19 +124,18 @@ fn main() {
         Ok("testnet") => bitcoin::Network::Testnet,
         Ok("signet") => bitcoin::Network::Signet,
         Ok("regtest") => bitcoin::Network::Regtest,
-        _ =>
-            panic!(
-                "Unknown Bitcoin Network, make sure to set BITCOIN_NETWORK in your env variables"
-            ),
+        _ => panic!(
+            "Unknown Bitcoin Network, make sure to set BITCOIN_NETWORK in your env variables"
+        ),
     };
 
     // ELECTRUM / ELECTRS
-    let electrs_host = env
-        ::var("ELECTRUM_API_URL")
-        .unwrap_or("https://blockstream.info/testnet/api/".to_string());
-    let blockchain = Arc::new(
-        ElectrsBlockchainProvider::new(electrs_host.to_string(), active_network)
-    );
+    let electrs_host =
+        env::var("ELECTRUM_API_URL").unwrap_or("https://blockstream.info/testnet/api/".to_string());
+    let blockchain = Arc::new(ElectrsBlockchainProvider::new(
+        electrs_host.to_string(),
+        active_network,
+    ));
 
     // Set up wallet store
     let root_sled_path: String = env::var("SLED_WALLET_PATH").unwrap_or("wallet_db".to_string());
@@ -144,9 +143,11 @@ fn main() {
     let wallet_store = Arc::new(SledStorageProvider::new(sled_path.as_str()).unwrap());
 
     // Set up wallet
-    let wallet = Arc::new(
-        SimpleWallet::new(blockchain.clone(), wallet_store.clone(), active_network)
-    );
+    let wallet = Arc::new(SimpleWallet::new(
+        blockchain.clone(),
+        wallet_store.clone(),
+        active_network,
+    ));
 
     let static_address = wallet.get_new_address().unwrap();
 
@@ -154,11 +155,8 @@ fn main() {
     let mut protocol_wallet_oracles = HashMap::new();
 
     for url in oracle_urls.iter() {
-        let p2p_client: P2PDOracleClient = retry!(
-            P2PDOracleClient::new(url),
-            10,
-            "oracle client creation"
-        );
+        let p2p_client: P2PDOracleClient =
+            retry!(P2PDOracleClient::new(url), 10, "oracle client creation");
         let oracle = Arc::new(p2p_client);
         protocol_wallet_oracles.insert(oracle.get_public_key(), oracle.clone());
     }
@@ -166,7 +164,11 @@ fn main() {
     // Set up time provider
     let time_provider = SystemTimeProvider {};
 
-    retry!(blockchain.get_blockchain_height(), 10, "get blockchain height");
+    retry!(
+        blockchain.get_blockchain_height(),
+        10,
+        "get blockchain height"
+    );
 
     let secp: Secp256k1<All> = Secp256k1::new();
     let secret_key = get_or_generate_secret_from_config(&secp, PathBuf::from("secret.key"));
@@ -178,44 +180,36 @@ fn main() {
     let dlc_store = StorageProvider::new(pubkey.to_string()).unwrap();
 
     // Create the DLC Manager
-    let manager = Arc::new(
-        Mutex::new(
-            Manager::new(
-                Arc::clone(&wallet),
-                Arc::clone(&blockchain),
-                Box::new(dlc_store),
-                protocol_wallet_oracles.clone(),
-                Arc::new(time_provider),
-                Arc::clone(&blockchain)
-            ).unwrap()
+    let manager = Arc::new(Mutex::new(
+        Manager::new(
+            Arc::clone(&wallet),
+            Arc::clone(&blockchain),
+            Box::new(dlc_store),
+            protocol_wallet_oracles.clone(),
+            Arc::new(time_provider),
+            Arc::clone(&blockchain),
         )
-    );
+        .unwrap(),
+    ));
 
     // Start periodic_check thread
-    let bitcoin_check_interval_seconds: u64 = env
-        ::var("BITCOIN_CHECK_INTERVAL_SECONDS")
+    let bitcoin_check_interval_seconds: u64 = env::var("BITCOIN_CHECK_INTERVAL_SECONDS")
         .unwrap_or("10".to_string())
         .parse::<u64>()
         .unwrap_or(10);
 
     let manager2 = manager.clone();
-    let blockchain2 = blockchain.clone();
     let wallet2 = wallet.clone();
     info!("Please query '/info' endpoint to get wallet info");
     info!("periodic_check loop thread starting");
-    thread::spawn(move || {
-        loop {
-            periodic_check(
-                manager2.clone(),
-                blockchain2.clone(),
-                funded_url.clone(),
-                &mut funded_uuids
-            );
-            wallet.refresh().unwrap_or_else(|e| warn!("Error refreshing wallet {e}"));
-            thread::sleep(
-                Duration::from_millis(cmp::max(10, bitcoin_check_interval_seconds) * 1000)
-            );
-        }
+    thread::spawn(move || loop {
+        periodic_check(manager2.clone(), funded_url.clone(), &mut funded_uuids);
+        wallet
+            .refresh()
+            .unwrap_or_else(|e| warn!("Error refreshing wallet {e}"));
+        thread::sleep(Duration::from_millis(
+            cmp::max(10, bitcoin_check_interval_seconds) * 1000,
+        ));
     });
 
     rouille::start_server(format!("0.0.0.0:{}", wallet_backend_port), move |request| {
@@ -256,7 +250,7 @@ fn main() {
                         total_outcomes: u64,
                     }
                     let req: OfferRequest = try_or_400!(rouille::input::json_input(request));
-                    
+
                     add_access_control_headers(create_new_offer(manager.clone(), protocol_wallet_oracles.values().cloned().collect(), active_network, req.uuid, req.accept_collateral, req.offer_collateral, req.total_outcomes))
                 },
                 (OPTIONS) (/offer) => {
@@ -288,7 +282,7 @@ fn main() {
 fn get_wallet_info(
     manager: Arc<Mutex<DlcManager>>,
     wallet: Arc<SimpleWallet<Arc<ElectrsBlockchainProvider>, Arc<SledStorageProvider>>>,
-    static_address: String
+    static_address: String,
 ) -> Response {
     let mut info_response = json!({});
     let mut contracts_json = json!({});
@@ -313,10 +307,12 @@ fn get_wallet_info(
         vec![],
         vec![],
         vec![],
-        vec![]
+        vec![],
     ];
 
-    let contracts = store.get_contracts().expect("Error retrieving contract list.");
+    let contracts = store
+        .get_contracts()
+        .expect("Error retrieving contract list.");
 
     for contract in contracts {
         let id = hex_str(&contract.get_id());
@@ -357,8 +353,7 @@ fn get_wallet_info(
     contracts_json["Rejected"] = collected_contracts[7].clone().into();
     contracts_json["PreClosed"] = collected_contracts[8].clone().into();
 
-    info_response["wallet"] =
-        json!({
+    info_response["wallet"] = json!({
         "balance": wallet.get_balance(),
         "address": static_address
     });
@@ -369,68 +364,77 @@ fn get_wallet_info(
 
 fn periodic_check(
     manager: Arc<Mutex<DlcManager>>,
-    blockchain: Arc<dyn Blockchain>,
     funded_url: String,
-    funded_uuids: &mut Vec<String>
+    funded_uuids: &mut Vec<String>,
 ) -> () {
     let mut man = manager.lock().unwrap();
 
-    match man.periodic_check() {
-        Ok(_) => (),
+    let updated_contract_ids = match man.periodic_check() {
+        Ok(updated_contract_ids) => updated_contract_ids,
         Err(e) => {
             info!("Error in periodic_check, will retry: {}", e.to_string());
-            ();
+            vec![]
         }
-    }
+    };
 
     let store = man.get_store();
 
-    let mut contracts = store.get_signed_contracts().unwrap_or(vec![]);
-    contracts.append(&mut store.get_confirmed_contracts().unwrap_or(vec![]));
-
-    let checked_contracts_must_use = contracts.iter().map(|c| {
-        let confirmations = match
-            blockchain.get_transaction_confirmations(
-                &c.accepted_contract.dlc_transactions.fund.txid()
-            )
-        {
-            Ok(confirms) => confirms,
+    for id in updated_contract_ids {
+        let contract = match store.get_contract(&id) {
+            Ok(Some(contract)) => contract,
+            Ok(None) => {
+                error!("Error retrieving contract: {:?}", id);
+                continue;
+            }
             Err(e) => {
-                info!("Error checking confirmations: {}", e.to_string());
-                0
+                error!("Error retrieving contract: {}", e.to_string());
+                continue;
             }
         };
-        if confirmations >= NUM_CONFIRMATIONS {
-            let uuid =
-                c.accepted_contract.offered_contract.contract_info[0].oracle_announcements[0].oracle_event.event_id.clone();
+
+        let newly_confirmed_uuids = match contract {
+            Contract::Confirmed(c) => c
+                .accepted_contract
+                .offered_contract
+                .contract_info
+                .iter()
+                .map(|ci| {
+                    ci.oracle_announcements
+                        .iter()
+                        .map(|oa| oa.oracle_event.event_id.clone())
+                        .collect::<Vec<String>>() // May include duplicates as multiple oracles will each have the same uuid for the same event
+                })
+                .flatten()
+                .collect::<Vec<String>>(),
+            _ => vec![],
+        };
+
+        for uuid in newly_confirmed_uuids {
             if !funded_uuids.contains(&uuid) {
                 debug!("Contract is funded, setting funded to true: {}", uuid);
                 let mut post_body = HashMap::new();
                 post_body.insert("uuid", &uuid);
 
-                let client = reqwest::blocking::Client::builder().use_rustls_tls().build();
+                let client = reqwest::blocking::Client::builder()
+                    .use_rustls_tls()
+                    .build();
                 if client.is_ok() {
                     let res = client.unwrap().post(&funded_url).json(&post_body).send();
 
                     match res {
-                        Ok(res) =>
-                            match res.error_for_status() {
-                                Ok(_res) => {
-                                    funded_uuids.push(uuid.clone());
-                                    info!(
-                                        "Success setting funded to true: {}, {}",
-                                        uuid,
-                                        _res.status()
-                                    );
-                                }
-                                Err(e) => {
-                                    info!(
-                                        "Error setting funded to true: {}: {}",
-                                        uuid,
-                                        e.to_string()
-                                    );
-                                }
+                        Ok(res) => match res.error_for_status() {
+                            Ok(_res) => {
+                                funded_uuids.push(uuid.clone());
+                                info!(
+                                    "Success setting funded to true: {}, {}",
+                                    uuid,
+                                    _res.status()
+                                );
                             }
+                            Err(e) => {
+                                info!("Error setting funded to true: {}: {}", uuid, e.to_string());
+                            }
+                        },
                         Err(e) => {
                             info!("Error setting funded to true: {}: {}", uuid, e.to_string());
                         }
@@ -438,12 +442,7 @@ fn periodic_check(
                 }
             }
         }
-        c.accepted_contract.get_contract_id_string()
-    });
-
-    // Oddly, this line of code is required otherwise the above code doesn't run, likely due to lazy evaluation
-    // This is even true when assigning with a let statement and _ variable
-    let _ = checked_contracts_must_use.collect::<Vec<String>>();
+    }
 }
 
 fn create_new_offer(
@@ -453,13 +452,13 @@ fn create_new_offer(
     event_id: String,
     accept_collateral: u64,
     offer_collateral: u64,
-    total_outcomes: u64
+    total_outcomes: u64,
 ) -> Response {
     let (_event_descriptor, descriptor) = get_numerical_contract_info(
         accept_collateral,
         offer_collateral,
         total_outcomes,
-        oracles.len()
+        oracles.len(),
     );
     info!(
         "Creating new offer with event id: {}, accept collateral: {}, offer_collateral: {}",
@@ -470,10 +469,7 @@ fn create_new_offer(
 
     let contract_info = ContractInputInfo {
         oracles: OracleInput {
-            public_keys: oracles
-                .iter()
-                .map(|o| o.get_public_key())
-                .collect(),
+            public_keys: oracles.iter().map(|o| o.get_public_key()).collect(),
             event_id: event_id.clone(),
             threshold: 2,
         },
@@ -496,8 +492,9 @@ fn create_new_offer(
                             ),
                             code: None,
                         }],
-                    })
-                ).with_status_code(400);
+                    }),
+                )
+                .with_status_code(400);
             }
         }
     }
@@ -517,12 +514,10 @@ fn create_new_offer(
         contract_infos: vec![contract_info],
     };
 
-    match
-        &manager
-            .lock()
-            .unwrap()
-            .send_offer(&contract_input, STATIC_COUNTERPARTY_NODE_ID.parse().unwrap())
-    {
+    match &manager.lock().unwrap().send_offer(
+        &contract_input,
+        STATIC_COUNTERPARTY_NODE_ID.parse().unwrap(),
+    ) {
         Ok(dlc) => Response::json(dlc),
         Err(e) => {
             info!("DLC manager - send offer error: {}", e.to_string());
@@ -533,41 +528,36 @@ fn create_new_offer(
                         message: e.to_string(),
                         code: None,
                     }],
-                })
-            ).with_status_code(400)
+                }),
+            )
+            .with_status_code(400)
         }
     }
 }
 
 fn accept_offer(accept_dlc: AcceptDlc, manager: Arc<Mutex<DlcManager>>) -> Response {
     println!("accept_dlc: {:?}", accept_dlc);
-    if
-        let Some(Message::Sign(sign)) = (match
-            manager
-                .lock()
-                .unwrap()
-                .on_dlc_message(
-                    &Message::Accept(accept_dlc),
-                    STATIC_COUNTERPARTY_NODE_ID.parse().unwrap()
+    if let Some(Message::Sign(sign)) = (match manager.lock().unwrap().on_dlc_message(
+        &Message::Accept(accept_dlc),
+        STATIC_COUNTERPARTY_NODE_ID.parse().unwrap(),
+    ) {
+        Ok(dlc) => dlc,
+        Err(e) => {
+            info!("DLC manager - accept offer error: {}", e.to_string());
+            return add_access_control_headers(
+                Response::json(
+                    &(ErrorsResponse {
+                        status: 400,
+                        errors: vec![ErrorResponse {
+                            message: e.to_string(),
+                            code: None,
+                        }],
+                    }),
                 )
-        {
-            Ok(dlc) => dlc,
-            Err(e) => {
-                info!("DLC manager - accept offer error: {}", e.to_string());
-                return add_access_control_headers(
-                    Response::json(
-                        &(ErrorsResponse {
-                            status: 400,
-                            errors: vec![ErrorResponse {
-                                message: e.to_string(),
-                                code: None,
-                            }],
-                        })
-                    ).with_status_code(400)
-                );
-            }
-        })
-    {
+                .with_status_code(400),
+            );
+        }
+    }) {
         add_access_control_headers(Response::json(&sign))
     } else {
         return Response::json(
@@ -577,8 +567,9 @@ fn accept_offer(accept_dlc: AcceptDlc, manager: Arc<Mutex<DlcManager>>) -> Respo
                     message: format!("Error: invalid Sign message for accept_offer function"),
                     code: None,
                 }],
-            })
-        ).with_status_code(400);
+            }),
+        )
+        .with_status_code(400);
     }
 }
 
@@ -591,7 +582,7 @@ fn delete_all_offers(manager: Arc<Mutex<DlcManager>>, response: Response) -> Res
 
 fn unlock_utxos(
     wallet: Arc<SimpleWallet<Arc<ElectrsBlockchainProvider>, Arc<SledStorageProvider>>>,
-    response: Response
+    response: Response,
 ) -> Response {
     info!("Unlocking UTXOs");
     wallet.unreserve_all_utxos();
@@ -601,7 +592,7 @@ fn unlock_utxos(
 fn empty_to_address(
     address: String,
     wallet: Arc<SimpleWallet<Arc<ElectrsBlockchainProvider>, Arc<SledStorageProvider>>>,
-    response: Response
+    response: Response,
 ) -> Response {
     info!("Unlocking UTXOs");
     match wallet.empty_to_address(&Address::from_str(&address).unwrap()) {
