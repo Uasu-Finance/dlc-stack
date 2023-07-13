@@ -58,3 +58,8 @@ as per this article: https://docs.aws.amazon.com/AmazonECR/latest/public/public-
 ## API documentation:
 
 See [wallet.yaml](docs/wallet.yaml) - the content can be copied to [swagger editor](https://editor.swagger.io/)
+
+## Build Error
+https://github.com/rust-lang/rust/issues/110475
+
+If seeing something like: error[E0275]: overflow evaluating the requirement `F: FnMut<(&Pk,)>` then consider reverting back your nightly build of Rust to something like: `rustup override set nightly-2023-03-31`

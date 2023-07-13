@@ -294,7 +294,7 @@ impl MemoryApiClient {
         return Ok(());
     }
 
-    pub async fn delete_event(&self, uuid: String) -> Result<(), ApiError> {
+    pub async fn delete_event(&self, _uuid: String) -> Result<(), ApiError> {
         unimplemented!()
     }
 
