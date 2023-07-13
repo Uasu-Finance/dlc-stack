@@ -106,10 +106,15 @@ fn get_or_generate_secret_from_config(
 
 fn main() {
     env_logger::init();
-    let oracle_url: String = env::var("ORACLE_URL").unwrap_or("http://localhost:8080".to_string());
+    let oracle_url_1: String =
+        env::var("ORACLE_URL").unwrap_or("http://localhost:8080".to_string());
+    let oracle_url_2: String =
+        env::var("ORACLE_URL_2").unwrap_or("http://localhost:8080".to_string());
+
+    let oracle_urls: Vec<String> = vec![oracle_url_1.clone(), oracle_url_2.clone()];
 
     let funded_url: String = env::var("FUNDED_URL")
-        .unwrap_or("http://stacks-observer-mocknet.herokuapp.com/funded".to_string());
+        .unwrap_or("https://stacks-observer-mocknet.herokuapp.com/funded".to_string());
     let wallet_backend_port: String = env::var("WALLET_BACKEND_PORT").unwrap_or("8085".to_string());
     let mut funded_uuids: Vec<String> = vec![];
 
@@ -147,14 +152,14 @@ fn main() {
     let static_address = wallet.get_new_address().unwrap();
 
     // Set up Oracle Client
-    let p2p_client: P2PDOracleClient = retry!(
-        P2PDOracleClient::new(&oracle_url),
-        10,
-        "oracle client creation"
-    );
-    let oracle = Arc::new(p2p_client);
-    let oracles: HashMap<bitcoin::XOnlyPublicKey, _> =
-        HashMap::from([(oracle.get_public_key(), oracle.clone())]);
+    let mut protocol_wallet_oracles = HashMap::new();
+
+    for url in oracle_urls.iter() {
+        let p2p_client: P2PDOracleClient =
+            retry!(P2PDOracleClient::new(url), 10, "oracle client creation");
+        let oracle = Arc::new(p2p_client);
+        protocol_wallet_oracles.insert(oracle.get_public_key(), oracle.clone());
+    }
 
     // Set up time provider
     let time_provider = SystemTimeProvider {};
@@ -180,7 +185,7 @@ fn main() {
             Arc::clone(&wallet),
             Arc::clone(&blockchain),
             Box::new(dlc_store),
-            oracles,
+            protocol_wallet_oracles.clone(),
             Arc::new(time_provider),
             Arc::clone(&blockchain),
         )
@@ -242,10 +247,11 @@ fn main() {
                         uuid: String,
                         accept_collateral: u64,
                         offer_collateral: u64,
-                        total_outcomes: u64
+                        total_outcomes: u64,
                     }
                     let req: OfferRequest = try_or_400!(rouille::input::json_input(request));
-                    add_access_control_headers(create_new_offer(manager.clone(), oracle.clone(), active_network, req.uuid, req.accept_collateral, req.offer_collateral, req.total_outcomes))
+
+                    add_access_control_headers(create_new_offer(manager.clone(), protocol_wallet_oracles.values().cloned().collect(), active_network, req.uuid, req.accept_collateral, req.offer_collateral, req.total_outcomes))
                 },
                 (OPTIONS) (/offer) => {
                     add_access_control_headers(Response::empty_204())
@@ -441,15 +447,19 @@ fn periodic_check(
 
 fn create_new_offer(
     manager: Arc<Mutex<DlcManager>>,
-    oracle: Arc<P2PDOracleClient>,
+    oracles: Vec<Arc<P2PDOracleClient>>,
     active_network: bitcoin::Network,
     event_id: String,
     accept_collateral: u64,
     offer_collateral: u64,
     total_outcomes: u64,
 ) -> Response {
-    let (_event_descriptor, descriptor) =
-        get_numerical_contract_info(accept_collateral, offer_collateral, total_outcomes);
+    let (_event_descriptor, descriptor) = get_numerical_contract_info(
+        accept_collateral,
+        offer_collateral,
+        total_outcomes,
+        oracles.len(),
+    );
     info!(
         "Creating new offer with event id: {}, accept collateral: {}, offer_collateral: {}",
         event_id.clone(),
@@ -459,37 +469,43 @@ fn create_new_offer(
 
     let contract_info = ContractInputInfo {
         oracles: OracleInput {
-            public_keys: vec![oracle.get_public_key()],
+            public_keys: oracles.iter().map(|o| o.get_public_key()).collect(),
             event_id: event_id.clone(),
-            threshold: 1,
+            threshold: 2,
         },
         contract_descriptor: descriptor,
     };
 
-    // check if the oracle has an event with the id of event_id
-    match oracle.get_announcement(&event_id) {
-        Ok(_announcement) => (),
-        Err(e) => {
-            info!("Error getting announcement: {}", event_id);
-            return Response::json(&ErrorsResponse {
-                status: 400,
-                errors: vec![ErrorResponse {
-                    message: format!(
-                        "Error: unable to get announcement. Does it exist? -- {}",
-                        e.to_string()
-                    ),
-                    code: None,
-                }],
-            })
-            .with_status_code(400);
+    for oracle in oracles {
+        // check if the oracle has an event with the id of event_id
+        match oracle.get_announcement(&event_id) {
+            Ok(_announcement) => (),
+            Err(e) => {
+                info!("Error getting announcement: {}", event_id);
+                return Response::json(
+                    &(ErrorsResponse {
+                        status: 400,
+                        errors: vec![ErrorResponse {
+                            message: format!(
+                                "Error: unable to get announcement. Does it exist? -- {}",
+                                e.to_string()
+                            ),
+                            code: None,
+                        }],
+                    }),
+                )
+                .with_status_code(400);
+            }
         }
     }
 
     // Some regtest networks have an unreliable fee estimation service
     let fee_rate = match active_network {
         bitcoin::Network::Regtest => 1,
-        _ => 21242,
+        _ => 400,
     };
+
+    println!("contract_info: {:?}", contract_info);
 
     let contract_input = ContractInput {
         offer_collateral: offer_collateral,
@@ -505,20 +521,23 @@ fn create_new_offer(
         Ok(dlc) => Response::json(dlc),
         Err(e) => {
             info!("DLC manager - send offer error: {}", e.to_string());
-            Response::json(&ErrorsResponse {
-                status: 400,
-                errors: vec![ErrorResponse {
-                    message: e.to_string(),
-                    code: None,
-                }],
-            })
+            Response::json(
+                &(ErrorsResponse {
+                    status: 400,
+                    errors: vec![ErrorResponse {
+                        message: e.to_string(),
+                        code: None,
+                    }],
+                }),
+            )
             .with_status_code(400)
         }
     }
 }
 
 fn accept_offer(accept_dlc: AcceptDlc, manager: Arc<Mutex<DlcManager>>) -> Response {
-    if let Some(Message::Sign(sign)) = match manager.lock().unwrap().on_dlc_message(
+    println!("accept_dlc: {:?}", accept_dlc);
+    if let Some(Message::Sign(sign)) = (match manager.lock().unwrap().on_dlc_message(
         &Message::Accept(accept_dlc),
         STATIC_COUNTERPARTY_NODE_ID.parse().unwrap(),
     ) {
@@ -526,26 +545,30 @@ fn accept_offer(accept_dlc: AcceptDlc, manager: Arc<Mutex<DlcManager>>) -> Respo
         Err(e) => {
             info!("DLC manager - accept offer error: {}", e.to_string());
             return add_access_control_headers(
-                Response::json(&ErrorsResponse {
-                    status: 400,
-                    errors: vec![ErrorResponse {
-                        message: e.to_string(),
-                        code: None,
-                    }],
-                })
+                Response::json(
+                    &(ErrorsResponse {
+                        status: 400,
+                        errors: vec![ErrorResponse {
+                            message: e.to_string(),
+                            code: None,
+                        }],
+                    }),
+                )
                 .with_status_code(400),
             );
         }
-    } {
+    }) {
         add_access_control_headers(Response::json(&sign))
     } else {
-        return Response::json(&ErrorsResponse {
-            status: 400,
-            errors: vec![ErrorResponse {
-                message: format!("Error: invalid Sign message for accept_offer function"),
-                code: None,
-            }],
-        })
+        return Response::json(
+            &(ErrorsResponse {
+                status: 400,
+                errors: vec![ErrorResponse {
+                    message: format!("Error: invalid Sign message for accept_offer function"),
+                    code: None,
+                }],
+            }),
+        )
         .with_status_code(400);
     }
 }

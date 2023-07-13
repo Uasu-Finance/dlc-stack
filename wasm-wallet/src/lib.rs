@@ -90,7 +90,7 @@ pub struct JsDLCInterface {
 // #[wasm_bindgen]
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct JsDLCInterfaceOptions {
-    oracle_url: String,
+    joined_oracle_urls: String,
     network: String,
     electrs_url: String,
     address: String,
@@ -100,7 +100,7 @@ impl Default for JsDLCInterfaceOptions {
     // Default values for Manager Options
     fn default() -> Self {
         Self {
-            oracle_url: "https://dev-oracle.dlc.link/oracle".to_string(),
+            joined_oracle_urls: "https://dev-oracle.dlc.link/oracle".to_string(),
             network: "regtest".to_string(),
             electrs_url: "https://dev-oracle.dlc.link/electrs".to_string(),
             address: "".to_string(),
@@ -115,14 +115,21 @@ impl JsDLCInterface {
         address: String,
         network: String,
         electrs_url: String,
-        oracle_url: String,
+        joined_oracle_urls: String,
     ) -> JsDLCInterface {
         console_error_panic_hook::set_once();
 
-        clog!("Received JsDLCInterface parameters: privkey={}, address={}, network={}, electrs_url={}, oracle_url={}", privkey, address, network, electrs_url, oracle_url);
+        clog!(
+            "Received JsDLCInterface parameters: privkey={}, address={}, network={}, electrs_url={}, oracle_urls={}",
+            privkey,
+            address,
+            network,
+            electrs_url,
+            joined_oracle_urls
+        );
 
         let options = JsDLCInterfaceOptions {
-            oracle_url,
+            joined_oracle_urls,
             network,
             electrs_url,
             address,
@@ -161,15 +168,19 @@ impl JsDLCInterface {
             PrivateKey::new(seckey, active_network),
         ));
 
-        // Set up Oracle Client
-        let p2p_client: P2PDOracleClient = P2PDOracleClient::new(&options.oracle_url)
-            .await
-            .expect("To be able to connect to the oracle");
+        let oracle_urls: Vec<&str> = options.joined_oracle_urls.split(',').collect();
 
-        let oracle = Arc::new(p2p_client);
-        let oracles: HashMap<bitcoin::XOnlyPublicKey, _> =
-            HashMap::from([(oracle.get_public_key(), oracle.clone())]);
+        // Set up Oracle Clients
+        let mut oracles: HashMap<bitcoin::XOnlyPublicKey, Arc<P2PDOracleClient>> = HashMap::new();
 
+        for url in oracle_urls {
+            let p2p_client: P2PDOracleClient = P2PDOracleClient::new(url)
+                .await
+                .expect("To be able to connect to the oracle");
+
+            let oracle = Arc::new(p2p_client);
+            oracles.insert(oracle.get_public_key(), oracle.clone());
+        }
         // Set up time provider
         let time_provider = SystemTimeProvider {};
 
@@ -266,7 +277,7 @@ impl JsDLCInterface {
         {
             Ok(_) => (),
             Err(e) => {
-                clog!("DLC manager - receive offer error: {}", e.to_string());
+                clog!("DLC manager - receive offer error: {:?}", e);
                 return "".to_string();
             }
         }
@@ -302,7 +313,7 @@ impl JsDLCInterface {
             Ok(_) => (),
             Err(e) => {
                 info!("DLC manager - sign offer error: {}", e.to_string());
-                panic!()
+                panic!();
             }
         }
         clog!("sign_offer - after on_dlc_message");
@@ -346,7 +357,7 @@ impl JsDLCInterface {
                     .unwrap();
             }
             _ => (),
-        };
+        }
     }
 
     // fn accept_offer(&self, offer_json: String, utxos: String) -> String {

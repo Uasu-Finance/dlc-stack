@@ -1,20 +1,37 @@
-use std::{cell::RefCell, ops::Deref, str::FromStr};
+use std::{ cell::RefCell, ops::Deref, str::FromStr };
 
 use bdk::{
-    database::{BatchOperations, Database},
+    database::{ BatchOperations, Database },
     wallet::coin_selection::{
-        decide_change, BranchAndBoundCoinSelection, CoinSelectionAlgorithm, CoinSelectionResult,
+        decide_change,
+        BranchAndBoundCoinSelection,
+        CoinSelectionAlgorithm,
+        CoinSelectionResult,
     },
-    FeeRate, KeychainKind, LocalUtxo, Utxo as BdkUtxo, WeightedUtxo,
+    FeeRate,
+    KeychainKind,
+    LocalUtxo,
+    Utxo as BdkUtxo,
+    WeightedUtxo,
 };
 use bitcoin::{
-    hashes::Hash, Address, Network, PackedLockTime, PrivateKey, Script, Sequence, Transaction,
-    TxIn, TxOut, Txid, Witness,
+    hashes::Hash,
+    Address,
+    Network,
+    PackedLockTime,
+    PrivateKey,
+    Script,
+    Sequence,
+    Transaction,
+    TxIn,
+    TxOut,
+    Txid,
+    Witness,
 };
-use dlc_manager::{error::Error, Blockchain, Signer, Utxo, Wallet};
-use lightning::chain::chaininterface::{ConfirmationTarget, FeeEstimator};
+use dlc_manager::{ error::Error, Blockchain, Signer, Utxo, Wallet };
+use lightning::chain::chaininterface::{ ConfirmationTarget, FeeEstimator };
 use rust_bitcoin_coin_selection::select_coins;
-use secp256k1_zkp::{rand::thread_rng, All, PublicKey, Secp256k1, SecretKey};
+use secp256k1_zkp::{ rand::thread_rng, All, PublicKey, Secp256k1, SecretKey };
 type Result<T> = core::result::Result<T, Error>;
 
 pub(crate) const TXIN_BASE_WEIGHT: usize = (32 + 4 + 4) * 4;
@@ -26,19 +43,19 @@ pub trait WalletBlockchainProvider: Blockchain + FeeEstimator {
 }
 
 /// Trait enabling the wallet to persist data.
-pub trait WalletStorage {
-    fn upsert_address(&self, address: &Address, privkey: &SecretKey) -> Result<()>;
-    fn delete_address(&self, address: &Address) -> Result<()>;
-    fn get_addresses(&self) -> Result<Vec<Address>>;
-    fn get_priv_key_for_address(&self, address: &Address) -> Result<Option<SecretKey>>;
-    fn upsert_key_pair(&self, public_key: &PublicKey, privkey: &SecretKey) -> Result<()>;
-    fn get_priv_key_for_pubkey(&self, public_key: &PublicKey) -> Result<Option<SecretKey>>;
-    fn upsert_utxo(&self, utxo: &Utxo) -> Result<()>;
-    fn has_utxo(&self, utxo: &Utxo) -> Result<bool>;
-    fn delete_utxo(&self, utxo: &Utxo) -> Result<()>;
-    fn get_utxos(&self) -> Result<Vec<Utxo>>;
-    fn unreserve_utxo(&self, txid: &Txid, vout: u32) -> Result<()>;
-}
+// pub trait WalletStorage {
+//     fn upsert_address(&self, address: &Address, privkey: &SecretKey) -> Result<()>;
+//     fn delete_address(&self, address: &Address) -> Result<()>;
+//     fn get_addresses(&self) -> Result<Vec<Address>>;
+//     fn get_priv_key_for_address(&self, address: &Address) -> Result<Option<SecretKey>>;
+//     fn upsert_key_pair(&self, public_key: &PublicKey, privkey: &SecretKey) -> Result<()>;
+//     fn get_priv_key_for_pubkey(&self, public_key: &PublicKey) -> Result<Option<SecretKey>>;
+//     fn upsert_utxo(&self, utxo: &Utxo) -> Result<()>;
+//     fn has_utxo(&self, utxo: &Utxo) -> Result<bool>;
+//     fn delete_utxo(&self, utxo: &Utxo) -> Result<()>;
+//     fn get_utxos(&self) -> Result<Vec<Utxo>>;
+//     fn unreserve_utxo(&self, txid: &Txid, vout: u32) -> Result<()>;
+// }
 
 /// Basic wallet mainly meant for testing purposes.
 // pub struct JSInterfaceWallet<B: Deref, W: Deref>
@@ -51,7 +68,6 @@ pub trait WalletStorage {
 //     secp_ctx: Secp256k1<All>,
 //     network: Network,
 // }
-
 pub struct JSInterfaceWallet {
     address: Address,
     secp_ctx: Secp256k1<All>,
@@ -203,7 +219,7 @@ impl Signer for JSInterfaceWallet {
         tx: &mut bitcoin::Transaction,
         input_index: usize,
         tx_out: &bitcoin::TxOut,
-        _: Option<bitcoin::Script>,
+        _: Option<bitcoin::Script>
     ) -> Result<()> {
         // let address = Address::from_script(&tx_out.script_pubkey, self.network)
         //     .expect("a valid scriptpubkey");
@@ -217,7 +233,7 @@ impl Signer for JSInterfaceWallet {
             tx,
             input_index,
             bitcoin::EcdsaSighashType::All,
-            tx_out.value,
+            tx_out.value
         )?;
         Ok(())
     }
@@ -231,7 +247,7 @@ fn select_sorted_utxos(
     utxos: impl Iterator<Item = (bool, WeightedUtxo)>,
     fee_rate: FeeRate,
     target_amount: u64,
-    drain_script: &Script,
+    drain_script: &Script
 ) -> Result<CoinSelectionResult> {
     let mut selected_amount = 0;
     let mut fee_amount = 0;
@@ -240,21 +256,22 @@ fn select_sorted_utxos(
             (&mut selected_amount, &mut fee_amount),
             |(selected_amount, fee_amount), (must_use, weighted_utxo)| {
                 if must_use || **selected_amount < target_amount + **fee_amount {
-                    **fee_amount +=
-                        fee_rate.fee_wu(TXIN_BASE_WEIGHT + weighted_utxo.satisfaction_weight);
+                    **fee_amount += fee_rate.fee_wu(
+                        TXIN_BASE_WEIGHT + weighted_utxo.satisfaction_weight
+                    );
                     **selected_amount += weighted_utxo.utxo.txout().value;
 
                     Some(weighted_utxo.utxo)
                 } else {
                     None
                 }
-            },
+            }
         )
         .collect::<Vec<_>>();
 
     let amount_needed_with_fees = target_amount + fee_amount;
     if selected_amount < amount_needed_with_fees {
-        panic!("insufficient funds");
+        return Err(Error::InvalidParameters("Insufficient Funds".to_string()));
     }
 
     let remaining_amount = selected_amount - amount_needed_with_fees;
@@ -281,7 +298,7 @@ impl Wallet for JSInterfaceWallet {
         &self,
         amount: u64,
         fee_rate: Option<u64>,
-        lock_utxos: bool,
+        lock_utxos: bool
     ) -> Result<Vec<Utxo>> {
         let org_utxos = self.utxos.borrow().as_ref().unwrap().clone();
         let mut utxos = org_utxos
@@ -297,17 +314,12 @@ impl Wallet for JSInterfaceWallet {
                 satisfaction_weight: 107,
             })
             .collect::<Vec<_>>();
-        // let coin_selection = BranchAndBoundCoinSelection::default();
         let dummy_pubkey: PublicKey =
-            "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798"
-                .parse()
-                .unwrap();
-        let dummy_drain =
-            Script::new_v0_p2wpkh(&bitcoin::WPubkeyHash::hash(&dummy_pubkey.serialize()));
+            "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798".parse().unwrap();
+        let dummy_drain = Script::new_v0_p2wpkh(
+            &bitcoin::WPubkeyHash::hash(&dummy_pubkey.serialize())
+        );
         let fee_rate = FeeRate::from_sat_per_vb(fee_rate.unwrap() as f32);
-        // let selection = coin_selection
-        //     .coin_select(self, Vec::new(), utxos, fee_rate, amount, &dummy_drain)
-        //     .map_err(|e| Error::WalletError(Box::new(e)))?;
         let required_utxos = Vec::new();
         let drain_script = &dummy_drain;
 
@@ -316,29 +328,28 @@ impl Wallet for JSInterfaceWallet {
             required_utxos
                 .into_iter()
                 .map(|utxo| (true, utxo))
-                .chain(utxos.into_iter().rev().map(|utxo| (false, utxo)))
+                .chain(
+                    utxos
+                        .into_iter()
+                        .rev()
+                        .map(|utxo| (false, utxo))
+                )
         };
 
-        let selection = select_sorted_utxos(temp_utxos, fee_rate, amount, drain_script);
+        let selection = select_sorted_utxos(temp_utxos, fee_rate, amount, drain_script).unwrap();
 
         let mut res = Vec::new();
-        if lock_utxos {
-            for utxo in selection.unwrap().selected {
-                let local_utxo = if let BdkUtxo::Local(l) = utxo {
-                    l
-                } else {
-                    panic!();
-                };
-                let org = org_utxos
-                    .iter()
-                    .find(|x| x.tx_out == local_utxo.txout && x.outpoint == local_utxo.outpoint)
-                    .unwrap();
-                let updated = Utxo {
-                    reserved: true,
-                    ..org.clone()
-                };
-                res.push(org.clone());
-            }
+        for utxo in selection.selected {
+            let local_utxo = if let BdkUtxo::Local(l) = utxo {
+                l
+            } else {
+                panic!();
+            };
+            let org = org_utxos
+                .iter()
+                .find(|x| x.tx_out == local_utxo.txout && x.outpoint == local_utxo.outpoint)
+                .unwrap();
+            res.push(org.clone());
         }
         Ok(res)
     }
