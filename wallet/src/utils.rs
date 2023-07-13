@@ -15,6 +15,7 @@ pub(crate) fn get_numerical_contract_info(
     accept_collateral: u64,
     offer_collateral: u64,
     total_outcomes: u64,
+    nb_attestors: usize,
 ) -> (EventDescriptor, ContractDescriptor) {
     let event_descriptor =
         EventDescriptor::DigitDecompositionEvent(DigitDecompositionEventDescriptor {
@@ -26,7 +27,7 @@ pub(crate) fn get_numerical_contract_info(
         });
 
     let descriptor =
-        get_numerical_contract_descriptor(accept_collateral, offer_collateral, total_outcomes);
+        get_numerical_contract_descriptor(accept_collateral, offer_collateral, total_outcomes, nb_attestors);
 
     (event_descriptor, descriptor)
 }
@@ -35,6 +36,7 @@ pub(crate) fn get_numerical_contract_descriptor(
     accept_collateral: u64,
     offer_collateral: u64,
     total_outcomes: u64,
+    nb_attestors: usize,
 ) -> ContractDescriptor {
     ContractDescriptor::Numerical(NumericalDescriptor {
         payout_function: PayoutFunction::new(get_polynomial_payout_curve_pieces(
@@ -51,7 +53,7 @@ pub(crate) fn get_numerical_contract_descriptor(
         },
         oracle_numeric_infos: OracleNumericInfo {
             base: BASE,
-            nb_digits: vec![NB_DIGITS],
+            nb_digits: vec![NB_DIGITS; nb_attestors],
         },
         difference_params: None,
     })
