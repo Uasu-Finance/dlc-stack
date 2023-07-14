@@ -9,13 +9,15 @@ const bitcoinNetworkURL = "https://dev-oracle.dlc.link/electrs";
 
 const protocolWalletURL = "http://localhost:8085";
 
-const oracleURLs = ["http://localhost:8801", "http://localhost:8802"];
+// const oracleURLs = ["http://localhost:8801", "http://localhost:8802"];
+const oracleURLs = ["http://localhost:8801"];
+const joinedOracleURLs = ["http://localhost:8801"];
 
-const joinedOracleURLs = oracleURLs.join(",");
+// const joinedOracleURLs = oracleURLs.join(",");
 
 async function fetchOfferFromProtocolWallet(oracleUrls) {
   let body = {
-    uuid: "0xe98d7d95b865e62d8e3c98816ae8a2a1835653445824c3019fdc9a428d4bf319",
+    uuid: "0xa2876fa089db7c4102157b909e31013f00b9558944bac010ecf49ef87155d0ce",
     acceptCollateral: 10000,
     offerCollateral: 0,
     totalOutcomes: 100,
