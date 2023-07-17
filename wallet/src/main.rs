@@ -30,7 +30,7 @@ use dlc_manager::{
     manager::Manager,
     Blockchain, Oracle, Storage, SystemTimeProvider, Wallet,
 };
-use dlc_messages::{AcceptDlc, Message, oracle_msgs};
+use dlc_messages::{AcceptDlc, Message};
 use dlc_sled_storage_provider::SledStorageProvider;
 use electrs_blockchain_provider::ElectrsBlockchainProvider;
 use log::{debug, error, info, warn};
