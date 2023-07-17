@@ -8,13 +8,13 @@ const bitcoinNetworkURL = "https://dev-oracle.dlc.link/electrs";
 
 const protocolWalletURL = "http://localhost:8085";
 
-const oracleURLs = [
+const exampleAttestorURLs = [
     "https://dev-oracle.dlc.link/oracle",
     // "https://testnet.dlc.link/oracle",
 ];
 
 const handleAttestors = true;
-const successful = true;
+const successfulAttesting = true;
 
 const testUUID = `test${Math.floor(Math.random() * 1000)}`;
 
@@ -24,15 +24,15 @@ function createMaturationDate() {
     return maturationDate.toISOString();
 }
 
-async function createEvent(oracleURL, uuid) {
+async function createEvent(attestorURL, uuid) {
     const maturationDate = createMaturationDate();
-    const response = await fetch(`${oracleURL}/v1/create_event/${uuid}?maturation=${maturationDate}`);
+    const response = await fetch(`${attestorURL}/v1/create_event/${uuid}?maturation=${maturationDate}`);
     const event = await response.json();
     return event;
 }
 
-async function attest(oracleURL, uuid, outcome) {
-    const response = await fetch(`${oracleURL}/v1/attest/${uuid}?outcome=${outcome}`);
+async function attest(attestorURL, uuid, outcome) {
+    const response = await fetch(`${attestorURL}/v1/attest/${uuid}?outcome=${outcome}`);
     const event = await response.json();
     return event;
 }
@@ -68,16 +68,16 @@ async function go() {
 
     if (handleAttestors) {
         console.log("Creating Events");
-        const events = await Promise.all(oracleURLs.map(oracleURL => createEvent(oracleURL, testUUID)))
+        const events = await Promise.all(exampleAttestorURLs.map(attestorURL => createEvent(attestorURL, testUUID)))
         console.log("Created Events: ", events);
     }
     
     console.log("Fetching Offer from Protocol Wallet")
     const offerResponse = await fetchOfferFromProtocolWallet();
     console.log("Received Offer (JSON): ", offerResponse[0]);
-    console.log("Received Oracle URLs: ", offerResponse[1]);
+    console.log("Received Attestor URLs: ", offerResponse[1]);
 
-    const joinedOracleURLs = offerResponse[1].join(',');
+    const joinedAttestorURLs = offerResponse[1].join(',');
 
     // creates a new instance of the JsDLCInterface
     const dlcManager = await JsDLCInterface.new(testWalletPrivateKey, testWalletAddress, bitcoinNetwork, bitcoinNetworkURL, joinedOracleURLs);
@@ -113,7 +113,7 @@ async function runDLCFlow(dlcManager, dlcOffer) {
 
     if (handleAttestors) {
         console.log("Attesting to Events");
-        const attestations = await Promise.all(oracleURLs.map((oracleURL, index) => attest(oracleURL, testUUID, successful ? 100 : index === 0 ? 0 : 100 )))
+        const attestations = await Promise.all(exampleAttestorURLs.map((attestorURL, index) => attest(attestorURL, testUUID, successful ? 100 : index === 0 ? 0 : 100 )))
         console.log("Attestation received: ", attestations);
     }
 

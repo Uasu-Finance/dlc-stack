@@ -79,34 +79,35 @@ struct ErrorsResponse {
     status: u64,
 }
 
-fn get_oracles() -> Vec<String> {
-    let get_all_attestors_url = format!(
-        "{}/get-all-attestors",
-        env
-            ::var("BLOCKCHAIN_INTERFACE_URL")
-            .unwrap_or("https://stacks-observer-mocknet.herokuapp.com".to_string())
-    );
+fn get_attestors() -> Option<Vec<String>> {
+    let blockchain_interface_url = env
+        ::var("BLOCKCHAIN_INTERFACE_URL")
+        .expect("BLOCKCHAIN_INTERFACE_URL environment variable not set, couldn't get attestors");
+
+    let get_all_attestors_endpoint_url = format!("{}/get-all-attestors", blockchain_interface_url);
+
     let client = reqwest::blocking::Client::builder().use_rustls_tls().build();
+
     if client.is_ok() {
-        let res = client.unwrap().get(get_all_attestors_url.as_str()).send();
+        let res = client.unwrap().get(get_all_attestors_endpoint_url.as_str()).send();
 
         match res {
             Ok(res) =>
                 match res.error_for_status() {
                     Ok(_res) => {
-                        let oracles: Vec<String> = _res.json().unwrap();
-                        return oracles;
+                        let attestors: Vec<String> = _res.json().unwrap();
+                        return Some(attestors);
                     }
                     Err(e) => {
-                        info!("Error getting oracle urls: {}", e.to_string());
+                        info!("Error getting attestor urls: {}", e.to_string());
                     }
                 }
             Err(e) => {
-                info!("Error getting oracle urls: {}", e.to_string());
+                info!("Error getting attestor urls: {}", e.to_string());
             }
         }
     }
-    vec![]
+    None
 }
 
 fn get_or_generate_secret_from_config(
@@ -133,25 +134,20 @@ fn get_or_generate_secret_from_config(
 
 fn main() {
     env_logger::init();
-    let oracle_url_1: String = env
-        ::var("ORACLE_URL")
-        .unwrap_or("http://localhost:8080".to_string());
-    let oracle_url_2: String = env
-        ::var("ORACLE_URL_2")
-        .unwrap_or("http://localhost:8080".to_string());
 
-    let oracle_urls: Vec<String> = get_oracles();
-
-    if oracle_urls.len() == 0 {
-        panic!("No oracles found, couldn't setup DLC Manager");
-    }
+    let attestor_urls: Vec<String> = get_attestors().unwrap_or_else(|| {
+        panic!("No attestors received, couldn't setup DLC Manager");
+    });
 
     let funded_url: String = format!(
         "{}/funded",
         env
             ::var("BLOCKCHAIN_INTERFACE_URL")
-            .unwrap_or("https://stacks-observer-mocknet.herokuapp.com/funded".to_string())
+            .expect(
+                "BLOCKCHAIN_INTERFACE_URL environment variable not set, couldn't instantiate funded endpoint"
+            )
     );
+
     let wallet_backend_port: String = env::var("WALLET_BACKEND_PORT").unwrap_or("8085".to_string());
     let mut funded_uuids: Vec<String> = vec![];
 
@@ -188,18 +184,16 @@ fn main() {
     let static_address = wallet.get_new_address().unwrap();
 
     // Set up Oracle Client
-    let mut protocol_wallet_oracles = HashMap::new();
+    let mut protocol_wallet_attestors = HashMap::new();
 
-    for url in oracle_urls.iter().map(|url| {
-        if url.starts_with("http://") { url.to_string() } else { format!("http://{}", url) }
-    }) {
+    for url in attestor_urls.iter() {
         let p2p_client: P2PDOracleClient = retry!(
-            P2PDOracleClient::new(&url),
+            P2PDOracleClient::new(url),
             10,
             "oracle client creation"
         );
-        let oracle = Arc::new(p2p_client);
-        protocol_wallet_oracles.insert(oracle.get_public_key(), oracle.clone());
+        let attestor = Arc::new(p2p_client);
+        protocol_wallet_attestors.insert(attestor.get_public_key(), attestor.clone());
     }
 
     // Set up time provider
@@ -223,7 +217,7 @@ fn main() {
                 Arc::clone(&wallet),
                 Arc::clone(&blockchain),
                 Box::new(dlc_store),
-                protocol_wallet_oracles.clone(),
+                protocol_wallet_attestors.clone(),
                 Arc::new(time_provider),
                 Arc::clone(&blockchain)
             ).unwrap()
@@ -290,7 +284,7 @@ fn main() {
                     }
                     let req: OfferRequest = try_or_400!(rouille::input::json_input(request));
 
-                    add_access_control_headers(create_new_offer(manager.clone(), oracle_urls.clone(), protocol_wallet_oracles.values().cloned().collect(), active_network, req.uuid, req.accept_collateral, req.offer_collateral, req.total_outcomes))
+                    add_access_control_headers(create_new_offer(manager.clone(), attestor_urls.clone(), protocol_wallet_attestors.values().cloned().collect(), active_network, req.uuid, req.accept_collateral, req.offer_collateral, req.total_outcomes))
                 },
                 (OPTIONS) (/offer) => {
                     add_access_control_headers(Response::empty_204())
@@ -486,8 +480,8 @@ fn periodic_check(
 
 fn create_new_offer(
     manager: Arc<Mutex<DlcManager>>,
-    oracle_urls: Vec<String>,
-    oracles: Vec<Arc<P2PDOracleClient>>,
+    attestor_urls: Vec<String>,
+    attestors: Vec<Arc<P2PDOracleClient>>,
     active_network: bitcoin::Network,
     event_id: String,
     accept_collateral: u64,
@@ -498,7 +492,7 @@ fn create_new_offer(
         accept_collateral,
         offer_collateral,
         total_outcomes,
-        oracles.len()
+        attestors.len()
     );
     info!(
         "Creating new offer with event id: {}, accept collateral: {}, offer_collateral: {}",
@@ -509,19 +503,19 @@ fn create_new_offer(
 
     let contract_info = ContractInputInfo {
         oracles: OracleInput {
-            public_keys: oracles
+            public_keys: attestors
                 .iter()
                 .map(|o| o.get_public_key())
                 .collect(),
             event_id: event_id.clone(),
-            threshold: oracles.len() as u16,
+            threshold: attestors.len() as u16,
         },
         contract_descriptor: descriptor,
     };
 
-    for oracle in oracles {
+    for attestor in attestors {
         // check if the oracle has an event with the id of event_id
-        match oracle.get_announcement(&event_id) {
+        match attestor.get_announcement(&event_id) {
             Ok(_announcement) => (),
             Err(e) => {
                 info!("Error getting announcement: {}", event_id);
@@ -562,7 +556,7 @@ fn create_new_offer(
             .unwrap()
             .send_offer(&contract_input, STATIC_COUNTERPARTY_NODE_ID.parse().unwrap())
     {
-        Ok(dlc) => Response::json(&(dlc, oracle_urls)),
+        Ok(dlc) => Response::json(&(dlc, attestor_urls)),
         Err(e) => {
             info!("DLC manager - send offer error: {}", e.to_string());
             Response::json(
