@@ -139,14 +139,11 @@ fn main() {
         panic!("No attestors received, couldn't setup DLC Manager");
     });
 
-    let funded_url: String = format!(
-        "{}/funded",
-        env
-            ::var("BLOCKCHAIN_INTERFACE_URL")
-            .expect(
-                "BLOCKCHAIN_INTERFACE_URL environment variable not set, couldn't instantiate funded endpoint"
-            )
-    );
+    let blockchain_interface_url = env
+    ::var("BLOCKCHAIN_INTERFACE_URL")
+    .expect("BLOCKCHAIN_INTERFACE_URL environment variable not set, couldn't get attestors");
+
+    let funded_endpoint_url = format!("{}/funded", blockchain_interface_url);
 
     let wallet_backend_port: String = env::var("WALLET_BACKEND_PORT").unwrap_or("8085".to_string());
     let mut funded_uuids: Vec<String> = vec![];
@@ -237,7 +234,7 @@ fn main() {
     info!("periodic_check loop thread starting");
     thread::spawn(move || {
         loop {
-            periodic_check(manager2.clone(), funded_url.clone(), &mut funded_uuids);
+            periodic_check(manager2.clone(), funded_endpoint_url.clone(), &mut funded_uuids);
             wallet.refresh().unwrap_or_else(|e| warn!("Error refreshing wallet {e}"));
             thread::sleep(
                 Duration::from_millis(cmp::max(10, bitcoin_check_interval_seconds) * 1000)
