@@ -30,7 +30,7 @@ use dlc_manager::{
     manager::Manager,
     Blockchain, Oracle, Storage, SystemTimeProvider, Wallet,
 };
-use dlc_messages::{AcceptDlc, Message};
+use dlc_messages::{AcceptDlc, Message, oracle_msgs};
 use dlc_sled_storage_provider::SledStorageProvider;
 use electrs_blockchain_provider::ElectrsBlockchainProvider;
 use log::{debug, error, info, warn};
@@ -111,7 +111,7 @@ fn main() {
     let oracle_url_2: String =
         env::var("ORACLE_URL_2").unwrap_or("http://localhost:8080".to_string());
 
-    let oracle_urls: Vec<String> = vec![oracle_url_1.clone(), oracle_url_2.clone()];
+    let oracle_urls: Vec<String> = vec![oracle_url_1.clone()];
 
     let funded_url: String = env::var("FUNDED_URL")
         .unwrap_or("https://stacks-observer-mocknet.herokuapp.com/funded".to_string());
@@ -251,7 +251,7 @@ fn main() {
                     }
                     let req: OfferRequest = try_or_400!(rouille::input::json_input(request));
 
-                    add_access_control_headers(create_new_offer(manager.clone(), protocol_wallet_oracles.values().cloned().collect(), active_network, req.uuid, req.accept_collateral, req.offer_collateral, req.total_outcomes))
+                    add_access_control_headers(create_new_offer(manager.clone(), oracle_urls.clone(), protocol_wallet_oracles.values().cloned().collect(), active_network, req.uuid, req.accept_collateral, req.offer_collateral, req.total_outcomes))
                 },
                 (OPTIONS) (/offer) => {
                     add_access_control_headers(Response::empty_204())
@@ -447,6 +447,7 @@ fn periodic_check(
 
 fn create_new_offer(
     manager: Arc<Mutex<DlcManager>>,
+    oracle_urls:  Vec<String>,
     oracles: Vec<Arc<P2PDOracleClient>>,
     active_network: bitcoin::Network,
     event_id: String,
@@ -471,7 +472,7 @@ fn create_new_offer(
         oracles: OracleInput {
             public_keys: oracles.iter().map(|o| o.get_public_key()).collect(),
             event_id: event_id.clone(),
-            threshold: 2,
+            threshold: oracles.len() as u16,
         },
         contract_descriptor: descriptor,
     };
@@ -518,7 +519,7 @@ fn create_new_offer(
         &contract_input,
         STATIC_COUNTERPARTY_NODE_ID.parse().unwrap(),
     ) {
-        Ok(dlc) => Response::json(dlc),
+        Ok(dlc) => Response::json(&(dlc, oracle_urls)),
         Err(e) => {
             info!("DLC manager - send offer error: {}", e.to_string());
             Response::json(

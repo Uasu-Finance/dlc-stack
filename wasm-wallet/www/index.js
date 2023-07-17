@@ -10,13 +10,11 @@ const protocolWalletURL = "http://localhost:8085";
 
 const oracleURLs = [
     "https://dev-oracle.dlc.link/oracle",
-    "https://testnet.dlc.link/oracle",
+    // "https://testnet.dlc.link/oracle",
 ];
 
 const handleAttestors = true;
-const successful = false;
-
-const joinedOracleURLs = oracleURLs.join(',');
+const successful = true;
 
 const testUUID = `test${Math.floor(Math.random() * 1000)}`;
 
@@ -39,13 +37,12 @@ async function attest(oracleURL, uuid, outcome) {
     return event;
 }
 
-async function fetchOfferFromProtocolWallet(oracleUrls) {
+async function fetchOfferFromProtocolWallet() {
     let body = {
         "uuid": testUUID,
         "acceptCollateral": 10000,
         "offerCollateral": 0,
         "totalOutcomes": 100,
-        // "oraclesUrls": oracleUrls,
     };
 
     return fetch(`${protocolWalletURL}/offer`, {
@@ -69,6 +66,19 @@ async function sendAcceptedOfferToProtocolWallet(accepted_offer) {
 async function go() {
     console.log("DLC WASM Wallet Test");
 
+    if (handleAttestors) {
+        console.log("Creating Events");
+        const events = await Promise.all(oracleURLs.map(oracleURL => createEvent(oracleURL, testUUID)))
+        console.log("Created Events: ", events);
+    }
+    
+    console.log("Fetching Offer from Protocol Wallet")
+    const offerResponse = await fetchOfferFromProtocolWallet();
+    console.log("Received Offer (JSON): ", offerResponse[0]);
+    console.log("Received Oracle URLs: ", offerResponse[1]);
+
+    const joinedOracleURLs = offerResponse[1].join(',');
+
     // creates a new instance of the JsDLCInterface
     const dlcManager = await JsDLCInterface.new(testWalletPrivateKey, testWalletAddress, bitcoinNetwork, bitcoinNetworkURL, joinedOracleURLs);
 
@@ -85,30 +95,21 @@ async function go() {
     }
     
     waitForBalance(dlcManager).then(() => {
-        runDLCFlow(dlcManager);
+        runDLCFlow(dlcManager, offerResponse[0]);
     });
 }
 
-async function runDLCFlow(dlcManager) {
+async function runDLCFlow(dlcManager, dlcOffer) {
     console.log("Starting DLC flow");
 
-    if (handleAttestors) {
-        console.log("Creating Events");
-        const events = await Promise.all(oracleURLs.map(oracleURL => createEvent(oracleURL, testUUID)))
-        console.log("Created Events: ", events);
-    }
-    
-    const offer_json = await fetchOfferFromProtocolWallet(dlcManager.get_options().oracle_urls);
-    console.log("Offer (JSON): ", offer_json);
+    const acceptedContract = await dlcManager.accept_offer(JSON.stringify(dlcOffer));
+    console.log("Accepted Contract:", acceptedContract);
 
-    const accepted_contract = await dlcManager.accept_offer(JSON.stringify(offer_json))
-    console.log("Accepted Contract:", accepted_contract);
+    const signedContract = await sendAcceptedOfferToProtocolWallet(acceptedContract);
+    console.log("Signed Contract: ", signedContract);
 
-    const signed_contract = await sendAcceptedOfferToProtocolWallet(accepted_contract);
-    console.log("Signed Contract: ", signed_contract);
-
-    const tx_id = await dlcManager.countersign_and_broadcast(JSON.stringify(signed_contract))
-    console.log(`Broadcast funding transaction with TX ID: ${tx_id}`);
+    const txID = await dlcManager.countersign_and_broadcast(JSON.stringify(signedContract))
+    console.log(`Broadcast funding transaction with TX ID: ${txID}`);
 
     if (handleAttestors) {
         console.log("Attesting to Events");
