@@ -1,6 +1,7 @@
 import { JsDLCInterface } from "dlc_protocol_wallet";
 
-const testWalletPrivateKey = "f8ec31c12b6d014249935f2cb76b543b442ac2325993b44cbed4cdf773fbc8df";
+const testWalletPrivateKey =
+  "f8ec31c12b6d014249935f2cb76b543b442ac2325993b44cbed4cdf773fbc8df";
 const testWalletAddress = "bcrt1qatfjgacgqaua975r0cnsqtl09td8636jm3vnp0";
 
 const bitcoinNetwork = "regtest";
@@ -55,35 +56,38 @@ async function fetchOfferFromProtocolWallet(oracleUrls) {
     }).then(res => res.json());
 }
 
-
 async function sendAcceptedOfferToProtocolWallet(accepted_offer) {
-    return fetch(`${protocolWalletURL}/offer/accept`, {
-        method: 'put',
-        body: JSON.stringify({
-            'acceptMessage': accepted_offer
-        }),
-        headers: { 'Content-Type': 'application/json' },
-    }).then(res => res.json());
+  return fetch(`${protocolWalletURL}/offer/accept`, {
+    method: "put",
+    body: JSON.stringify({
+      acceptMessage: accepted_offer,
+    }),
+    headers: { "Content-Type": "application/json" },
+  }).then((res) => res.json());
 }
 
 async function go() {
-    console.log("DLC WASM Wallet Test");
+  console.log("DLC WASM Wallet Test");
 
-    // creates a new instance of the JsDLCInterface
-    const dlcManager = await JsDLCInterface.new(testWalletPrivateKey, testWalletAddress, bitcoinNetwork, bitcoinNetworkURL, joinedOracleURLs);
+  // creates a new instance of the JsDLCInterface
+  const dlcManager = await JsDLCInterface.new(
+    testWalletPrivateKey,
+    testWalletAddress,
+    bitcoinNetwork,
+    bitcoinNetworkURL,
+    joinedOracleURLs
+  );
 
-    console.log("DLC Manager Interface Options: ", dlcManager.get_options());
+  console.log("DLC Manager Interface Options: ", dlcManager.get_options());
 
-    async function waitForBalance(dlcManager) {
-        let balance = 0;
-        while (balance <= 0) {
-            balance = await dlcManager.get_wallet_balance();
-            console.log("DLC Wasm Wallet Balance: " + balance);
-            await new Promise(resolve => setTimeout(resolve, 5000));
-        }
-        return balance;
+  async function waitForBalance(dlcManager) {
+    let balance = 0;
+    while (balance <= 0) {
+      balance = await dlcManager.get_wallet_balance();
+      console.log("DLC Wasm Wallet Balance: " + balance);
+      await new Promise((resolve) => setTimeout(resolve, 5000));
     }
-    
+
     waitForBalance(dlcManager).then(() => {
         runDLCFlow(dlcManager);
     });
