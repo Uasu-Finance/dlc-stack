@@ -80,15 +80,15 @@ struct ErrorsResponse {
 }
 
 fn get_oracles() -> Vec<String> {
-    let get_all_attestors_url = format!("{}/get-all-attestors", env
-        ::var("BLOCKCHAIN_INTERFACE_URL")
-        .unwrap_or("https://stacks-observer-mocknet.herokuapp.com".to_string()));
+    let get_all_attestors_url = format!(
+        "{}/get-all-attestors",
+        env
+            ::var("BLOCKCHAIN_INTERFACE_URL")
+            .unwrap_or("https://stacks-observer-mocknet.herokuapp.com".to_string())
+    );
     let client = reqwest::blocking::Client::builder().use_rustls_tls().build();
     if client.is_ok() {
-        let res = client
-            .unwrap()
-            .get(get_all_attestors_url.as_str())
-            .send();
+        let res = client.unwrap().get(get_all_attestors_url.as_str()).send();
 
         match res {
             Ok(res) =>
@@ -146,9 +146,12 @@ fn main() {
         panic!("No oracles found, couldn't setup DLC Manager");
     }
 
-    let funded_url: String = format!("{}/funded", env
-        ::var("BLOCKCHAIN_INTERFACE_URL")
-        .unwrap_or("https://stacks-observer-mocknet.herokuapp.com/funded".to_string()));
+    let funded_url: String = format!(
+        "{}/funded",
+        env
+            ::var("BLOCKCHAIN_INTERFACE_URL")
+            .unwrap_or("https://stacks-observer-mocknet.herokuapp.com/funded".to_string())
+    );
     let wallet_backend_port: String = env::var("WALLET_BACKEND_PORT").unwrap_or("8085".to_string());
     let mut funded_uuids: Vec<String> = vec![];
 
@@ -187,9 +190,11 @@ fn main() {
     // Set up Oracle Client
     let mut protocol_wallet_oracles = HashMap::new();
 
-    for url in oracle_urls.iter() {
+    for url in oracle_urls.iter().map(|url| {
+        if url.starts_with("http://") { url.to_string() } else { format!("http://{}", url) }
+    }) {
         let p2p_client: P2PDOracleClient = retry!(
-            P2PDOracleClient::new(url),
+            P2PDOracleClient::new(&url),
             10,
             "oracle client creation"
         );
