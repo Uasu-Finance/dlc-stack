@@ -158,7 +158,7 @@ impl JsDLCInterface {
         // Set up DLC store
         let dlc_store = AsyncStorageApiProvider::new(
             pubkey.to_string(),
-            "https://dev-oracle.dlc.link/storage-api".to_string(),
+            "http://localhost:8100".to_string(),
         );
 
         // Set up wallet

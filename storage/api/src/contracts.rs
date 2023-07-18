@@ -7,6 +7,7 @@ use dlc_storage_reader;
 use dlc_storage_writer;
 use log::info;
 
+
 #[get("/contracts")]
 pub async fn get_contracts(
     pool: Data<DbPool>,
@@ -37,6 +38,7 @@ pub async fn get_contract(pool: Data<DbPool>, uuid: Path<String>) -> impl Respon
 #[post("/contracts")]
 pub async fn create_contract(pool: Data<DbPool>, contract: Json<NewContract>) -> impl Responder {
     let mut conn = pool.get().expect("couldn't get db connection from pool");
+    println!("create_contract called for contract: {:?}", contract);
     let contract = dlc_storage_writer::create_contract(&mut conn, contract.into_inner()).unwrap();
     HttpResponse::Ok().json(contract)
 }

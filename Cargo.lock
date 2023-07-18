@@ -1207,6 +1207,7 @@ dependencies = [
  "reqwest",
  "serde",
  "serde_json",
+ "web-sys",
 ]
 
 [[package]]
@@ -1234,6 +1235,7 @@ dependencies = [
  "rand_chacha",
  "secp256k1-zkp",
  "serde",
+ "web-sys",
 ]
 
 [[package]]
@@ -1338,6 +1340,7 @@ dependencies = [
 name = "dlc-storage-api"
 version = "0.1.0"
 dependencies = [
+ "actix-cors",
  "actix-web",
  "diesel",
  "diesel_migrations",
@@ -1349,6 +1352,7 @@ dependencies = [
  "log",
  "serde",
  "serde_json",
+ "web-sys",
 ]
 
 [[package]]
