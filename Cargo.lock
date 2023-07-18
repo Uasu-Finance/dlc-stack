@@ -1235,7 +1235,6 @@ dependencies = [
  "rand_chacha",
  "secp256k1-zkp",
  "serde",
- "web-sys",
 ]
 
 [[package]]
@@ -1352,7 +1351,6 @@ dependencies = [
  "log",
  "serde",
  "serde_json",
- "web-sys",
 ]
 
 [[package]]

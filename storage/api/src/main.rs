@@ -41,7 +41,6 @@ async fn main() -> std::io::Result<()> {
             .app_data(Data::new(pool.clone()))
             .app_data(
                 web::JsonConfig::default().error_handler(|err, _req| {
-                    println!("request is {:?}", _req);
                     error::InternalError
                         ::from_response(
                             "",

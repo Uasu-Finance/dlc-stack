@@ -7,7 +7,6 @@ use dlc_storage_reader;
 use dlc_storage_writer;
 use log::info;
 
-
 #[get("/contracts")]
 pub async fn get_contracts(
     pool: Data<DbPool>,

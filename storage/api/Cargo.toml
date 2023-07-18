@@ -20,10 +20,3 @@ serde = { version = "1.0.137", features = ["derive"] }
 serde_json = "1.0.81"
 env_logger = "0.9.0"
 log = "0.4.17"
-
-[dependencies.web-sys]
-version = "0.3"
-features = [
-  "console",
-]
-
