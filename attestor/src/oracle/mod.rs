@@ -1,4 +1,4 @@
-use secp256k1_zkp::{All, KeyPair, Secp256k1, SecretKey};
+use secp256k1_zkp::{All, KeyPair, Secp256k1, SecretKey, XOnlyPublicKey as SchnorrPublicKey};
 use serde::{Deserialize, Serialize};
 
 mod error;
@@ -7,7 +7,7 @@ use crate::oracle::handler::EventHandler;
 pub use error::OracleError;
 pub use error::Result;
 
-#[derive(Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct DbValue(
     pub Option<Vec<SecretKey>>, // outstanding_sk_nonces?
     pub Vec<u8>,                // announcement
@@ -30,7 +30,11 @@ impl Oracle {
         storage_api_enabled: bool,
         storage_api_endpoint: String,
     ) -> Result<Oracle> {
-        let event_handler = EventHandler::new(storage_api_enabled, storage_api_endpoint);
+        let event_handler = EventHandler::new(
+            storage_api_enabled,
+            storage_api_endpoint,
+            SchnorrPublicKey::from_keypair(&key_pair).0.to_string(),
+        );
 
         Ok(Oracle {
             event_handler,

@@ -11,6 +11,8 @@ use secp256k1_zkp::{
     hashes::*, All, KeyPair, Message, Secp256k1, SecretKey, XOnlyPublicKey as SchnorrPublicKey,
 };
 use std::io::Cursor;
+use std::str::FromStr;
+use web_sys::console::warn;
 
 use serde::{Deserialize, Serialize};
 
@@ -45,15 +47,27 @@ pub struct Attestor {
 
 #[wasm_bindgen]
 impl Attestor {
-    pub async fn new(storage_api_enabled: bool, storage_api_endpoint: String) -> Attestor {
+    pub async fn new(
+        storage_api_enabled: bool,
+        storage_api_endpoint: String,
+        secret_key: String,
+    ) -> Attestor {
         clog!(
-            "[WASM-ATTESTOR]: Creating new attestor with storage_api_enabled: {}, storage_api_endpoint: {}",
+            "[WASM-ATTESTOR]: Creating new attestor with storage_api_enabled: {}, storage_api_endpoint: {}, secret_key: {:?}",
             storage_api_enabled,
-            storage_api_endpoint
+            storage_api_endpoint,
+            secret_key
         );
+
         let secp = Secp256k1::new();
-        let new_key = secp.generate_keypair(&mut rand::thread_rng()).0;
-        let key_pair = KeyPair::from_secret_key(&secp, &new_key);
+        let key = match SecretKey::from_str(&secret_key) {
+            Ok(key) => key,
+            Err(_) => {
+                clog!("[WASM-ATTESTOR] Invalid secret key provided, shutting down");
+                panic!("Invalid secret key provided");
+            }
+        };
+        let key_pair = KeyPair::from_secret_key(&secp, &key);
         let oracle =
             Oracle::new(key_pair, secp, storage_api_enabled, storage_api_endpoint).unwrap();
         Attestor { oracle }
@@ -106,21 +120,38 @@ impl Attestor {
     pub async fn attest(&mut self, uuid: String, outcome: u64) {
         clog!("[WASM-ATTESTOR] retrieving oracle event with uuid {}", uuid);
         let mut event: DbValue;
+
         if self.oracle.event_handler.storage_api.is_some() {
-            let event_vec = match self
+            let res = match self
                 .oracle
                 .event_handler
                 .storage_api
                 .as_ref()
-                .unwrap()
+                .expect("Storage API connection to initialize properly")
                 .get(uuid.clone())
                 .await
-                .unwrap()
             {
+                Ok(val) => val,
+                Err(e) => {
+                    clog!(
+                        "[WASM-ATTESTOR] Error retrieving event from StorageAPI: {:?}",
+                        e
+                    );
+                    panic!();
+                }
+            };
+            let event_vec = match res {
                 Some(val) => val,
-                None => panic!(), // None => return Err(AttestorError::OracleEventNotFoundError(uuid).into()),
+                None => {
+                    clog!(
+                        "[WASM-ATTESTOR] Event missing in StorageAPI with uuid: {}",
+                        uuid
+                    );
+                    panic!();
+                }
             };
             event = serde_json::from_str(&String::from_utf8_lossy(&event_vec)).unwrap();
+            clog!("[WASM-ATTESTOR] Got event from StorageAPI: {:?}", event);
         } else {
             let event_ivec = match self
                 .oracle
@@ -133,10 +164,10 @@ impl Attestor {
                 .unwrap()
             {
                 Some(val) => val,
-                // None => return Err(AttestorError::OracleEventNotFoundError(uuid).into()),
                 None => panic!(),
             };
             event = serde_json::from_str(&String::from_utf8_lossy(&event_ivec)).unwrap();
+            clog!("[WASM-ATTESTOR] Got event from MemoryAPI: {:?}", event);
         }
 
         let outstanding_sk_nonces = event.clone().0.unwrap();
@@ -173,19 +204,33 @@ impl Attestor {
         let new_event = serde_json::to_string(&event).unwrap().into_bytes();
 
         if self.oracle.event_handler.storage_api.is_some() {
-            let _insert_event = match self
+            let res = match self
                 .oracle
                 .event_handler
                 .storage_api
                 .as_ref()
-                .unwrap()
-                .insert(uuid, new_event.clone())
+                .expect("Storage API connection to initialize properly")
+                .insert(uuid.clone(), new_event.clone())
                 .await
-                .unwrap()
             {
+                Ok(val) => val,
+                Err(e) => {
+                    clog!(
+                        "[WASM-ATTESTOR] Error inserting event to StorageAPI: {:?}",
+                        e
+                    );
+                    panic!();
+                }
+            };
+            let _insert_event = match res {
                 Some(val) => val,
-                // None => return Err(AttestorError::OracleEventNotFoundError(uuid).into()),
-                None => panic!(),
+                None => {
+                    clog!(
+                        "[WASM-ATTESTOR] Event was unable to update in StorageAPI with uuid: {}",
+                        uuid
+                    );
+                    panic!();
+                }
             };
         } else {
             let _insert_event = match self
