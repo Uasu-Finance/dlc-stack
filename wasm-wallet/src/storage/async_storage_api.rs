@@ -1,4 +1,7 @@
-use dlc_clients::{ApiError, NewContract, StorageApiClient, UpdateContract};
+use dlc_clients::{
+    ApiError, ContractRequestParams, ContractsRequestParams, NewContract, StorageApiClient,
+    UpdateContract,
+};
 use dlc_link_manager::AsyncStorage;
 use dlc_manager::contract::offered_contract::OfferedContract;
 use dlc_manager::contract::signed_contract::SignedContract;
@@ -33,7 +36,11 @@ impl AsyncStorageApiProvider {
     pub async fn get_contracts_by_state(&self, state: String) -> Result<Vec<Contract>, Error> {
         let contracts_res: Result<Vec<dlc_clients::Contract>, ApiError> = self
             .client
-            .get_contracts_by_state(state.clone(), self.key.clone())
+            .get_contracts(ContractsRequestParams {
+                state: Some(state),
+                key: self.key.clone(),
+                uuid: None,
+            })
             .await;
         let mut contents: Vec<String> = vec![];
         let mut contracts: Vec<Contract> = vec![];
@@ -53,8 +60,13 @@ impl AsyncStorage for AsyncStorageApiProvider {
     async fn get_contract(&self, id: &ContractId) -> Result<Option<Contract>, Error> {
         let cid = get_contract_id_string(*id);
         info!("Get contract by id - {}", cid.clone());
-        let contract_res: Result<Option<dlc_clients::Contract>, ApiError> =
-            self.client.get_contract(cid.clone()).await;
+        let contract_res: Result<Option<dlc_clients::Contract>, ApiError> = self
+            .client
+            .get_contract(ContractRequestParams {
+                key: self.key.clone(),
+                uuid: cid.clone(),
+            })
+            .await;
         if let Some(res) = contract_res.map_err(to_storage_error)? {
             let bytes = base64::decode(res.content).unwrap();
             let contract = deserialize_contract(&bytes)?;
@@ -66,8 +78,14 @@ impl AsyncStorage for AsyncStorageApiProvider {
     }
 
     async fn get_contracts(&self) -> Result<Vec<Contract>, Error> {
-        let contracts_res: Result<Vec<dlc_clients::Contract>, ApiError> =
-            self.client.get_contracts(self.key.clone()).await;
+        let contracts_res: Result<Vec<dlc_clients::Contract>, ApiError> = self
+            .client
+            .get_contracts(ContractsRequestParams {
+                key: self.key.clone(),
+                uuid: None,
+                state: None,
+            })
+            .await;
         let mut contents: Vec<String> = vec![];
         let mut contracts: Vec<Contract> = vec![];
         let unpacked_contracts = contracts_res.map_err(to_storage_error)?;
@@ -160,8 +178,13 @@ impl AsyncStorage for AsyncStorageApiProvider {
             contract_id.clone(),
             curr_state.clone()
         );
-        let contract_res: Result<Option<dlc_clients::Contract>, ApiError> =
-            self.client.get_contract(contract_id.clone()).await;
+        let contract_res: Result<Option<dlc_clients::Contract>, ApiError> = self
+            .client
+            .get_contract(ContractRequestParams {
+                key: self.key.clone(),
+                uuid: contract_id.clone(),
+            })
+            .await;
         let unw_contract = match contract_res {
             Ok(res) => {
                 info!(
@@ -196,13 +219,12 @@ impl AsyncStorage for AsyncStorageApiProvider {
             );
             let update_res = self
                 .client
-                .update_contract(
-                    contract_id.clone(),
-                    UpdateContract {
-                        state: Some(curr_state.clone()),
-                        content: Some(encoded_content),
-                    },
-                )
+                .update_contract(UpdateContract {
+                    state: Some(curr_state.clone()),
+                    content: Some(encoded_content),
+                    key: self.key.clone(),
+                    uuid: contract_id.clone(),
+                })
                 .await;
             match update_res {
                 Ok(_) => {
