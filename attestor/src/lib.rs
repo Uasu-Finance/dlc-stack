@@ -119,7 +119,6 @@ impl Attestor {
 
     pub async fn attest(&mut self, uuid: String, outcome: u64) {
         clog!("[WASM-ATTESTOR] retrieving oracle event with uuid {}", uuid);
-
         let mut event: DbValue;
 
         if self.oracle.event_handler.storage_api.is_some() {

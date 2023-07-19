@@ -12,6 +12,7 @@ dlc-storage-common = { path = "../common" }
 dlc-storage-reader = { path = "../reader" }
 dlc-storage-writer = { path = "../writer" }
 actix-web = "4"
+actix-cors = "0.6.4"
 diesel = { version = "2.0.0", features = ["postgres", "r2d2"] }
 diesel_migrations = { version = "2.0.0", features = ["postgres"] }
 dotenv = "0.15.0"

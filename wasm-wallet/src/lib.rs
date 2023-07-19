@@ -1,3 +1,4 @@
+#![feature(async_fn_in_trait)]
 #![allow(unreachable_code)]
 extern crate console_error_panic_hook;
 extern crate log;
@@ -9,6 +10,7 @@ use wasm_bindgen::prelude::*;
 use lightning::util::ser::Readable;
 
 use secp256k1_zkp::hashes::*;
+use secp256k1_zkp::Secp256k1;
 
 use core::panic;
 use std::{
@@ -27,7 +29,8 @@ use dlc_link_manager::{AsyncStorage, Manager};
 
 use std::fmt::Write as _;
 
-use dlc_memory_storage_provider::DlcMemoryStorageProvider;
+use storage::async_storage_api::AsyncStorageApiProvider;
+// use dlc_memory_storage_provider::DlcMemoryStorageProvider;
 use log::info;
 
 use esplora_async_blockchain_provider::EsploraAsyncBlockchainProvider;
@@ -38,6 +41,7 @@ use oracle_client::P2PDOracleClient;
 use serde::{Deserialize, Serialize};
 
 mod oracle_client;
+mod storage;
 mod utils;
 #[macro_use]
 mod macros;
@@ -45,7 +49,7 @@ mod macros;
 type DlcManager = Manager<
     Arc<JSInterfaceWallet>,
     Arc<EsploraAsyncBlockchainProvider>,
-    Box<DlcMemoryStorageProvider>,
+    Box<AsyncStorageApiProvider>,
     Arc<P2PDOracleClient>,
     Arc<SystemTimeProvider>,
 >;
@@ -140,11 +144,22 @@ impl JsDLCInterface {
             EsploraAsyncBlockchainProvider::new(options.electrs_url.to_string(), active_network),
         );
 
-        // Set up DLC store
-        let store = DlcMemoryStorageProvider::new();
-
         // Generate keypair from secret key
         let seckey = secp256k1_zkp::SecretKey::from_str(&privkey).unwrap();
+
+        let secp = Secp256k1::new();
+
+        // let pubkey = PublicKey::from_secret_key(&secp, &seckey);
+        let pubkey =
+            bitcoin::PublicKey::from_private_key(&secp, &PrivateKey::new(seckey, active_network));
+
+        info!("Starting DLC Manager with pubkey: {}", pubkey.to_string());
+
+        // Set up DLC store
+        let dlc_store = AsyncStorageApiProvider::new(
+            pubkey.to_string(),
+            "http://localhost:8100".to_string(),
+        );
 
         // Set up wallet
         let wallet = Arc::new(JSInterfaceWallet::new(
@@ -174,7 +189,7 @@ impl JsDLCInterface {
             Manager::new(
                 Arc::clone(&wallet),
                 Arc::clone(&blockchain),
-                Box::new(store),
+                Box::new(dlc_store),
                 oracles,
                 Arc::new(time_provider),
             )
