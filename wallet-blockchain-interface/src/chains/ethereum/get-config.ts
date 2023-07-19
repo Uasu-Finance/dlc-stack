@@ -6,12 +6,11 @@ import { DeploymentInfo } from '../shared/models/deployment-info.interface.js';
 import fs from 'fs';
 import { WrappedContract } from '../shared/models/wrapped-contract.interface.js';
 
-async function fetchDeploymentInfo(subchain: string, version: string): Promise<DeploymentInfo> {
-    // TODO: versioning the deployment files
+async function fetchDeploymentInfo(subchain: string, version: string, branch: string): Promise<DeploymentInfo> {
     const contract = 'DlcManager';
     try {
         const response = await fetch(
-            `https://raw.githubusercontent.com/DLC-link/dlc-solidity/master/deploymentFiles/${subchain}/${contract}.json`
+            `https://raw.githubusercontent.com/DLC-link/dlc-solidity/${branch}/deploymentFiles/${subchain}/v${version}/${contract}.json`
         );
         return await response.json();
     } catch (error) {
@@ -36,17 +35,17 @@ export default async (config: ConfigSet): Promise<WrappedContract> => {
 
     switch (config.chain) {
         case 'ETH_MAINNET':
-            deploymentInfo = await fetchDeploymentInfo('mainnet', config.version);
+            deploymentInfo = await fetchDeploymentInfo('mainnet', config.version, config.branch);
             provider = new WebSocketProvider(`wss://mainnet.infura.io/ws/v3/${config.apiKey}`);
             wallet = new ethers.Wallet(config.privateKey, provider);
             break;
         case 'ETH_SEPOLIA':
-            deploymentInfo = await fetchDeploymentInfo('sepolia', config.version);
+            deploymentInfo = await fetchDeploymentInfo('sepolia', config.version, config.branch);
             provider = new WebSocketProvider(`wss://sepolia.infura.io/ws/v3/${config.apiKey}`);
             wallet = new ethers.Wallet(config.privateKey, provider);
             break;
         case 'ETH_GOERLI':
-            deploymentInfo = await fetchDeploymentInfo('goerli', config.version);
+            deploymentInfo = await fetchDeploymentInfo('goerli', config.version, config.branch);
             provider = new WebSocketProvider(`wss://goerli.infura.io/ws/v3/${config.apiKey}`);
             wallet = new ethers.Wallet(config.privateKey, provider);
             break;

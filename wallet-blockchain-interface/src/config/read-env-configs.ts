@@ -8,6 +8,7 @@ export default (): ConfigSet => {
     let version = process.env.VERSION as string;
     let privateKey = process.env.PRIVATE_KEY as string;
     let apiKey = process.env.API_KEY as string;
+    let branch = (process.env.BRANCH as string) || 'master';
 
     // Throw an error if one of the set is missing
     if (!chain || !version || !privateKey || !apiKey)
@@ -18,5 +19,6 @@ export default (): ConfigSet => {
         version: version,
         privateKey: privateKey,
         apiKey: apiKey,
+        branch: branch,
     };
 };

@@ -3,6 +3,7 @@ export interface ConfigSet {
     version: string;
     privateKey: string;
     apiKey: string;
+    branch: string;
 }
 
 export type EthChain = 'ETH_MAINNET' | 'ETH_SEPOLIA' | 'ETH_GOERLI' | 'ETH_LOCAL';
