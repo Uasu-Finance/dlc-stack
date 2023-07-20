@@ -84,7 +84,7 @@ fn get_json(path: &str) -> Result<Value, DlcManagerError> {
 }
 
 fn pubkey_path(host: &str) -> String {
-    format!("{}{}", host, "public-key")
+    format!("{}{}", host, "publickey")
 }
 
 fn announcement_path(host: &str, event_id: &str) -> String {

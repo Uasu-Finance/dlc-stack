@@ -25,9 +25,9 @@ router.get('/events', async (req, res) => {
   res.status(200).send(data);
 });
 
-router.get('/public-key', async (req, res) => {
+router.get('/publickey', async (req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
-  console.log('GET /public-key');
+  console.log('GET /publickey');
   const data = await AttestorService.getPublicKey();
   res.status(200).send(data);
 });
