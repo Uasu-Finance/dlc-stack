@@ -3,7 +3,7 @@
 extern crate console_error_panic_hook;
 extern crate log;
 
-use bitcoin::{Network, PrivateKey};
+use bitcoin::{Network, PrivateKey, XOnlyPublicKey};
 use dlc_messages::{Message, OfferDlc, SignDlc};
 use wasm_bindgen::prelude::*;
 
@@ -39,12 +39,27 @@ use js_interface_wallet::JSInterfaceWallet;
 
 use oracle_client::P2PDOracleClient;
 use serde::{Deserialize, Serialize};
+use serde_json::{json, Value};
 
 mod oracle_client;
 mod storage;
 mod utils;
 #[macro_use]
 mod macros;
+
+async fn generate_p2pd_clients(
+    attestor_urls: Vec<String>,
+) -> HashMap<XOnlyPublicKey, Arc<P2PDOracleClient>> {
+    let mut attestor_clients = HashMap::new();
+
+    for url in attestor_urls.iter() {
+        let p2p_client: P2PDOracleClient =
+            P2PDOracleClient::new(url).await.expect("Error creating oracle client");
+        let attestor = Arc::new(p2p_client);
+        attestor_clients.insert(attestor.get_public_key(), attestor.clone());
+    }
+    return attestor_clients;
+}
 
 type DlcManager = Manager<
     Arc<JSInterfaceWallet>,
@@ -90,7 +105,7 @@ pub struct JsDLCInterface {
 // #[wasm_bindgen]
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct JsDLCInterfaceOptions {
-    joined_oracle_urls: String,
+    attestor_urls: String,
     network: String,
     electrs_url: String,
     address: String,
@@ -100,7 +115,7 @@ impl Default for JsDLCInterfaceOptions {
     // Default values for Manager Options
     fn default() -> Self {
         Self {
-            joined_oracle_urls: "https://dev-oracle.dlc.link/oracle".to_string(),
+            attestor_urls: "https://dev-oracle.dlc.link/oracle".to_string(),
             network: "regtest".to_string(),
             electrs_url: "https://dev-oracle.dlc.link/electrs".to_string(),
             address: "".to_string(),
@@ -115,21 +130,21 @@ impl JsDLCInterface {
         address: String,
         network: String,
         electrs_url: String,
-        joined_oracle_urls: String,
+        attestor_urls: String,
     ) -> JsDLCInterface {
         console_error_panic_hook::set_once();
 
         clog!(
-            "Received JsDLCInterface parameters: privkey={}, address={}, network={}, electrs_url={}, oracle_urls={}",
+            "Received JsDLCInterface parameters: privkey={}, address={}, network={}, electrs_url={}, attestor_urls={}",
             privkey,
             address,
             network,
             electrs_url,
-            joined_oracle_urls
+            attestor_urls
         );
 
         let options = JsDLCInterfaceOptions {
-            joined_oracle_urls,
+            attestor_urls,
             network,
             electrs_url,
             address,
@@ -168,19 +183,17 @@ impl JsDLCInterface {
             PrivateKey::new(seckey, active_network),
         ));
 
-        let oracle_urls: Vec<&str> = options.joined_oracle_urls.split(',').collect();
-
         // Set up Oracle Clients
-        let mut oracles: HashMap<bitcoin::XOnlyPublicKey, Arc<P2PDOracleClient>> = HashMap::new();
+        let attestor_urls_vec: Vec<String> = match serde_json::from_str(&options.attestor_urls.clone()) {
+            Ok(vec) => vec,
+            Err(e) => {
+                eprintln!("Error deserializing Attestor URLs: {}", e);
+                Vec::new()
+            }
+        };
 
-        for url in oracle_urls {
-            let p2p_client: P2PDOracleClient = P2PDOracleClient::new(url)
-                .await
-                .expect("To be able to connect to the oracle");
+        let attestors = generate_p2pd_clients(attestor_urls_vec).await;
 
-            let oracle = Arc::new(p2p_client);
-            oracles.insert(oracle.get_public_key(), oracle.clone());
-        }
         // Set up time provider
         let time_provider = SystemTimeProvider {};
 
@@ -190,7 +203,7 @@ impl JsDLCInterface {
                 Arc::clone(&wallet),
                 Arc::clone(&blockchain),
                 Box::new(dlc_store),
-                oracles,
+                attestors,
                 Arc::new(time_provider),
             )
             .unwrap(),
