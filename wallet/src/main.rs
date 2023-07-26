@@ -310,7 +310,7 @@ fn main() {
 
                             let bitcoin_contract_attestors: HashMap<XOnlyPublicKey, Arc<P2PDOracleClient>> = generate_p2pd_clients(bitcoin_contract_attestor_urls.clone());
 
-                            add_access_control_headers(create_new_offer(manager.clone(), attestor_urls.clone(), bitcoin_contract_attestors.values().cloned().collect(), active_network, req.uuid, req.accept_collateral, req.offer_collateral, req.total_outcomes))
+                            add_access_control_headers(create_new_offer(manager.clone(), bitcoin_contract_attestors.values().cloned().collect(), active_network, req.uuid, req.accept_collateral, req.offer_collateral, req.total_outcomes))
                         },
                         (OPTIONS) (/offer) => {
                             add_access_control_headers(Response::empty_204())
@@ -506,7 +506,6 @@ fn periodic_check(
 
 fn create_new_offer(
     manager: Arc<Mutex<DlcManager>>,
-    attestor_urls: Vec<String>,
     attestors: Vec<Arc<P2PDOracleClient>>,
     active_network: bitcoin::Network,
     event_id: String,
@@ -578,7 +577,7 @@ fn create_new_offer(
         &contract_input,
         STATIC_COUNTERPARTY_NODE_ID.parse().unwrap(),
     ) {
-        Ok(dlc) => Response::json(&(dlc, attestor_urls)),
+        Ok(dlc) => Response::json(&(dlc)),
         Err(e) => {
             info!("DLC manager - send offer error: {}", e.to_string());
             Response::json(
