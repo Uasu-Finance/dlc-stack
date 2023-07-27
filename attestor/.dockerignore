@@ -7,3 +7,5 @@ README.md
 events
 target
 docker/
+node_modules/
+deploymentFiles
