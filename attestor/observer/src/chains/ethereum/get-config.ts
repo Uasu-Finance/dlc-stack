@@ -6,11 +6,12 @@ import { DeploymentInfo } from '../shared/models/deployment-info.interface.js';
 import fs from 'fs';
 
 async function fetchDeploymentInfo(subchain: string, version: string): Promise<DeploymentInfo> {
-  // TODO: versioning the deployment files
   const contract = 'DlcManager';
+  const branch = process.env.BRANCH || 'master';
+  console.log(`Fetching deployment info for ${contract} on ${subchain} from dlc-solidity/${branch}`);
   try {
     const response = await fetch(
-      `https://raw.githubusercontent.com/DLC-link/dlc-solidity/master/deploymentFiles/${subchain}/${contract}.json`
+      `https://raw.githubusercontent.com/DLC-link/dlc-solidity/${branch}/deploymentFiles/${subchain}/v${version}/${contract}.json`
     );
     return await response.json();
   } catch (error) {
@@ -34,21 +35,21 @@ export default async (
 > => {
   switch (config.chain) {
     case 'ETH_MAINNET':
-      if (!config.apiKey) throw new Error(`API_KEY is required for ${config.chain}.`);
+      if (!config.api_key) throw new Error(`API_KEY is required for ${config.chain}.`);
       return {
-        provider: new WebSocketProvider(`wss://mainnet.infura.io/ws/v3/${config.apiKey}`),
+        provider: new WebSocketProvider(`wss://mainnet.infura.io/ws/v3/${config.api_key}`),
         deploymentInfo: await fetchDeploymentInfo('mainnet', config.version),
       };
     case 'ETH_SEPOLIA':
-      if (!config.apiKey) throw new Error(`API_KEY is required for ${config.chain}.`);
+      if (!config.api_key) throw new Error(`API_KEY is required for ${config.chain}.`);
       return {
-        provider: new WebSocketProvider(`wss://sepolia.infura.io/ws/v3/${config.apiKey}`),
+        provider: new WebSocketProvider(`wss://sepolia.infura.io/ws/v3/${config.api_key}`),
         deploymentInfo: await fetchDeploymentInfo('sepolia', config.version),
       };
     case 'ETH_GOERLI':
-      if (!config.apiKey) throw new Error(`API_KEY is required for ${config.chain}.`);
+      if (!config.api_key) throw new Error(`API_KEY is required for ${config.chain}.`);
       return {
-        provider: new WebSocketProvider(`wss://goerli.infura.io/ws/v3/${config.apiKey}`),
+        provider: new WebSocketProvider(`wss://goerli.infura.io/ws/v3/${config.api_key}`),
         deploymentInfo: await fetchDeploymentInfo('goerli', config.version),
       };
     case 'ETH_LOCAL':
