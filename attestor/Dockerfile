@@ -39,10 +39,13 @@ WORKDIR /app/attestor
 
 COPY --from=attestor-build /app/attestor/observer/dist /app/attestor/observer/dist
 COPY --from=attestor-build /app/attestor/observer/package.json /app/attestor/observer/package.json
+COPY --from=attestor-build /app/attestor/observer/tsconfig.json /app/attestor/observer/tsconfig.json
 COPY --from=attestor-build /app/attestor/observer/node_modules /app/attestor/observer/node_modules
 COPY --from=attestor-build /app/attestor/pkg /app/attestor/pkg
 COPY --from=attestor-build /app/attestor/observer/.env /app/attestor/observer/.env
 
+RUN mkdir ./config
+
 WORKDIR /app/attestor/observer
 
-CMD ["npm", "run", "run"]
+CMD if [ "$NODE_ENV" = "development" ] ; then npm run dev ; else npm run run ; fi

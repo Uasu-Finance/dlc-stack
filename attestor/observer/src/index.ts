@@ -16,6 +16,8 @@ async function testAttestorService() {
 }
 
 async function main() {
+  await AttestorService.init();
+
   // Set up necessary polyfills
   setupPolyfills();
 

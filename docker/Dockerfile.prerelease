@@ -19,21 +19,6 @@ RUN npm run build
 EXPOSE 3000
 CMD [ "node", "dist/src/index.js" ]
 
-# Build Attestor
-FROM node:16-alpine AS attestor-build
-
-WORKDIR /app/attestor
-RUN apk add --no-cache curl jq bash build-base && \
-  curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y && \
-  source $HOME/.cargo/env && \
-  curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
-
-COPY ./attestor/observer/package*.json ./observer/
-RUN cd observer && npm install
-COPY ./attestor/ .
-
-RUN ["bash", "./observer/build_all.sh"]
-
 # Final Image
 FROM debian:bullseye-slim AS dlc-link-stack
 RUN apt-get update && apt-get install -y openssl libpq-dev ca-certificates && apt-get clean
@@ -44,8 +29,6 @@ COPY --from=rust-build /app/dlc-stack/target/release/storage-api /app/storage-ap
 COPY --from=rust-build /app/dlc-stack/target/release/dlc-protocol-wallet /app/dlc-protocol-wallet
 
 COPY --from=BI-build /app/blockchain-interface /app/blockchain-interface
-
-COPY --from=attestor-build /app/attestor/observer/dist /app/attestor/observer/dist
 
 WORKDIR /app
 CMD ["/app/storage-api"]

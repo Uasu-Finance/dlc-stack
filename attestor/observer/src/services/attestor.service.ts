@@ -33,13 +33,20 @@ export default class AttestorService {
   private constructor() {}
 
   public static async getAttestor(): Promise<Attestor> {
-    if (!this.attestor)
+    if (!this.attestor) {
       this.attestor = await Attestor.new(
         getEnv('STORAGE_API_ENABLED') === 'true',
         getEnv('STORAGE_API_ENDPOINT'),
         await getOrGenerateSecretFromConfig(`../config/${getEnv('SECRET_KEY_FILE') as string}`)
       );
+      console.log('Attestor created');
+    }
+    console.log('Attestor public key:', await this.attestor.get_pubkey());
     return this.attestor;
+  }
+
+  public static async init() {
+    await this.getAttestor();
   }
 
   public static async createAnnouncement(uuid: string, maturation?: string) {
