@@ -14,7 +14,6 @@ COPY ./clients/ /app/clients
 COPY ./attestor/observer/src /app/attestor/observer/src
 COPY ./attestor/observer/package.json /app/attestor/observer/package.json
 COPY ./attestor/observer/tsconfig.json /app/attestor/observer/tsconfig.json
-COPY ./attestor/observer/.env /app/attestor/observer/.env
 COPY ./attestor/src /app/attestor/src
 COPY ./attestor/Cargo.toml /app/attestor/Cargo.toml
 
@@ -42,7 +41,6 @@ COPY --from=attestor-build /app/attestor/observer/package.json /app/attestor/obs
 COPY --from=attestor-build /app/attestor/observer/tsconfig.json /app/attestor/observer/tsconfig.json
 COPY --from=attestor-build /app/attestor/observer/node_modules /app/attestor/observer/node_modules
 COPY --from=attestor-build /app/attestor/pkg /app/attestor/pkg
-COPY --from=attestor-build /app/attestor/observer/.env /app/attestor/observer/.env
 
 RUN mkdir ./config
 
