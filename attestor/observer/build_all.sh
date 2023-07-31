@@ -3,6 +3,8 @@
 # Change to the directory of the current script
 cd "$(dirname "$0")"
 
+npm i
+
 # Building wasm in the folder above
 AR=/opt/homebrew/opt/llvm/bin/llvm-ar CC=/opt/homebrew/opt/llvm/bin/clang wasm-pack build --target bundler ..
 
