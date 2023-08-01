@@ -8,8 +8,8 @@ use dlc_manager::contract::signed_contract::SignedContract;
 use dlc_manager::contract::{Contract, PreClosedContract};
 use dlc_manager::error::Error;
 use dlc_manager::ContractId;
-use log::{debug, info, warn};
 
+use crate::log_to_console;
 use crate::storage::utils::{get_contract_id_string, to_storage_error};
 
 use super::utils::{deserialize_contract, get_contract_state_str, serialize_contract};
@@ -21,7 +21,7 @@ pub struct AsyncStorageApiProvider {
 
 impl AsyncStorageApiProvider {
     pub fn new(key: String, storage_api_endpoint: String) -> Self {
-        info!("Creating storage API provider");
+        log_to_console!("Creating storage API provider");
         Self {
             client: StorageApiClient::new(storage_api_endpoint),
             key,
@@ -30,7 +30,7 @@ impl AsyncStorageApiProvider {
 
     // TODO: For testing only, delete later
     pub async fn delete_contracts(&self) {
-        info!("Delete all contracts by storage api ...");
+        log_to_console!("Delete all contracts by storage api ...");
         let _res = self.client.delete_contracts(self.key.clone());
     }
 
@@ -60,7 +60,7 @@ impl AsyncStorageApiProvider {
 impl AsyncStorage for AsyncStorageApiProvider {
     async fn get_contract(&self, id: &ContractId) -> Result<Option<Contract>, Error> {
         let cid = get_contract_id_string(*id);
-        info!("Get contract by id - {}", cid.clone());
+        log_to_console!("Get contract by id - {}", cid.clone());
         let contract_res: Result<Option<dlc_clients::Contract>, ApiError> = self
             .client
             .get_contract(ContractRequestParams {
@@ -73,7 +73,7 @@ impl AsyncStorage for AsyncStorageApiProvider {
             let contract = deserialize_contract(&bytes)?;
             Ok(Some(contract))
         } else {
-            info!("Contract not found with id: {}", cid.clone());
+            log_to_console!("Contract not found with id: {}", cid.clone());
             Ok(None)
         }
     }
@@ -104,7 +104,7 @@ impl AsyncStorage for AsyncStorageApiProvider {
     async fn create_contract(&self, contract: &OfferedContract) -> Result<(), Error> {
         let data = serialize_contract(&Contract::Offered(contract.clone()))?;
         let uuid = get_contract_id_string(contract.id);
-        info!(
+        log_to_console!(
             "Create new contract with contract id {} and key {}",
             uuid.clone(),
             self.key.clone()
@@ -118,14 +118,14 @@ impl AsyncStorage for AsyncStorageApiProvider {
         let res = self.client.create_contract(req).await;
         match res {
             Ok(_) => {
-                info!(
+                log_to_console!(
                     "Contract has been successfully created with id {} and state 'offered'",
                     uuid.clone()
                 );
                 return Ok(());
             }
             Err(err) => {
-                info!("Contract creation has failed with id {}", uuid.clone());
+                log_to_console!("Contract creation has failed with id {}", uuid.clone());
                 return Err(to_storage_error(err));
             }
         }
@@ -133,7 +133,7 @@ impl AsyncStorage for AsyncStorageApiProvider {
 
     async fn delete_contract(&self, id: &ContractId) -> Result<(), Error> {
         let cid = get_contract_id_string(*id);
-        info!("Delete contract with contract id {}", cid.clone());
+        log_to_console!("Delete contract with contract id {}", cid.clone());
         let res = self
             .client
             .delete_contract(ContractRequestParams {
@@ -143,14 +143,14 @@ impl AsyncStorage for AsyncStorageApiProvider {
             .await;
         match res {
             Ok(r) => {
-                info!(
+                log_to_console!(
                     "Contract has been successfully deleted with id {}",
                     cid.clone()
                 );
                 return Ok(r);
             }
             Err(err) => {
-                info!("Contract deletion has been failed with id {}", cid.clone());
+                log_to_console!("Contract deletion has been failed with id {}", cid.clone());
                 return Err(to_storage_error(err));
             }
         }
@@ -159,7 +159,7 @@ impl AsyncStorage for AsyncStorageApiProvider {
     async fn update_contract(&self, contract: &Contract) -> Result<(), Error> {
         let state = get_contract_state_str(contract);
         let uuid = get_contract_id_string(contract.get_id());
-        info!(
+        log_to_console!(
             "Update contract with contract id {} - state: {}",
             uuid, state
         );
@@ -168,10 +168,10 @@ impl AsyncStorage for AsyncStorageApiProvider {
                 let res = self.delete_contract(&a.get_temporary_id()).await;
                 match res {
                     Ok(_) => {
-                        debug!("Contract has been successfully deleted (during update) with id {} and state '{}'", get_contract_id_string(a.get_temporary_id()), state);
+                        log_to_console!("Contract has been successfully deleted (during update) with id {} and state '{}'", get_contract_id_string(a.get_temporary_id()), state);
                     }
                     Err(err) => {
-                        warn!("Deleting contract has failed (during update) with id {} and state '{}'", get_contract_id_string(a.get_temporary_id()), state);
+                        log_to_console!("Deleting contract has failed (during update) with id {} and state '{}'", get_contract_id_string(a.get_temporary_id()), state);
                         return Err(to_storage_error(err));
                     }
                 }
@@ -184,7 +184,7 @@ impl AsyncStorage for AsyncStorageApiProvider {
                     })
                     .await
                     .map_err(to_storage_error)?;
-                debug!("Created new contract to replace temporary one during update with id {} and state '{}'", get_contract_id_string(contract.get_id()), state);
+                log_to_console!("Created new contract to replace temporary one during update with id {} and state '{}'", get_contract_id_string(contract.get_id()), state);
                 Ok(())
             }
             _ => {

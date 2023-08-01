@@ -31,7 +31,6 @@ use std::fmt::Write as _;
 
 use storage::async_storage_api::AsyncStorageApiProvider;
 // use dlc_memory_storage_provider::DlcMemoryStorageProvider;
-use log::info;
 
 use esplora_async_blockchain_provider::EsploraAsyncBlockchainProvider;
 
@@ -168,13 +167,14 @@ impl JsDLCInterface {
         let pubkey =
             bitcoin::PublicKey::from_private_key(&secp, &PrivateKey::new(seckey, active_network));
 
-        info!("Starting DLC Manager with pubkey: {}", pubkey.to_string());
+        log_to_console!("Starting DLC Manager with pubkey: {}", pubkey.to_string());
 
         // Set up DLC store
-        let dlc_store = AsyncStorageApiProvider::new(
-            pubkey.to_string(),
-            "http://localhost:8100".to_string(),
-        );
+        // let dlc_store = AsyncStorageApiProvider::new(
+        //     pubkey.to_string(),
+        //     "http://localhost:8100".to_string(),
+        // );
+        let dlc_store = MemoryStorage
 
         // Set up wallet
         let wallet = Arc::new(JSInterfaceWallet::new(
@@ -325,11 +325,11 @@ impl JsDLCInterface {
         {
             Ok(_) => (),
             Err(e) => {
-                info!("DLC manager - sign offer error: {}", e.to_string());
+                log_to_console!("DLC manager - sign offer error: {}", e.to_string());
                 panic!();
             }
         }
-        clog!("sign_offer - after on_dlc_message");
+        log_to_console!("sign_offer - after on_dlc_message");
         let manager = self.manager.lock().unwrap();
         let store = manager.get_store();
         let contract: SignedContract = store
