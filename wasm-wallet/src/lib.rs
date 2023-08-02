@@ -309,7 +309,6 @@ impl JsDLCInterface {
                 panic!();
             }
         }
-        log_to_console!("sign_offer - after on_dlc_message");
         let manager = self.manager.lock().unwrap();
         let store = manager.get_store();
         let contract: SignedContract = store

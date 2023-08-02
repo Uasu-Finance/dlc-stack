@@ -1,5 +1,44 @@
 version: '3.9'
 services:
+  dlc-link-attestor-1:
+    image: attestor
+    ports:
+      - 8801:8801
+    environment:
+      "BRANCH": "attestor-manager"
+      "PORT": "8801"
+      "NODE_ENV": "development"
+    env_file:
+      - ./attestor/observer/.env
+    volumes:
+      - ./attestor/observer/src:/app/attestor/observer/src
+
+  dlc-link-attestor-2:
+    image: attestor
+    ports:
+      - 8802:8802
+    environment:
+      "BRANCH": "attestor-manager"
+      "PORT": "8802"
+      "NODE_ENV": "development"
+    env_file:
+      - ./attestor/observer/.env
+    volumes:
+      - ./attestor/observer/src:/app/attestor/observer/src
+
+  dlc-link-attestor-3:
+    image: attestor
+    ports:
+      - 8803:8803
+    environment:
+      "BRANCH": "attestor-manager"
+      "PORT": "8803"
+      "NODE_ENV": "development"
+    env_file:
+      - ./attestor/observer/.env
+    volumes:
+      - ./attestor/observer/src:/app/attestor/observer/src
+
   blockchain-interface:
     container_name: blockchain-interface
     hostname: blockchain-interface
@@ -8,15 +47,19 @@ services:
       - ./wallet-blockchain-interface:/usr/src/app
     ports:
       - 3000:3000
+    environment:
+      - "PORT=3000"
     depends_on:
-      - rust-wallet
+      - dlc-link-attestor-1
+      - dlc-link-attestor-2
+      - dlc-link-attestor-3
 
   rust-wallet:
     container_name: rust-wallet
     hostname: rust-wallet
     build:
       context: .
-      dockerfile: Dockerfile.wallet
+      dockerfile: ./wallet/Dockerfile
     volumes:
       - ./wallet:/usr/src/app
     ports:
@@ -37,9 +80,11 @@ services:
       - "STORAGE_API_ENABLED=true"
       - "STORAGE_API_ENDPOINT=http://storageapi:8100"
       - "CONTRACT_CLEANUP_ENABLED=false"
+      - "BLOCKCHAIN_INTERFACE_URL=http://blockchain-interface:3000"
     depends_on:
         - postgresdlc
         - storageapi
+        - blockchain-interface
 
   storageapi:
     container_name: storageapi
