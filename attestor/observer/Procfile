@@ -1,0 +1,3 @@
+attestor1: npm run dev:1
+attestor2: npm run dev:2
+attestor3: npm run dev:3

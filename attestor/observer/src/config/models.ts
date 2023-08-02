@@ -1,7 +1,7 @@
 export interface ConfigSet {
   chain: Chain;
   version: string;
-  apiKey?: string;
+  api_key?: string;
 }
 
 export type EthChain = 'ETH_MAINNET' | 'ETH_SEPOLIA' | 'ETH_GOERLI' | 'ETH_LOCAL';

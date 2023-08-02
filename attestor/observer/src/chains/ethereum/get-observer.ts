@@ -12,7 +12,7 @@ export const getEthObserver = async (config: ConfigSet): Promise<Observer> => {
 
   console.log(`\n[${config.chain}] Loaded config:`);
   console.dir(networkConfig.deploymentInfo, { depth: 1 });
-  console.log(networkConfig.provider);
+  console.dir(networkConfig.provider, { depth: 1 });
 
   const deploymentInfo = networkConfig.deploymentInfo;
   const contract = new ethers.Contract(

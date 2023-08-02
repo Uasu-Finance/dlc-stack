@@ -1,0 +1,26 @@
+version: '3.9'
+services:
+  dlc-link-attestor-1:
+    image: attestor
+    ports:
+      - 8801:8801
+    environment:
+      "BRANCH": "attestor-manager"
+      "PORT": "8801"
+      "NODE_ENV": "development"
+    env_file:
+      - ./observer/.env
+    volumes:
+      - ./observer/src:/app/attestor/observer/src
+  dlc-link-attestor-2:
+    image: attestor
+    ports:
+      - 8802:8802
+    environment:
+      "BRANCH": "attestor-manager"
+      "PORT": "8802"
+      "NODE_ENV": "development"
+    env_file:
+      - ./observer/.env
+    volumes:
+      - ./observer/src:/app/attestor/observer/src
