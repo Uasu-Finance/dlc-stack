@@ -22,6 +22,8 @@ pub struct AsyncStorageApiProvider {
 impl AsyncStorageApiProvider {
     pub fn new(key: String, storage_api_endpoint: String) -> Self {
         log_to_console!("Creating storage API provider");
+        log_to_console!("Storage API endpoint: {}", storage_api_endpoint.clone());
+        log_to_console!("Storage API key: {}", key.clone());
         Self {
             client: StorageApiClient::new(storage_api_endpoint),
             key,
@@ -161,30 +163,44 @@ impl AsyncStorage for AsyncStorageApiProvider {
         let uuid = get_contract_id_string(contract.get_id());
         log_to_console!(
             "Update contract with contract id {} - state: {}",
-            uuid, state
+            uuid,
+            state
         );
         match contract {
             a @ Contract::Accepted(_) | a @ Contract::Signed(_) => {
-                let res = self.delete_contract(&a.get_temporary_id()).await;
-                match res {
-                    Ok(_) => {
-                        log_to_console!("Contract has been successfully deleted (during update) with id {} and state '{}'", get_contract_id_string(a.get_temporary_id()), state);
-                    }
-                    Err(err) => {
-                        log_to_console!("Deleting contract has failed (during update) with id {} and state '{}'", get_contract_id_string(a.get_temporary_id()), state);
-                        return Err(to_storage_error(err));
-                    }
+                if let Some(_) = self.get_contract(&a.get_temporary_id()).await? {
+                    log_to_console!(
+                        "Contract with id {} already exists",
+                        get_contract_id_string(a.get_temporary_id())
+                    );
+                    self.delete_contract(&a.get_temporary_id()).await?;
                 }
-                self.client
-                    .create_contract(NewContract {
-                        uuid: get_contract_id_string(contract.get_id()),
-                        state: get_contract_state_str(contract),
-                        content: base64::encode(serialize_contract(contract).unwrap()),
-                        key: self.key.clone(),
-                    })
-                    .await
-                    .map_err(to_storage_error)?;
-                log_to_console!("Created new contract to replace temporary one during update with id {} and state '{}'", get_contract_id_string(contract.get_id()), state);
+                if let Some(_) = self.get_contract(&contract.get_id()).await? {
+                    log_to_console!(
+                        "Contract with id {} already exists",
+                        get_contract_id_string(a.get_id())
+                    );
+                    self.client
+                        .update_contract(UpdateContract {
+                            uuid: get_contract_id_string(contract.get_id()),
+                            state: Some(get_contract_state_str(contract)),
+                            content: Some(base64::encode(serialize_contract(contract).unwrap())),
+                            key: self.key.clone(),
+                        })
+                        .await
+                        .map_err(to_storage_error)?;
+                } else {
+                    self.client
+                        .create_contract(NewContract {
+                            uuid: get_contract_id_string(contract.get_id()),
+                            state: get_contract_state_str(contract),
+                            content: base64::encode(serialize_contract(contract).unwrap()),
+                            key: self.key.clone(),
+                        })
+                        .await
+                        .map_err(to_storage_error)?;
+                    log_to_console!("Created new contract to replace temporary one during update with id {} and state '{}'", get_contract_id_string(contract.get_id()), state);
+                }
                 Ok(())
             }
             _ => {
