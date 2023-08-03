@@ -136,8 +136,6 @@ impl AsyncStorage for AsyncStorageApiProvider {
     }
 
     async fn update_contract(&self, contract: &Contract) -> Result<(), Error> {
-        // let state = get_contract_state_str(contract);
-        // let uuid = get_contract_id_string(contract.get_id());
         match contract {
             a @ Contract::Accepted(_) | a @ Contract::Signed(_) => {
                 match self.delete_contract(&a.get_temporary_id()).await {
