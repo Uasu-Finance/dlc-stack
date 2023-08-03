@@ -31,7 +31,6 @@ use std::fmt::Write as _;
 
 use storage::async_storage_api::AsyncStorageApiProvider;
 // use dlc_memory_storage_provider::DlcMemoryStorageProvider;
-use log::info;
 
 use esplora_async_blockchain_provider::EsploraAsyncBlockchainProvider;
 
@@ -53,8 +52,9 @@ async fn generate_p2pd_clients(
     let mut attestor_clients = HashMap::new();
 
     for url in attestor_urls.iter() {
-        let p2p_client: P2PDOracleClient =
-            P2PDOracleClient::new(url).await.expect("Error creating oracle client");
+        let p2p_client: P2PDOracleClient = P2PDOracleClient::new(url)
+            .await
+            .expect("Error creating oracle client");
         let attestor = Arc::new(p2p_client);
         attestor_clients.insert(attestor.get_public_key(), attestor.clone());
     }
@@ -134,15 +134,6 @@ impl JsDLCInterface {
     ) -> JsDLCInterface {
         console_error_panic_hook::set_once();
 
-        clog!(
-            "Received JsDLCInterface parameters: privkey={}, address={}, network={}, electrs_url={}, attestor_urls={}",
-            privkey,
-            address,
-            network,
-            electrs_url,
-            attestor_urls
-        );
-
         let options = JsDLCInterfaceOptions {
             attestor_urls,
             network,
@@ -168,12 +159,10 @@ impl JsDLCInterface {
         let pubkey =
             bitcoin::PublicKey::from_private_key(&secp, &PrivateKey::new(seckey, active_network));
 
-        info!("Starting DLC Manager with pubkey: {}", pubkey.to_string());
-
         // Set up DLC store
         let dlc_store = AsyncStorageApiProvider::new(
             pubkey.to_string(),
-            "http://localhost:8100".to_string(),
+            "https://devnet.dlc.link/storage-api".to_string(),
         );
 
         // Set up wallet
@@ -184,13 +173,14 @@ impl JsDLCInterface {
         ));
 
         // Set up Oracle Clients
-        let attestor_urls_vec: Vec<String> = match serde_json::from_str(&options.attestor_urls.clone()) {
-            Ok(vec) => vec,
-            Err(e) => {
-                eprintln!("Error deserializing Attestor URLs: {}", e);
-                Vec::new()
-            }
-        };
+        let attestor_urls_vec: Vec<String> =
+            match serde_json::from_str(&options.attestor_urls.clone()) {
+                Ok(vec) => vec,
+                Err(e) => {
+                    eprintln!("Error deserializing Attestor URLs: {}", e);
+                    Vec::new()
+                }
+            };
 
         let attestors = generate_p2pd_clients(attestor_urls_vec).await;
 
@@ -208,8 +198,6 @@ impl JsDLCInterface {
             )
             .unwrap(),
         ));
-
-        clog!("Finished setting up manager");
 
         blockchain.refresh_chain_data(options.address.clone()).await;
 
@@ -273,9 +261,7 @@ impl JsDLCInterface {
 
     pub async fn accept_offer(&self, offer_json: String) -> String {
         let dlc_offer_message: OfferDlc = serde_json::from_str(&offer_json).unwrap();
-        clog!("Offer to accept: {:?}", dlc_offer_message);
 
-        clog!("receive_offer - after on_dlc_message");
         let temporary_contract_id = dlc_offer_message.temporary_contract_id;
 
         match self
@@ -290,12 +276,9 @@ impl JsDLCInterface {
         {
             Ok(_) => (),
             Err(e) => {
-                clog!("DLC manager - receive offer error: {:?}", e);
-                return "".to_string();
+                return e.to_string();
             }
         }
-
-        clog!("accepting contract with id {:?}", temporary_contract_id);
 
         let (_contract_id, _public_key, accept_msg) = self
             .manager
@@ -305,14 +288,11 @@ impl JsDLCInterface {
             .await
             .expect("Error accepting contract offer");
 
-        clog!("receive_offer - after accept_contract_offer");
         serde_json::to_string(&accept_msg).unwrap()
     }
 
     pub async fn countersign_and_broadcast(&self, dlc_sign_message: String) -> String {
-        clog!("sign_offer - before on_dlc_message");
         let dlc_sign_message: SignDlc = serde_json::from_str(&dlc_sign_message).unwrap();
-        clog!("dlc_sign_message: {:?}", dlc_sign_message);
         match self
             .manager
             .lock()
@@ -325,11 +305,10 @@ impl JsDLCInterface {
         {
             Ok(_) => (),
             Err(e) => {
-                info!("DLC manager - sign offer error: {}", e.to_string());
+                log_to_console!("DLC manager - sign offer error: {}", e.to_string());
                 panic!();
             }
         }
-        clog!("sign_offer - after on_dlc_message");
         let manager = self.manager.lock().unwrap();
         let store = manager.get_store();
         let contract: SignedContract = store
