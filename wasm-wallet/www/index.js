@@ -1,4 +1,5 @@
 import { JsDLCInterface } from 'dlc_protocol_wallet';
+import { off } from 'npm';
 
 const testWalletPrivateKey = 'bea4ecfec5cfa1e965ee1b3465ca4deff4f04b36a1fb5286a07660d5158789fb';
 const testWalletAddress = 'tb1q3tj2fr9scwmcw3rq5m6jslva65f2rqjxt2t0zh';
@@ -39,7 +40,7 @@ async function fetchOfferFromProtocolWallet() {
     acceptCollateral: 10000,
     offerCollateral: 0,
     totalOutcomes: 100,
-    attestorList: JSON.stringify(["http://localhost:8803","http://localhost:8802","http://localhost:8801"]),
+    attestorList: JSON.stringify(['http://localhost:8803', 'http://localhost:8802', 'http://localhost:8801']),
   };
 
   return fetch(`${protocolWalletURL}/offer`, {
@@ -108,19 +109,19 @@ async function main() {
   console.log('Received Offer (JSON): ', offerResponse);
   console.log('Received Attestor URLs: ');
 
-    // creates a new instance of the JsDLCInterface
-    const dlcManager = await JsDLCInterface.new(
-      testWalletPrivateKey,
-      testWalletAddress,
-      bitcoinNetwork,
-      bitcoinNetworkURL,
-      JSON.stringify(["http://localhost:8803","http://localhost:8802","http://localhost:8801"])
-    );
+  // creates a new instance of the JsDLCInterface
+  const dlcManager = await JsDLCInterface.new(
+    testWalletPrivateKey,
+    testWalletAddress,
+    bitcoinNetwork,
+    bitcoinNetworkURL,
+    JSON.stringify(offerResponse[1])
+  );
 
   console.log('DLC Manager Interface Options: ', dlcManager.get_options());
 
   waitForBalance(dlcManager).then(() => {
-    runDLCFlow(dlcManager, offerResponse);
+    runDLCFlow(dlcManager, offerResponse[0]);
   });
 }
 
