@@ -40,8 +40,8 @@ use simple_wallet::SimpleWallet;
 use crate::storage::storage_provider::StorageProvider;
 use oracle_client::P2PDOracleClient;
 use rouille::Response;
-use serde::{de::IntoDeserializer, Deserialize, Serialize};
-use serde_json::{json, Value};
+use serde::{Deserialize, Serialize};
+use serde_json::json;
 use std::fmt::Write as _;
 use utils::get_numerical_contract_info;
 
@@ -257,81 +257,81 @@ fn main() {
 
     rouille::start_server(format!("0.0.0.0:{}", wallet_backend_port), move |request| {
         router!(request,
-                        (GET) (/cleanup) => {
-                            let contract_cleanup_enabled: bool = env::var("CONTRACT_CLEANUP_ENABLED")
-                                .unwrap_or("false".to_string())
-                                .parse().unwrap_or(false);
-                            if contract_cleanup_enabled {
-                                info!("Call cleanup contract offers.");
-                                delete_all_offers(manager.clone(), Response::json(&("OK".to_string())).with_status_code(200))
-                            } else {
-                                info!("Call cleanup contract offers feature disabled.");
-                                Response::json(&("Disabled".to_string())).with_status_code(400)
-                            }
-                        },
-                        (GET) (/health) => {
-                            Response::json(&("OK".to_string())).with_status_code(200)
-                        },
-                        (GET) (/unlockutxos) => {
-                            unlock_utxos(wallet2.clone(), Response::json(&("OK".to_string())).with_status_code(200))
-                        },
-                        (GET) (/empty_to_address/{address: String}) => {
-                            empty_to_address(address, wallet2.clone(), Response::json(&("OK".to_string())).with_status_code(200))
-                        },
-                        (GET) (/info) => {
-                            info!("Call info.");
-                            add_access_control_headers(get_wallet_info(manager.clone(), wallet2.clone(), static_address.to_string()))
-                        },
-                        (POST) (/offer) => {
-                            info!("Call POST (create) offer {:?}", request);
-                            #[derive(Deserialize)]
-                            #[serde(rename_all = "camelCase")]
-                            struct OfferRequest {
-                                uuid: String,
-                                accept_collateral: u64,
-                                offer_collateral: u64,
-                                total_outcomes: u64,
-                                attestor_list: String
-                            }
+                (GET) (/cleanup) => {
+                    let contract_cleanup_enabled: bool = env::var("CONTRACT_CLEANUP_ENABLED")
+                        .unwrap_or("false".to_string())
+                        .parse().unwrap_or(false);
+                    if contract_cleanup_enabled {
+                        info!("Call cleanup contract offers.");
+                        delete_all_offers(manager.clone(), Response::json(&("OK".to_string())).with_status_code(200))
+                    } else {
+                        info!("Call cleanup contract offers feature disabled.");
+                        Response::json(&("Disabled".to_string())).with_status_code(400)
+                    }
+                },
+                (GET) (/health) => {
+                    Response::json(&("OK".to_string())).with_status_code(200)
+                },
+                (GET) (/unlockutxos) => {
+                    unlock_utxos(wallet2.clone(), Response::json(&("OK".to_string())).with_status_code(200))
+                },
+                (GET) (/empty_to_address/{address: String}) => {
+                    empty_to_address(address, wallet2.clone(), Response::json(&("OK".to_string())).with_status_code(200))
+                },
+                (GET) (/info) => {
+                    info!("Call info.");
+                    add_access_control_headers(get_wallet_info(manager.clone(), wallet2.clone(), static_address.to_string()))
+                },
+                (POST) (/offer) => {
+                    info!("Call POST (create) offer {:?}", request);
+                    #[derive(Deserialize)]
+                    #[serde(rename_all = "camelCase")]
+                    struct OfferRequest {
+                        uuid: String,
+                        accept_collateral: u64,
+                        offer_collateral: u64,
+                        total_outcomes: u64,
+                        attestor_list: String
+                    }
 
-                            let req: OfferRequest = try_or_400!(rouille::input::json_input(request));
+                    let req: OfferRequest = try_or_400!(rouille::input::json_input(request));
 
-                                    // Set up Oracle Clients
-                            let bitcoin_contract_attestor_urls: Vec<String> = match serde_json::from_str(&req.attestor_list.clone()) {
-                                Ok(vec) => vec,
-                                Err(e) => {
-                                    eprintln!("Error deserializing Attestor URLs: {}", e);
-                                    Vec::new()
-                                }
-                            };
+                            // Set up Oracle Clients
+                    let bitcoin_contract_attestor_urls: Vec<String> = match serde_json::from_str(&req.attestor_list.clone()) {
+                        Ok(vec) => vec,
+                        Err(e) => {
+                            eprintln!("Error deserializing Attestor URLs: {}", e);
+                            Vec::new()
+                        }
+                    };
 
-                            let bitcoin_contract_attestors: HashMap<XOnlyPublicKey, Arc<P2PDOracleClient>> = generate_p2pd_clients(bitcoin_contract_attestor_urls.clone());
+                    let bitcoin_contract_attestors: HashMap<XOnlyPublicKey, Arc<P2PDOracleClient>> = generate_p2pd_clients(bitcoin_contract_attestor_urls.clone());
 
-                            add_access_control_headers(create_new_offer(manager.clone(), bitcoin_contract_attestors.values().cloned().collect(), active_network, req.uuid, req.accept_collateral, req.offer_collateral, req.total_outcomes))
-                        },
-                        (OPTIONS) (/offer) => {
-                            add_access_control_headers(Response::empty_204())
-                        },
-                        (OPTIONS) (/offer/accept) => {
-                            add_access_control_headers(Response::empty_204())
-                        },
-                        (PUT) (/offer/accept) => {
-                            info!("Call PUT (accept) offer {:?}", request);
-                            #[derive(Deserialize)]
-                            #[serde(rename_all = "camelCase")]
-                            struct AcceptOfferRequest {
-                                accept_message: String,
-                            }
-                            let json: AcceptOfferRequest = try_or_400!(rouille::input::json_input(request));
-                            let accept_dlc: AcceptDlc = match serde_json::from_str(&json.accept_message)
-                            {
-                                Ok(dlc) => dlc,
-                                Err(e) => return add_access_control_headers(Response::json(&ErrorsResponse{status: 400, errors: vec![ErrorResponse{message: e.to_string(), code: None}]}).with_status_code(400)),
-                            };
-                            accept_offer(accept_dlc, manager.clone())
-                        },
-                        _ => rouille::Response::empty_404()
-                )
+                    add_access_control_headers(create_new_offer(manager.clone(), bitcoin_contract_attestors.values().cloned().collect(), active_network, req.uuid, req.accept_collateral, req.offer_collateral, req.total_outcomes))
+                },
+                (OPTIONS) (/offer) => {
+                    add_access_control_headers(Response::empty_204())
+                },
+                (OPTIONS) (/offer/accept) => {
+                    add_access_control_headers(Response::empty_204())
+                },
+                (PUT) (/offer/accept) => {
+                    info!("Call PUT (accept) offer {:?}", request);
+                    #[derive(Deserialize)]
+                    #[serde(rename_all = "camelCase")]
+                    struct AcceptOfferRequest {
+                        accept_message: String,
+                    }
+                    let json: AcceptOfferRequest = try_or_400!(rouille::input::json_input(request));
+                    let accept_dlc: AcceptDlc = match serde_json::from_str(&json.accept_message)
+                    {
+                        Ok(dlc) => dlc,
+                        Err(e) => return add_access_control_headers(Response::json(&ErrorsResponse{status: 400, errors: vec![ErrorResponse{message: e.to_string(), code: None}]}).with_status_code(400)),
+                    };
+                    accept_offer(accept_dlc, manager.clone())
+                },
+                _ => rouille::Response::empty_404()
+        )
     });
 }
 
@@ -593,7 +593,7 @@ fn create_new_offer(
 
 fn accept_offer(accept_dlc: AcceptDlc, manager: Arc<Mutex<DlcManager>>) -> Response {
     println!("accept_dlc: {:?}", accept_dlc);
-    if let Some(Message::Sign(sign)) = (match manager.lock().unwrap().on_dlc_message(
+    if let Some(Message::Sign(sign)) = match manager.lock().unwrap().on_dlc_message(
         &Message::Accept(accept_dlc),
         STATIC_COUNTERPARTY_NODE_ID.parse().unwrap(),
     ) {
@@ -613,7 +613,7 @@ fn accept_offer(accept_dlc: AcceptDlc, manager: Arc<Mutex<DlcManager>>) -> Respo
                 .with_status_code(400),
             );
         }
-    }) {
+    } {
         add_access_control_headers(Response::json(&sign))
     } else {
         return Response::json(
