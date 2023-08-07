@@ -156,8 +156,6 @@ fn main() {
 
     let attestor_urls: Vec<String> = retry!(get_attestors(), 10, "Loading attestors");
 
-    println!("attestor_urls: {:?}", attestor_urls);
-
     let blockchain_interface_url = env::var("BLOCKCHAIN_INTERFACE_URL")
         .expect("BLOCKCHAIN_INTERFACE_URL environment variable not set, couldn't get attestors");
 

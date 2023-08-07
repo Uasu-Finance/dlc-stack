@@ -354,7 +354,6 @@ where
         oracle_inputs: &OracleInput,
     ) -> Result<Vec<OracleAnnouncement>, Error> {
         let mut announcements = Vec::new();
-        println!("Oracle input Public Keys: {:?}", oracle_inputs.public_keys);
         for pubkey in &oracle_inputs.public_keys {
             let oracle = self
                 .oracles
