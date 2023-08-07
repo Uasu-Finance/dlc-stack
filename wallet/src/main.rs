@@ -156,6 +156,8 @@ fn main() {
 
     let attestor_urls: Vec<String> = retry!(get_attestors(), 10, "Loading attestors");
 
+    println!("attestor_urls: {:?}", attestor_urls);
+
     let blockchain_interface_url = env::var("BLOCKCHAIN_INTERFACE_URL")
         .expect("BLOCKCHAIN_INTERFACE_URL environment variable not set, couldn't get attestors");
 
@@ -304,6 +306,7 @@ fn main() {
                             Vec::new()
                         }
                     };
+                    println!("bitcoin_contract_attestor_urls: {:?}", bitcoin_contract_attestor_urls);
 
                     let bitcoin_contract_attestors: HashMap<XOnlyPublicKey, Arc<P2PDOracleClient>> = generate_p2pd_clients(bitcoin_contract_attestor_urls.clone());
 
