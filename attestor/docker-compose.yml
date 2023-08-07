@@ -1,26 +1,19 @@
 version: '3.9'
 services:
   dlc-link-attestor-1:
-    image: attestor
+    image: public.ecr.aws/dlc-link/dlc-attestor:${ATTESTOR_VERSION}
     ports:
-      - 8801:8801
+      - ${ATTESTOR_PORT}:8801
     environment:
-      "BRANCH": "attestor-manager"
-      "PORT": "8801"
-      "NODE_ENV": "development"
-    env_file:
-      - ./observer/.env
-    volumes:
-      - ./observer/src:/app/attestor/observer/src
-  dlc-link-attestor-2:
-    image: attestor
-    ports:
-      - 8802:8802
-    environment:
-      "BRANCH": "attestor-manager"
-      "PORT": "8802"
-      "NODE_ENV": "development"
-    env_file:
-      - ./observer/.env
-    volumes:
-      - ./observer/src:/app/attestor/observer/src
+      'PORT': '8801'
+      # Supported chains: ETH_GOERLI, ETH_SEPOLIA, ETH_MAINNET, ETH_LOCAL
+      'CHAIN_1': 'ETH_GOERLI'
+      'VERSION_1': '1'
+      # This is the API key for the ETH_GOERLI chain (Infura)
+      'API_KEY_1': ${INFURA_API_KEY}
+      'STORAGE_API_ENABLED': 'true'
+      'STORAGE_API_ENDPOINT': ${STORAGE_API_ENDPOINT}
+      'SECRET_KEY_FILE': 'secret1.key'
+      # Optional BRANCH: the branch in dlc-solidity repo to fetch deployment info from
+      # Default: master
+      'BRANCH': 'attestor-manager'
