@@ -186,7 +186,8 @@ fn main() {
     // Set up wallet store
     let root_sled_path: String = env::var("SLED_WALLET_PATH").unwrap_or("wallet_db".to_string());
     let sled_path = format!("{root_sled_path}_{}", active_network);
-    let wallet_store = Arc::new(SledStorageProvider::new(sled_path.as_str()).unwrap());
+    let wallet_store: Arc<SledStorageProvider> =
+        Arc::new(SledStorageProvider::new(sled_path.as_str()).unwrap());
 
     // Set up wallet
     let wallet = Arc::new(SimpleWallet::new(
