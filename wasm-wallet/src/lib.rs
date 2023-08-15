@@ -443,12 +443,10 @@ impl JsContract {
         };
 
         let acceptor_collateral: String = match contract.clone() {
-            Contract::Offered(_c) | Contract::Rejected(_c) => String::new(),
             Contract::Accepted(c) => c.accept_params.collateral.to_string(),
             Contract::Signed(c) | Contract::Confirmed(c) | Contract::Refunded(c) => {
                 c.accepted_contract.accept_params.collateral.to_string()
             }
-            Contract::FailedAccept(_c) => String::new(),
             Contract::FailedSign(c) => c.accepted_contract.accept_params.collateral.to_string(),
             Contract::PreClosed(c) => c
                 .signed_contract
@@ -456,16 +454,14 @@ impl JsContract {
                 .accept_params
                 .collateral
                 .to_string(),
-            Contract::Closed(_c) => String::new(),
+            _ => String::new(),
         };
 
         let tx_id: String = match contract.clone() {
-            Contract::Offered(_c) | Contract::Rejected(_c) => String::new(),
             Contract::Accepted(c) => c.dlc_transactions.fund.txid().to_string(),
             Contract::Signed(c) | Contract::Confirmed(c) | Contract::Refunded(c) => {
                 c.accepted_contract.dlc_transactions.fund.txid().to_string()
             }
-            Contract::FailedAccept(_c) => String::new(),
             Contract::FailedSign(c) => c.accepted_contract.dlc_transactions.fund.txid().to_string(),
             Contract::PreClosed(c) => c
                 .signed_contract
@@ -473,7 +469,7 @@ impl JsContract {
                 .accept_params
                 .collateral
                 .to_string(),
-            Contract::Closed(_c) => String::new(),
+            _ => String::new(),
         };
 
         fn hex_str(value: &[u8]) -> String {
