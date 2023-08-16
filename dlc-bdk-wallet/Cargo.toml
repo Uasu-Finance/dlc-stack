@@ -1,19 +1,19 @@
 [package]
 edition = "2018"
-name = "js-interface-wallet"
+name = "dlc-bdk-wallet"
 version = "0.1.0"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-bitcoin = {version = "0.29.2", features=["serde"]}
+bitcoin = "0.29"
 dlc = { git = "https://github.com/dlc-link/rust-dlc", features = ["use-serde"] }
 dlc-manager = { git = "https://github.com/dlc-link/rust-dlc", features = ["use-serde"] }
 lightning = {version = "0.0.113"}
-rust-bitcoin-coin-selection = {version = "0.1.0", git = "https://github.com/p2pderivatives/rust-bitcoin-coin-selection", features = ["rand"]}
-secp256k1-zkp = {version = "0.7.0"}
-miniscript = { version = "10.0", features = ["serde", "std"], default-features = false }
 bdk = {version = "0.28.0", default-features = false}
+secp256k1-zkp = {version = "0.7.0"}
+simple-wallet = {git = "https://github.com/dlc-link/rust-dlc"}
 
 [dev-dependencies]
+mocks = {git = "https://github.com/dlc-link/rust-dlc"}
 secp256k1-zkp = {version = "0.7.0", features = ["global-context"]}

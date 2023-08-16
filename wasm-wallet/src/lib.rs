@@ -30,7 +30,6 @@ use dlc_link_manager::{AsyncStorage, Manager};
 use std::fmt::Write as _;
 
 use storage::async_storage_api::AsyncStorageApiProvider;
-// use dlc_memory_storage_provider::DlcMemoryStorageProvider;
 
 use esplora_async_blockchain_provider::EsploraAsyncBlockchainProvider;
 
@@ -38,11 +37,9 @@ use js_interface_wallet::JSInterfaceWallet;
 
 use oracle_client::P2PDOracleClient;
 use serde::{Deserialize, Serialize};
-use serde_json::{json, Value};
 
 mod oracle_client;
 mod storage;
-mod utils;
 #[macro_use]
 mod macros;
 

@@ -1,13 +1,13 @@
 {
   "compilerOptions": {
     "target": "es2022",
-    "module": "es2022",
+    "module": "NodeNext",
     "strict": true,
     "esModuleInterop": true,
     "forceConsistentCasingInFileNames": true,
     "moduleResolution": "NodeNext",
     "outDir": "./dist",
     "rootDir": ".",
-    "skipLibCheck": true                                 /* Skip type checking all .d.ts files. */
+    "skipLibCheck": true // Skip type checking all .d.ts files.
   }
 }

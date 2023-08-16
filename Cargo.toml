@@ -2,6 +2,7 @@
 members = [
   "attestor",
   "esplora-async-blockchain-provider",
+  "esplora-async-blockchain-provider-locking",
   "js-interface-wallet",
   "dlc-memory-storage-provider",
   "dlc-link-manager",
@@ -9,6 +10,7 @@ members = [
   "wallet",
   "wasm-wallet",
   "clients",
+  "dlc-bdk-wallet",
   "storage/reader",
   "storage/writer",
   "storage/common",

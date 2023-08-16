@@ -11,7 +11,6 @@ use serde::{Deserialize, Serialize};
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::str::FromStr;
-use std::sync::{Arc, Mutex};
 use std::vec;
 
 use bdk::blockchain::esplora::EsploraBlockchain;
@@ -44,30 +43,24 @@ struct UTXOSpent {
     spent: bool,
 }
 
-pub struct EsploraAsyncBlockchainProvider {
+pub struct EsploraAsyncBlockchainProviderLocking {
     host: String,
     blockchain: EsploraBlockchain,
-    chain_data: Arc<Mutex<ChainCacheData>>,
-}
-
-struct ChainCacheData {
-    utxos: RefCell<Option<Vec<Utxo>>>,
+    utxos: RefCell<Option<Vec<Utxo>>>, // Change this to RwLock?
     txs: RefCell<Option<HashMap<String, Vec<u8>>>>,
     height: RefCell<Option<u64>>,
 }
 
-impl EsploraAsyncBlockchainProvider {
+impl EsploraAsyncBlockchainProviderLocking {
     pub fn new(host: String, _network: Network) -> Self {
         let blockchain = EsploraBlockchain::new(&host, 20);
 
         Self {
             host,
             blockchain,
-            chain_data: Arc::new(Mutex::new(ChainCacheData {
-                utxos: Some(vec![]).into(),
-                txs: Some(HashMap::new()).into(),
-                height: Some(0).into(),
-            })),
+            utxos: Some(vec![]).into(),
+            txs: Some(HashMap::new()).into(),
+            height: Some(0).into(),
         }
     }
 
@@ -127,8 +120,7 @@ impl EsploraAsyncBlockchainProvider {
 
     // gets all the utxos and txs and height of chain, and returns the balance of the address
     pub async fn refresh_chain_data(&self, address: String) -> () {
-        *self.chain_data.lock().unwrap().height.borrow_mut() =
-            Some(self.blockchain.get_height().await.unwrap() as u64);
+        *self.height.borrow_mut() = Some(self.blockchain.get_height().await.unwrap() as u64);
         //Some(self.get_u64("blocks/tip/height").await.unwrap());
 
         let utxos: Vec<UtxoResp> = self
@@ -172,40 +164,19 @@ impl EsploraAsyncBlockchainProvider {
         //     utxo_spent_pairs.push((utxo, is_spent.spent));
         // }
 
-        self.chain_data
-            .lock()
-            .unwrap()
-            .utxos
+        self.utxos
             .try_borrow_mut()
             .unwrap() // FIXME this blows up sometimes!
             .as_mut()
             .unwrap()
             .clear();
-        self.chain_data
-            .lock()
-            .unwrap()
-            .utxos
-            .borrow_mut()
-            .as_mut()
-            .unwrap()
-            .append(&mut utxos);
+        self.utxos.borrow_mut().as_mut().unwrap().append(&mut utxos);
 
-        for utxo in self
-            .chain_data
-            .lock()
-            .unwrap()
-            .utxos
-            .borrow()
-            .as_ref()
-            .unwrap()
-        {
+        for utxo in self.utxos.borrow().as_ref().unwrap() {
             let txid = utxo.outpoint.txid.to_string();
             // self.blockchain.get_tx(txid).await.unwrap();
             let tx: Vec<u8> = self.get_bytes(&format!("tx/{}/raw", txid)).await.unwrap();
-            self.chain_data
-                .lock()
-                .unwrap()
-                .txs
+            self.txs
                 .borrow_mut()
                 .as_mut()
                 .unwrap()
@@ -214,22 +185,11 @@ impl EsploraAsyncBlockchainProvider {
     }
 
     pub fn get_utxos(&self) -> Result<Vec<Utxo>, Error> {
-        Ok(self
-            .chain_data
-            .lock()
-            .unwrap()
-            .utxos
-            .borrow()
-            .as_ref()
-            .unwrap()
-            .clone())
+        Ok(self.utxos.borrow().as_ref().unwrap().clone())
     }
 
     pub async fn get_balance(&self) -> Result<u64, Error> {
         Ok(self
-            .chain_data
-            .lock()
-            .unwrap()
             .utxos
             .borrow()
             .as_ref()
@@ -240,7 +200,7 @@ impl EsploraAsyncBlockchainProvider {
     }
 }
 
-impl Blockchain for EsploraAsyncBlockchainProvider {
+impl Blockchain for EsploraAsyncBlockchainProviderLocking {
     fn send_transaction(&self, transaction: &Transaction) -> Result<(), Error> {
         let x = self.blockchain.clone();
         let y = transaction.clone();
@@ -252,21 +212,13 @@ impl Blockchain for EsploraAsyncBlockchainProvider {
         Ok(bitcoin::Network::Regtest)
     }
     fn get_blockchain_height(&self) -> Result<u64, Error> {
-        Ok(self.chain_data.lock().unwrap().height.borrow().unwrap())
+        Ok(self.height.borrow().unwrap())
     }
     fn get_block_at_height(&self, _height: u64) -> Result<Block, Error> {
         unimplemented!();
     }
     fn get_transaction(&self, tx_id: &Txid) -> Result<Transaction, Error> {
-        let raw_tx = self
-            .chain_data
-            .lock()
-            .unwrap()
-            .txs
-            .borrow()
-            .as_ref()
-            .unwrap()
-            .clone();
+        let raw_tx = self.txs.borrow().as_ref().unwrap().clone();
         let raw_tx = raw_tx.get(&tx_id.to_string()).unwrap();
         Transaction::consensus_decode(&mut std::io::Cursor::new(&*raw_tx))
             .map_err(|e| Error::BlockchainError(e.to_string()))
@@ -276,29 +228,13 @@ impl Blockchain for EsploraAsyncBlockchainProvider {
     }
 }
 
-impl WalletBlockchainProvider for EsploraAsyncBlockchainProvider {
+impl WalletBlockchainProvider for EsploraAsyncBlockchainProviderLocking {
     fn get_utxos_for_address(&self, _address: &bitcoin::Address) -> Result<Vec<Utxo>, Error> {
-        Ok(self
-            .chain_data
-            .lock()
-            .unwrap()
-            .utxos
-            .borrow()
-            .as_ref()
-            .unwrap()
-            .clone())
+        Ok(self.utxos.borrow().as_ref().unwrap().clone())
     }
 
     fn is_output_spent(&self, txid: &Txid, vout: u32) -> Result<bool, Error> {
-        let utxos = self
-            .chain_data
-            .lock()
-            .unwrap()
-            .utxos
-            .borrow()
-            .as_ref()
-            .unwrap()
-            .clone();
+        let utxos = self.utxos.borrow().as_ref().unwrap().clone();
         let matched_utxo = utxos.into_iter().find(|utxo| utxo.outpoint.txid == *txid);
         if matched_utxo.is_none() {
             return Ok(false);
@@ -308,7 +244,7 @@ impl WalletBlockchainProvider for EsploraAsyncBlockchainProvider {
     }
 }
 
-impl FeeEstimator for EsploraAsyncBlockchainProvider {
+impl FeeEstimator for EsploraAsyncBlockchainProviderLocking {
     fn get_est_sat_per_1000_weight(
         &self,
         _confirmation_target: lightning::chain::chaininterface::ConfirmationTarget,
