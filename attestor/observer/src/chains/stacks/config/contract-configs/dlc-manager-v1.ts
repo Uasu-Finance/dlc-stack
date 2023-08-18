@@ -66,7 +66,6 @@ export class DlcManagerV1 implements ContractConfig {
 
       switch (eventSource.event) {
         case 'create-dlc': {
-          console.dir(printEvent, { depth: 5 });
           const _uuid = printEvent['uuid']?.value;
           const _creator = printEvent['creator']?.value;
           const _callbackContract = printEvent['callback-contract']?.value;
