@@ -50,6 +50,7 @@ export default class AttestorService {
     let _maturation = maturation ? new Date(maturation).toISOString() : createMaturationDate();
 
     await attestor.create_event(uuid, _maturation);
+    return { uuid: uuid, maturation: _maturation };
   }
 
   public static async createAttestation(uuid: string, value: bigint, precisionShift = 0) {
@@ -60,6 +61,7 @@ export default class AttestorService {
     const formattedOutcome = formatOutcome(Number(value));
 
     await attestor.attest(uuid, formattedOutcome);
+    return { uuid: uuid, outcome: Number(formattedOutcome) };
   }
 
   public static async getEvent(uuid: string) {
