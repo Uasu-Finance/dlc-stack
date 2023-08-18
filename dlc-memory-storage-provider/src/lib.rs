@@ -102,7 +102,7 @@ impl AsyncStorage for DlcMemoryStorageProvider {
                     map.remove(&a.get_temporary_id());
                 } else {
                     panic!("Temporary contract is null");
-                } 
+                }
             }
             _ => {}
         };

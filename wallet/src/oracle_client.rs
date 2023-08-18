@@ -17,8 +17,6 @@ extern crate dlc_messages;
 extern crate secp256k1_zkp;
 extern crate serde;
 
-// use crate::clog;
-
 // use wasm_bindgen::prelude::*;
 // use wasm_bindgen_futures::JsFuture;
 // use web_sys::{Request, RequestInit, RequestMode, Response};
@@ -26,12 +24,13 @@ extern crate serde;
 use std::{fmt, io::Cursor, num::ParseIntError};
 
 use chrono::{DateTime, Utc};
+use dlc_link_manager::AsyncOracle;
 use dlc_manager::error::Error as DlcManagerError;
-use dlc_manager::Oracle;
+// use dlc_manager::Oracle;
 use dlc_messages::oracle_msgs::{OracleAnnouncement, OracleAttestation};
 use log::info;
 use secp256k1_zkp::{schnorr::Signature, XOnlyPublicKey};
-use serde_json::{json, Value};
+use serde_json::Value;
 
 /// Enables interacting with a DLC oracle.
 pub struct P2PDOracleClient {
@@ -91,16 +90,17 @@ struct AttestationResponse {
 //         .map_err(|e| dlc_manager::error::Error::OracleError(e.to_string()))
 // }
 
-fn get_json(_path: &str) -> Result<Value, DlcManagerError> {
-    // reqwest::blocking::get(path)
-    //     .map_err(|x| {
-    //         dlc_manager::error::Error::IOError(std::io::Error::new(std::io::ErrorKind::Other, x))
-    //     })?
-    //     .json::<Value>()
-    //     .map_err(|x| {
-    //         dlc_manager::error::Error::IOError(std::io::Error::new(std::io::ErrorKind::Other, x))
-    //     })
-    Ok(json!({"name": "John"}))
+async fn get_json(path: &str) -> Result<Value, DlcManagerError> {
+    reqwest::get(path)
+        .await
+        .map_err(|x| {
+            dlc_manager::error::Error::IOError(std::io::Error::new(std::io::ErrorKind::Other, x))
+        })?
+        .json::<Value>()
+        .await
+        .map_err(|x| {
+            dlc_manager::error::Error::IOError(std::io::Error::new(std::io::ErrorKind::Other, x))
+        })
 }
 
 fn pubkey_path(host: &str) -> String {
@@ -144,8 +144,6 @@ impl P2PDOracleClient {
 
         info!("Oracle Pub Key: {}", oracle_key.to_string());
 
-        // clog!("Oracle Pub Key: {}", oracle_key.to_string());
-
         let public_key: XOnlyPublicKey = oracle_key
             .parse()
             .map_err(|_| DlcManagerError::OracleError("Oracle PubKey Error".to_string()))?;
@@ -188,16 +186,19 @@ pub fn decode_hex(s: &str) -> Result<Vec<u8>, DecodeHexError> {
     }
 }
 
-impl Oracle for P2PDOracleClient {
-    fn get_public_key(&self) -> XOnlyPublicKey {
+impl AsyncOracle for P2PDOracleClient {
+    async fn get_public_key(&self) -> XOnlyPublicKey {
         self.public_key
     }
 
-    fn get_announcement(&self, event_id: &str) -> Result<OracleAnnouncement, DlcManagerError> {
+    async fn get_announcement(
+        &self,
+        event_id: &str,
+    ) -> Result<OracleAnnouncement, DlcManagerError> {
         info!("Getting announcement for event_id {event_id}");
         let path = announcement_path(&self.host, event_id);
         info!("Getting announcement at URL {path}");
-        let v = get_json(&path)?;
+        let v = get_json(&path).await?;
 
         let encoded_hex_announcement = match v["rust_announcement"].as_str() {
             //call to_string instead of as_str and watch your world crumble to pieces
@@ -222,12 +223,12 @@ impl Oracle for P2PDOracleClient {
         Ok(decoded_announcement)
     }
 
-    fn get_attestation(
+    async fn get_attestation(
         &self,
         event_id: &str,
     ) -> Result<OracleAttestation, dlc_manager::error::Error> {
         let path = attestation_path(&self.host, event_id);
-        let v = get_json(&path)?;
+        let v = get_json(&path).await?;
 
         //TODO: this next line might be None, throwing at unwrap, fix
         let encoded_hex_attestation = match v["rust_attestation"].as_str() {

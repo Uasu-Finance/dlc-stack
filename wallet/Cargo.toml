@@ -32,14 +32,12 @@ http-body = "=1.0.0-rc.2"
 http-body-util = "0.1.0-rc.3"
 log = "0.4.17"
 reqwest = {version = "0.11", features = ["blocking", "json", "rustls-tls"]}
-# rouille = {version = "3.5.0"}
 serde = {version = "*", features = ["derive"]}
 serde_json = "1.0.81"
 secp256k1-zkp = {version = "0.7.0" }
 dlc-bdk-wallet = { path = "../dlc-bdk-wallet" }
 sled = "0.34"
 tokio = {version = "1.31.0", features = ["rt"]}
-warp = "0.3"
 pretty_env_logger = "0.4.0"
 
 [dev-dependencies]

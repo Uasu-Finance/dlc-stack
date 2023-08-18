@@ -16,7 +16,7 @@ use crate::dlc_manager::{Blockchain, Time, Wallet};
 use bitcoin::Address;
 use bitcoin::Transaction;
 
-use dlc_manager::{ContractId, Oracle};
+use dlc_manager::{contract, ContractId};
 use dlc_messages::oracle_msgs::{OracleAnnouncement, OracleAttestation};
 use dlc_messages::{AcceptDlc, Message as DlcMessage, OfferDlc, SignDlc};
 
@@ -42,6 +42,16 @@ type ClosableContractInfo<'a> = Option<(
     &'a AdaptorInfo,
     Vec<(usize, OracleAttestation)>,
 )>;
+
+/// Oracle trait provides access to oracle information.
+pub trait AsyncOracle {
+    /// Returns the public key of the oracle.
+    async fn get_public_key(&self) -> XOnlyPublicKey;
+    /// Returns the announcement for the event with the given id if found.
+    async fn get_announcement(&self, event_id: &str) -> Result<OracleAnnouncement, Error>;
+    /// Returns the attestation for the event with the given id if found.
+    async fn get_attestation(&self, event_id: &str) -> Result<OracleAttestation, Error>;
+}
 
 pub trait AsyncStorage {
     /// Returns the contract with given id if found.
@@ -71,7 +81,7 @@ where
     W::Target: Wallet,
     B::Target: Blockchain,
     S::Target: AsyncStorage,
-    O::Target: Oracle,
+    O::Target: AsyncOracle,
     T::Target: Time,
 {
     oracles: HashMap<XOnlyPublicKey, O>,
@@ -130,7 +140,7 @@ where
     W::Target: Wallet,
     B::Target: Blockchain,
     S::Target: AsyncStorage,
-    O::Target: Oracle,
+    O::Target: AsyncOracle,
     T::Target: Time,
 {
     /// Create a new Manager struct.
@@ -190,11 +200,77 @@ where
     ) -> Result<OfferDlc, Error> {
         contract_input.validate()?;
 
-        let oracle_announcements = contract_input
+        // let contract_infos = &contract_input.contract_infos;
+        // let mut oracle_announcements = Vec::new();
+        let event_id = &contract_input
+            .contract_infos
+            .first()
+            .unwrap()
+            .oracles
+            .event_id;
+        let oracle_set: Vec<Vec<&O>> = contract_input
             .contract_infos
             .iter()
-            .map(|x| self.get_oracle_announcements(&x.oracles))
-            .collect::<Result<Vec<_>, Error>>()?;
+            .map(|x| {
+                x.oracles
+                    .public_keys
+                    .iter()
+                    .map(|pubkey| {
+                        self.oracles
+                            .get(pubkey)
+                            .ok_or_else(|| {
+                                Error::InvalidParameters("Unknown oracle public key".to_string())
+                            })
+                            .unwrap()
+                    })
+                    .collect::<Vec<&O>>()
+            })
+            .collect::<Vec<_>>();
+
+        let mut oracle_announcements = Vec::new();
+
+        for oracles in oracle_set {
+            let mut announcements = Vec::new();
+            for oracle in oracles {
+                announcements.push(oracle.get_announcement(&event_id).await.unwrap());
+            }
+            oracle_announcements.push(announcements)
+            //     futures::future::join_all(
+            //         announcements
+            //             .iter()
+            //             .map(|oracle| async { oracle.get_announcement(&event_id).await.unwrap() }),
+            //     )
+            //     .await,
+            // )
+        }
+
+        // .collect::<Vec<_>>()
+
+        // let oracle_announcements =
+        //     futures::future::join_all(contract_input.contract_infos.iter().map(
+        //         |x: &dlc_manager::contract::contract_input::ContractInputInfo| async move {
+        //             let mut announcements = Vec::new();
+        //             for pubkey in &x.oracles.public_keys {
+        //                 let oracle = self
+        //                     .oracles
+        //                     .get(pubkey)
+        //                     .ok_or_else(|| {
+        //                         Error::InvalidParameters("Unknown oracle public key".to_string())
+        //                     })
+        //                     .unwrap();
+        //                 announcements.push(
+        //                     oracle
+        //                         .get_announcement(&x.oracles.event_id)
+        //                         .await
+        //                         .unwrap()
+        //                         .clone(),
+        //                 );
+        //             }
+        //             announcements
+        //             // self.get_oracle_announcements(&x.oracles).await.unwrap()
+        //         },
+        //     ))
+        //     .await;
 
         let (offered_contract, offer_msg) = crate::dlc_manager::contract_updater::offer_contract(
             &self.secp,
@@ -358,7 +434,7 @@ where
         Ok(())
     }
 
-    fn get_oracle_announcements(
+    async fn get_oracle_announcements(
         &self,
         oracle_inputs: &OracleInput,
     ) -> Result<Vec<OracleAnnouncement>, Error> {
@@ -368,7 +444,12 @@ where
                 .oracles
                 .get(pubkey)
                 .ok_or_else(|| Error::InvalidParameters("Unknown oracle public key".to_string()))?;
-            announcements.push(oracle.get_announcement(&oracle_inputs.event_id)?.clone());
+            announcements.push(
+                oracle
+                    .get_announcement(&oracle_inputs.event_id)
+                    .await?
+                    .clone(),
+            );
         }
 
         Ok(announcements)
@@ -461,7 +542,7 @@ where
         Ok(contracts_to_close)
     }
 
-    fn get_closable_contract_info<'a>(
+    async fn get_closable_contract_info<'a>(
         &'a self,
         contract: &'a SignedContract,
     ) -> ClosableContractInfo<'a> {
@@ -477,18 +558,21 @@ where
                 .enumerate()
                 .collect();
             if matured.len() >= contract_info.threshold {
-                let attestations: Vec<_> = matured
-                    .iter()
-                    .filter_map(|(i, announcement)| {
-                        let oracle = self.oracles.get(&announcement.oracle_public_key)?;
-                        Some((
-                            *i,
-                            oracle
-                                .get_attestation(&announcement.oracle_event.event_id)
-                                .ok()?,
-                        ))
-                    })
-                    .collect();
+                let attestations: Vec<_> =
+                    futures::future::join_all(matured.iter().filter_map(|(i, announcement)| {
+                        Some(async move {
+                            let oracle = self.oracles.get(&announcement.oracle_public_key).unwrap();
+                            (
+                                *i,
+                                oracle
+                                    .get_attestation(&announcement.oracle_event.event_id)
+                                    .await
+                                    .unwrap(), // .ok(),
+                            )
+                        })
+                    }))
+                    .await;
+                // .collect();
                 if attestations.len() >= contract_info.threshold {
                     return Some((contract_info, adaptor_info, attestations));
                 }
@@ -498,7 +582,7 @@ where
     }
 
     async fn check_confirmed_contract(&mut self, contract: &SignedContract) -> Result<bool, Error> {
-        let closable_contract_info = self.get_closable_contract_info(contract);
+        let closable_contract_info = self.get_closable_contract_info(contract).await;
         if let Some((contract_info, adaptor_info, attestations)) = closable_contract_info {
             let cet = crate::dlc_manager::contract_updater::get_signed_cet(
                 &self.secp,

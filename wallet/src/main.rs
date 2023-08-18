@@ -44,12 +44,11 @@ use std::{
 };
 use tokio::sync::RwLock;
 use tokio::{runtime, task};
-use warp::{sse::Event, Filter};
 
 use bitcoin::{hashes::Hash, KeyPair, Network, XOnlyPublicKey};
 use dlc_bdk_wallet::DlcBdkWallet;
 // use dlc_link_manager::Manager;
-use dlc_link_manager::{AsyncStorage, Manager};
+use dlc_link_manager::{AsyncOracle, AsyncStorage, Manager};
 use dlc_manager::{
     contract::{
         contract_input::{ContractInput, ContractInputInfo, OracleInput},
@@ -181,7 +180,7 @@ async fn generate_p2pd_clients(
     for url in attestor_urls.iter() {
         let p2p_client: P2PDOracleClient = P2PDOracleClient::new(url).await.unwrap();
         let attestor = Arc::new(p2p_client);
-        attestor_clients.insert(attestor.get_public_key(), attestor.clone());
+        attestor_clients.insert(attestor.get_public_key().await, attestor.clone());
     }
     return attestor_clients;
 }
@@ -398,20 +397,18 @@ async fn run() {
 
     let make_service = make_service_fn(move |_| {
         // For each connection, clone the counter to use in our service...
-        let cnt = counter.clone();
         let manager = manager.clone();
         let dlc_store = dlc_store.clone();
         let client = client.clone();
+        let protocol_wallet_attestors = protocol_wallet_attestors.clone();
         let wallet = wallet.clone();
 
         async move {
             Ok::<_, Error>(service_fn(move |req| {
-                let prev = cnt.get();
-                cnt.set(prev + 1);
-                let value = cnt.get();
                 let manager = manager.clone();
                 let dlc_store = dlc_store.clone();
                 let wallet = wallet.clone();
+                let protocol_wallet_attestors = protocol_wallet_attestors.clone();
                 let client = client.clone();
                 async move {
                     // let resp = periodic_check(manager.clone(), dlc_store.clone())
@@ -434,6 +431,19 @@ async fn run() {
                         (&Method::GET, "/info") => get_wallet_info(dlc_store, wallet).await,
                         (&Method::GET, "/periodic_check") => {
                             periodic_check(manager, dlc_store).await
+                            //update funded uuids code goes here
+                        }
+                        (&Method::GET, "/create_offer") => {
+                            create_new_offer(
+                                manager,
+                                protocol_wallet_attestors.clone(),
+                                active_network,
+                                "0x1e9e6909f58fd76bed366442e8a4f6c03f2aedb902e057b1d697a2c29b876cb0".to_string(),
+                                100000,
+                                100000,
+                                2,
+                            )
+                            .await
                             //update funded uuids code goes here
                         }
                         _ => {
@@ -466,6 +476,114 @@ async fn run() {
     // The server would block on current thread to await !Send futures.
     if let Err(e) = server.await {
         eprintln!("server error: {}", e);
+    }
+}
+
+async fn create_new_offer(
+    manager: Arc<Mutex<DlcManager<'_>>>,
+    attestors: HashMap<XOnlyPublicKey, Arc<P2PDOracleClient>>,
+    active_network: bitcoin::Network,
+    event_id: String,
+    accept_collateral: u64,
+    offer_collateral: u64,
+    total_outcomes: u64,
+) -> Result<Response<Body>, GenericError> {
+    let (_event_descriptor, descriptor) = get_numerical_contract_info(
+        accept_collateral,
+        offer_collateral,
+        total_outcomes,
+        attestors.len(),
+    );
+    info!(
+        "Creating new offer with event id: {}, accept collateral: {}, offer_collateral: {}",
+        event_id.clone(),
+        accept_collateral,
+        offer_collateral
+    );
+
+    let public_keys = attestors.clone().into_keys().collect();
+    let contract_info = ContractInputInfo {
+        oracles: OracleInput {
+            public_keys,
+            event_id: event_id.clone(),
+            threshold: attestors.len() as u16,
+        },
+        contract_descriptor: descriptor,
+    };
+
+    for (_k, attestor) in attestors {
+        // check if the oracle has an event with the id of event_id
+        match attestor.get_announcement(&event_id).await {
+            Ok(_announcement) => (),
+            Err(e) => {
+                info!("Error getting announcement: {}", event_id);
+                return Ok(Response::builder()
+                    .status(StatusCode::BAD_REQUEST)
+                    .header(header::CONTENT_TYPE, "application/json")
+                    .body(Body::from(
+                        json!(
+                           {
+                                "status": 400,
+                                "errors": vec![ErrorResponse {
+                                    message: format!(
+                                        "Error: unable to get announcement. Does it exist? -- {}",
+                                        e.to_string()
+                                    ),
+                                    code: None,
+                                }],
+                            }
+                        )
+                        .to_string(),
+                    ))?);
+            }
+        }
+    }
+
+    // Some regtest networks have an unreliable fee estimation service
+    let fee_rate = match active_network {
+        bitcoin::Network::Regtest => 1,
+        _ => 400,
+    };
+
+    println!("contract_info: {:?}", contract_info);
+
+    let contract_input = ContractInput {
+        offer_collateral,
+        accept_collateral,
+        fee_rate,
+        contract_infos: vec![contract_info],
+    };
+
+    //had to make this mutable because of the borrow, not sure why
+    let mut man = manager.lock().unwrap();
+
+    match man
+        .send_offer(
+            &contract_input,
+            STATIC_COUNTERPARTY_NODE_ID.parse().unwrap(),
+        )
+        .await
+    {
+        Ok(dlc) => Ok(Response::builder()
+            .status(StatusCode::OK)
+            .header(header::CONTENT_TYPE, "application/json")
+            .body(Body::from(serde_json::to_string(&dlc)?))?),
+        Err(e) => {
+            info!("DLC manager - send offer error: {}", e.to_string());
+            Ok(Response::builder()
+                .status(StatusCode::BAD_REQUEST)
+                .header(header::CONTENT_TYPE, "application/json")
+                .body(Body::from(
+                    json!({
+                        "status": 400,
+                        "errors": vec![ErrorResponse {
+                            message: e.to_string(),
+                            code: None,
+                        }],
+                    })
+                    .to_string(),
+                ))?)
+        }
     }
 }
 
