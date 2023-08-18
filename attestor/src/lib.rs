@@ -1,18 +1,16 @@
-#[macro_use]
-extern crate log;
 extern crate core;
+extern crate log;
 use ::hex::ToHex;
 use wasm_bindgen::prelude::*;
 
 use lightning::util::ser::{Readable, Writeable};
 
-use secp256k1_zkp::rand::{self, thread_rng};
+use secp256k1_zkp::rand::thread_rng;
 use secp256k1_zkp::{
     hashes::*, All, KeyPair, Message, Secp256k1, SecretKey, XOnlyPublicKey as SchnorrPublicKey,
 };
 use std::io::Cursor;
 use std::str::FromStr;
-use web_sys::console::warn;
 
 use serde::{Deserialize, Serialize};
 
@@ -123,58 +121,40 @@ impl Attestor {
         }
     }
 
-    pub async fn attest(&mut self, uuid: String, outcome: u64) {
+    pub async fn attest(&self, uuid: String, outcome: u64) {
         clog!("[WASM-ATTESTOR] retrieving oracle event with uuid {}", uuid);
         let mut event: DbValue;
 
-        if self.oracle.event_handler.storage_api.is_some() {
-            let res = match self
-                .oracle
-                .event_handler
-                .storage_api
-                .as_ref()
-                .expect("Storage API connection to initialize properly")
-                .get(uuid.clone())
-                .await
-            {
-                Ok(val) => val,
-                Err(e) => {
-                    clog!(
-                        "[WASM-ATTESTOR] Error retrieving event from StorageAPI: {:?}",
-                        e
-                    );
-                    panic!();
-                }
-            };
-            let event_vec = match res {
-                Some(val) => val,
-                None => {
-                    clog!(
-                        "[WASM-ATTESTOR] Event missing in StorageAPI with uuid: {}",
-                        uuid
-                    );
-                    panic!();
-                }
-            };
-            event = serde_json::from_str(&String::from_utf8_lossy(&event_vec)).unwrap();
-            clog!("[WASM-ATTESTOR] Got event from StorageAPI: {:?}", event);
-        } else {
-            let event_ivec = match self
-                .oracle
-                .event_handler
-                .memory_api
-                .as_ref()
-                .unwrap()
-                .get(uuid.clone())
-                .await
-                .unwrap()
-            {
-                Some(val) => val,
-                None => panic!(),
-            };
-            event = serde_json::from_str(&String::from_utf8_lossy(&event_ivec)).unwrap();
-            clog!("[WASM-ATTESTOR] Got event from MemoryAPI: {:?}", event);
-        }
+        let res = match self
+            .oracle
+            .event_handler
+            .storage_api
+            .as_ref()
+            .expect("Storage API connection to initialize properly")
+            .get(uuid.clone())
+            .await
+        {
+            Ok(val) => val,
+            Err(e) => {
+                clog!(
+                    "[WASM-ATTESTOR] Error retrieving event from StorageAPI: {:?}",
+                    e
+                );
+                panic!();
+            }
+        };
+        let event_vec = match res {
+            Some(val) => val,
+            None => {
+                clog!(
+                    "[WASM-ATTESTOR] Event missing in StorageAPI with uuid: {}",
+                    uuid
+                );
+                panic!();
+            }
+        };
+        event = serde_json::from_str(&String::from_utf8_lossy(&event_vec)).unwrap();
+        clog!("[WASM-ATTESTOR] Got event from StorageAPI: {:?}", event);
 
         let outstanding_sk_nonces = event.clone().0.unwrap();
 
@@ -209,67 +189,47 @@ impl Attestor {
 
         let new_event = serde_json::to_string(&event).unwrap().into_bytes();
 
-        if self.oracle.event_handler.storage_api.is_some() {
-            let res = match self
-                .oracle
-                .event_handler
-                .storage_api
-                .as_ref()
-                .expect("Storage API connection to initialize properly")
-                .insert(uuid.clone(), new_event.clone())
-                .await
-            {
-                Ok(val) => val,
-                Err(e) => {
-                    clog!(
-                        "[WASM-ATTESTOR] Error inserting event to StorageAPI: {:?}",
-                        e
-                    );
-                    panic!();
-                }
-            };
-            let _insert_event = match res {
-                Some(val) => val,
-                None => {
-                    clog!(
-                        "[WASM-ATTESTOR] Event was unable to update in StorageAPI with uuid: {}",
-                        uuid
-                    );
-                    panic!();
-                }
-            };
-        } else {
-            let _insert_event = match self
-                .oracle
-                .event_handler
-                .memory_api
-                .as_mut()
-                .unwrap()
-                .insert(uuid, new_event.clone())
-                .await
-                .unwrap()
-            {
-                Some(val) => val,
-                // None => return Err(AttestorError::OracleEventNotFoundError(uuid).into()),
-                None => panic!(),
-            };
-        }
+        let res = match self
+            .oracle
+            .event_handler
+            .storage_api
+            .as_ref()
+            .expect("Storage API connection to initialize properly")
+            .insert(uuid.clone(), new_event.clone())
+            .await
+        {
+            Ok(val) => val,
+            Err(e) => {
+                clog!(
+                    "[WASM-ATTESTOR] Error inserting event to StorageAPI: {:?}",
+                    e
+                );
+                panic!();
+            }
+        };
+        let _insert_event = match res {
+            Some(val) => val,
+            None => {
+                clog!(
+                    "[WASM-ATTESTOR] Event was unable to update in StorageAPI with uuid: {}",
+                    uuid
+                );
+                panic!();
+            }
+        };
     }
 
     pub async fn get_events(&self) -> JsValue {
-        let events = match self.oracle.event_handler.storage_api {
-            Some(ref storage_api) => storage_api.get_all().await.unwrap().unwrap(),
-            None => self
-                .oracle
-                .event_handler
-                .memory_api
-                .as_ref()
-                .unwrap()
-                .get_all()
-                .await
-                .unwrap()
-                .unwrap(),
-        };
+        let events = self
+            .oracle
+            .event_handler
+            .storage_api
+            .clone()
+            .unwrap()
+            .get_all()
+            .await
+            .unwrap()
+            .unwrap();
 
         let events: Vec<ApiOracleEvent> = events
             .iter()
@@ -280,18 +240,15 @@ impl Attestor {
     }
 
     pub async fn get_event(&self, uuid: String) -> JsValue {
-        let result = match self.oracle.event_handler.storage_api {
-            Some(ref storage_api) => storage_api.get(uuid).await.unwrap(),
-            None => self
-                .oracle
-                .event_handler
-                .memory_api
-                .as_ref()
-                .unwrap()
-                .get(uuid)
-                .await
-                .unwrap(),
-        };
+        let result = self
+            .oracle
+            .event_handler
+            .storage_api
+            .clone()
+            .unwrap()
+            .get(uuid)
+            .await
+            .unwrap();
 
         match result {
             Some(event) => {
