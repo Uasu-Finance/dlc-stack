@@ -73,7 +73,7 @@ impl Attestor {
         Attestor { oracle }
     }
 
-    pub async fn create_event(&mut self, uuid: &str, maturation: &str) -> Result<(), JsValue> {
+    pub async fn create_event(&self, uuid: &str, maturation: &str) -> Result<(), JsValue> {
         let maturation = OffsetDateTime::parse(maturation, &Rfc3339)
             .map_err(AttestorError::DatetimeParseError)
             .unwrap();
@@ -102,19 +102,25 @@ impl Attestor {
 
         let new_event = serde_json::to_string(&db_value).unwrap().into_bytes();
 
-        if let Some(storage_api) = &self.oracle.event_handler.storage_api {
-            storage_api
-                .insert(uuid.to_string(), new_event.clone())
-                .await
-                .expect("[WASM-ATTESTOR] Failed to insert to storage api");
-        } else if let Some(memory_api) = &mut self.oracle.event_handler.memory_api {
-            memory_api
-                .insert(uuid.to_string(), new_event.clone())
-                .await
-                .expect("[WASM-ATTESTOR] Failed to insert to memory api");
+        match &self
+            .oracle
+            .event_handler
+            .storage_api
+            .clone()
+            .unwrap()
+            .insert(uuid.to_string(), new_event.clone())
+            .await
+            .expect("[WASM-ATTESTOR] Failed to insert to storage api")
+        {
+            Some(_val) => Ok(()),
+            None => {
+                clog!(
+                    "[WASM-ATTESTOR] Event was unable to update in StorageAPI with uuid: {}, failed to create event",
+                    uuid
+                );
+                Err(JsValue::from_str("Failed to create event"))
+            }
         }
-
-        Ok(())
     }
 
     pub async fn attest(&mut self, uuid: String, outcome: u64) {
