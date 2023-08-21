@@ -28,16 +28,17 @@ router.get('/get-all-attestors', express.json(), async (req, res) => {
 });
 
 router.post('/post-close-dlc', express.json(), async (req, res) => {
-    if (!req.query.uuid) {
+    if (!req.body.uuid) {
         res.status(400).send('Missing UUID');
         return;
     }
-    if (!req.query.btcTxId) {
+    if (!req.body.btcTxId) {
         res.status(400).send('Missing BTC TX ID');
         return;
     }
-    console.log('POST /post-close-dlc with UUID:', req.query.uuid);
-    const data = await blockchainWriter.postCloseDLC(req.query.uuid as string, req.query.btcTxId as string);
+    const { uuid, btcTxId } = req.body;
+    console.log('POST /post-close-dlc with UUID:', uuid);
+    const data = await blockchainWriter.postCloseDLC(uuid as string, btcTxId as string);
     res.status(200).send(data);
 });
 
