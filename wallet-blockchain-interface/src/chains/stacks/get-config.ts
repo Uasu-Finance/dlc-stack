@@ -152,7 +152,7 @@ export default async (config: ConfigSet): Promise<WrappedContract> => {
             try {
                 const callbackContractPrincipal = await getCallbackContract(uuid, contractName, deployer, network);
 
-                const functionName = 'post-close-dlc';
+                const functionName = 'post-close';
                 const contractNonFungiblePostCondition = makeContractNonFungiblePostCondition(
                     deployer,
                     contractName,
@@ -174,7 +174,7 @@ export default async (config: ConfigSet): Promise<WrappedContract> => {
                                 callbackContractPrincipal.contractName.content
                             ),
                         ],
-                        postConditions: [contractNonFungiblePostCondition],
+                        // postConditions: [contractNonFungiblePostCondition],
                         senderKey: adminKey,
                         validateWithAbi: true,
                         network: network,
