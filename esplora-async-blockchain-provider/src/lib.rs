@@ -46,7 +46,7 @@ struct UTXOSpent {
 
 pub struct EsploraAsyncBlockchainProvider {
     host: String,
-    blockchain: EsploraBlockchain,
+    pub blockchain: EsploraBlockchain,
     chain_data: Arc<Mutex<ChainCacheData>>,
 }
 

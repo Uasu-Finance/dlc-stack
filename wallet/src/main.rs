@@ -2,6 +2,9 @@
 #![feature(async_fn_in_trait)]
 #![allow(unreachable_code)]
 
+use bdk::blockchain::{log_progress, Progress};
+use bdk::keys::DescriptorSecretKey;
+use bdk::miniscript::miniscript;
 // use log::warn;
 use bytes::Buf;
 use futures_util::{stream, StreamExt};
@@ -28,6 +31,7 @@ extern crate log;
 use bdk::Wallet as BdkWallet;
 use bdk::{blockchain::esplora::EsploraBlockchain, SyncOptions};
 use bdk::{descriptor::IntoWalletDescriptor, wallet::AddressIndex};
+// use bdk::descriptor::DescriptorSecretKey::XPrv;
 use core::fmt;
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
@@ -254,25 +258,6 @@ async fn api_get_response() -> Result<Response<Body>, GenericError> {
     };
     Ok(res)
 }
-// async fn response_examples(
-//     req: Request<Body>,
-//     client: Client<HttpConnector>,
-// ) -> Result<Response<Body>, GenericError> {
-//     match (req.method(), req.uri().path()) {
-//         (&Method::GET, "/") | (&Method::GET, "/index.html") => Ok(Response::new(INDEX.into())),
-//         (&Method::GET, "/test.html") => client_request_response(&client).await,
-//         (&Method::POST, "/json_api") => api_post_response(req).await,
-//         (&Method::GET, "/json_api") => api_get_response().await,
-//         (&Method::GET, "/periodic_check") => periodic_check(manager, dlc_store).await,
-//         _ => {
-//             // Return 404 not found response.
-//             Ok(Response::builder()
-//                 .status(StatusCode::NOT_FOUND)
-//                 .body(NOTFOUND.into())
-//                 .unwrap())
-//         }
-//     }
-// }
 
 async fn run() {
     let client = Client::new();
@@ -287,27 +272,6 @@ async fn run() {
     let wallet_pkey = env::var("WALLET_PKEY")
         .expect("WALLET_PKEY environment variable not set, please run `just generate-descriptor`, securely backup the output, and set this env_var accordingly");
 
-    let secp = bitcoin::secp256k1::Secp256k1::new();
-    let (wallet_desc, keymap) = wallet_descriptor_string
-        .into_wallet_descriptor(&secp, Network::Testnet)
-        .unwrap();
-
-    println!("wallet_desc: {:?}", wallet_desc);
-    println!("\n\nkeymap: {:?}", keymap);
-    let first_key = keymap.keys().next().unwrap();
-    // this is creating a 66 hex-character pubkey, but in attestor we are currently creating an xpubkey with only 64 characters
-    let pubkey = first_key
-        .clone()
-        .at_derivation_index(0)
-        .derive_public_key(&secp)
-        .unwrap()
-        .inner
-        .to_string();
-
-    let keypair = KeyPair::from_seckey_str(&secp, &wallet_pkey).unwrap();
-
-    let seckey = keypair.secret_key();
-
     // Setup Blockchain Connection Object
     let active_network = match env::var("BITCOIN_NETWORK").as_deref() {
         Ok("bitcoin") => bitcoin::Network::Bitcoin,
@@ -318,6 +282,39 @@ async fn run() {
             "Unknown Bitcoin Network, make sure to set BITCOIN_NETWORK in your env variables"
         ),
     };
+
+    let secp = bitcoin::secp256k1::Secp256k1::new();
+    let (wallet_desc, keymap) = wallet_descriptor_string
+        .into_wallet_descriptor(&secp, active_network)
+        .unwrap();
+
+    println!("wallet_desc: {:?}", wallet_desc);
+    println!("\n\nkeymap: {:?}", keymap);
+    let x_pub_key = keymap.keys().next().unwrap();
+    let x_priv_key = keymap.get(x_pub_key).unwrap();
+    println!("x_pub_key: {:?}", x_pub_key);
+    println!("x_priv_key: {:?}", x_priv_key);
+
+    // match x_priv_key {
+    // miniscript::::Single(skey) => println!("SinglePriv"),
+    // /// Extended private key (xpriv).
+    // XPrv(xkey) => println!("XPrv"),
+    // }
+
+    //How to get a derived private_key from the keymap and xprivatekey of the descriptor
+
+    // this is creating a 66 hex-character pubkey, but in attestor we are currently creating an xpubkey with only 64 characters
+    let pubkey = x_pub_key
+        .clone()
+        .at_derivation_index(0)
+        .derive_public_key(&secp)
+        .unwrap()
+        .inner
+        .to_string();
+
+    let keypair = KeyPair::from_seckey_str(&secp, &wallet_pkey).unwrap();
+
+    let seckey = keypair.secret_key();
 
     // Set up wallet store
     let root_sled_path: String = env::var("SLED_WALLET_PATH").unwrap_or("wallet_db".to_string());
@@ -345,7 +342,7 @@ async fn run() {
     ));
 
     let bdk_wallet = Arc::new(Mutex::new(
-        BdkWallet::new(wallet_desc, None, Network::Testnet, sled).unwrap(),
+        BdkWallet::new(wallet_desc, None, active_network, sled).unwrap(),
     ));
 
     let static_address = bdk_wallet
@@ -398,6 +395,7 @@ async fn run() {
     let make_service = make_service_fn(move |_| {
         // For each connection, clone the counter to use in our service...
         let manager = manager.clone();
+        let blockchain = blockchain.clone();
         let dlc_store = dlc_store.clone();
         let client = client.clone();
         let protocol_wallet_attestors = protocol_wallet_attestors.clone();
@@ -406,21 +404,12 @@ async fn run() {
         async move {
             Ok::<_, Error>(service_fn(move |req| {
                 let manager = manager.clone();
+                let blockchain = blockchain.clone();
                 let dlc_store = dlc_store.clone();
                 let wallet = wallet.clone();
                 let protocol_wallet_attestors = protocol_wallet_attestors.clone();
                 let client = client.clone();
                 async move {
-                    // let resp = periodic_check(manager.clone(), dlc_store.clone())
-                    //     .await
-                    //     .unwrap();
-                    // info!("resp: {:?}", resp);
-
-                    // Ok::<_, Error>(Response::new(Body::from(format!("Request #{}", value))))
-                    // Ok::<_, GenericError>(service_fn(move |req| {
-                    // Clone again to ensure that client outlives this closure.
-
-                    // }))
                     match (req.method(), req.uri().path()) {
                         (&Method::GET, "/") | (&Method::GET, "/index.html") => {
                             Ok(Response::new(INDEX.into()))
@@ -430,6 +419,24 @@ async fn run() {
                         (&Method::GET, "/json_api") => api_get_response().await,
                         (&Method::GET, "/info") => get_wallet_info(dlc_store, wallet).await,
                         (&Method::GET, "/periodic_check") => {
+                            if refresh_wallet(blockchain, wallet).await.is_err() {
+                                warn!("Error refreshing wallet: ");
+                                return Ok(Response::builder()
+                                    .status(StatusCode::BAD_REQUEST)
+                                    .header(header::CONTENT_TYPE, "application/json")
+                                    .body(Body::from(
+                                        json!(
+                                            {
+                                                "status": 400,
+                                                "errors": vec![ErrorResponse {
+                                                    message: "Error refreshing wallet".to_string(),
+                                                    code: None,
+                                                }],
+                                            }
+                                        )
+                                        .to_string(),
+                                    ))?);
+                            };
                             periodic_check(manager, dlc_store).await
                             //update funded uuids code goes here
                         }
@@ -460,7 +467,11 @@ async fn run() {
         }
     });
 
-    let addr = ([127, 0, 0, 1], 3000).into();
+    let addr = (
+        [127, 0, 0, 1],
+        wallet_backend_port.parse().expect("Correct port value"),
+    )
+        .into();
 
     let server = Server::bind(&addr).executor(LocalExec).serve(make_service);
 
@@ -673,10 +684,95 @@ async fn get_wallet_info(
     Ok(response)
 }
 
+async fn refresh_wallet(
+    blockchain: Arc<EsploraAsyncBlockchainProvider>,
+    wallet: Arc<DlcBdkWallet>,
+) -> Result<Response<Body>, GenericError> {
+    let wallet = match wallet.bdk_wallet.lock() {
+        Ok(wallet) => wallet,
+        Err(e) => {
+            error!("Error locking wallet: {}", e.to_string());
+            return Ok(Response::builder()
+                .status(StatusCode::BAD_REQUEST)
+                .header(header::CONTENT_TYPE, "application/json")
+                .body(Body::from(
+                    json!(
+                        {
+                            "status": 400,
+                            "errors": vec![ErrorResponse {
+                                message: e.to_string(),
+                                code: None,
+                            }],
+                        }
+                    )
+                    .to_string(),
+                ))?);
+        }
+    };
+
+    // This doesn't work
+    let progress =
+        Some(Box::new(delay_progress()) as Box<(dyn bdk::blockchain::Progress + 'static)>);
+    let sync_options = SyncOptions { progress };
+
+    match wallet.sync(&blockchain.blockchain, sync_options).await {
+        Ok(_) => (),
+        Err(e) => {
+            error!("Error syncing wallet: {}", e.to_string());
+            return Ok(Response::builder()
+                .status(StatusCode::BAD_REQUEST)
+                .header(header::CONTENT_TYPE, "application/json")
+                .body(Body::from(
+                    json!(
+                        {
+                            "status": 400,
+                            "errors": vec![ErrorResponse {
+                                message: e.to_string(),
+                                code: None,
+                            }],
+                        }
+                    )
+                    .to_string(),
+                ))?);
+        }
+    };
+
+    let response = Response::builder()
+        .status(StatusCode::OK)
+        .header(header::CONTENT_TYPE, "application/json")
+        .body(Body::from("Refreshed wallet"))?;
+    Ok(response)
+}
+
+/// Type that implements [`Progress`] and logs at level `INFO` every update received
+#[derive(Clone, Copy, Default, Debug)]
+pub struct DelayProgress;
+
+/// Create a new instance of [`DelayProgress`]
+pub fn delay_progress() -> DelayProgress {
+    DelayProgress
+}
+
+impl Progress for DelayProgress {
+    fn update(&self, progress: f32, message: Option<String>) -> Result<(), bdk::Error> {
+        println!(
+            "Super Sync {:.3}%: `{}`",
+            progress,
+            message.unwrap_or_else(|| "".into())
+        );
+
+        // Sleep for a bit to simulate a slow sync
+        thread::sleep(Duration::from_millis(1000));
+
+        Ok(())
+    }
+}
+
 async fn periodic_check(
     manager: Arc<Mutex<DlcManager<'_>>>,
     store: Arc<AsyncStorageApiProvider>,
 ) -> Result<Response<Body>, GenericError> {
+    debug!("Running periodic_check");
     let mut man = manager.lock().unwrap();
 
     let updated_contract_ids = match man.periodic_check().await {
