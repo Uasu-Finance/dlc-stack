@@ -8,10 +8,7 @@ import {
     addressToString,
     makeContractCall,
     broadcastTransaction,
-    NonFungibleConditionCode,
     bufferCV,
-    createAssetInfo,
-    makeContractNonFungiblePostCondition,
     stringAsciiCV,
     uintCV,
 } from '@stacks/transactions';
@@ -19,9 +16,11 @@ import type { TxBroadcastResult } from '@stacks/transactions';
 import { ConfigSet } from '../../config/models.js';
 import { WrappedContract } from '../shared/models/wrapped-contract.interface.js';
 import { callReadOnly, hexToBytes, uuidToCV } from './helper-functions.js';
-import { StacksMainnet, StacksMocknet, StacksNetwork, StacksTestnet } from '@stacks/network';
+import { StacksNetwork } from '@stacks/network';
 import { getEnv } from '../../config/read-env-configs.js';
 import { NFTHoldingsData } from '../shared/models/nft-holdings-data.interface.js';
+import getNetworkInfo from './get-network-config.js';
+import StacksNonceService from '../../services/stacks-nonce.service.js';
 
 async function getCallbackContract(uuid: string, contractName: string, deployer: string, network: StacksNetwork) {
     const functionName = 'get-callback-contract';
@@ -81,41 +80,11 @@ async function getAllAttestors(
 
 export default async (config: ConfigSet): Promise<WrappedContract> => {
     console.log(`[Stacks] Loading contract config for ${config.chain}...`);
-    const adminKey = getEnv('PRIVATE_KEY');
-    let api_base_extended: string;
+    const walletKey = getEnv('PRIVATE_KEY');
     const contractName = 'dlc-manager-v1';
-    const dlcNFTName = `open-dlc`;
     const attestorNFTName = 'dlc-attestors';
 
-    let network: StacksNetwork;
-    let deployer: string;
-
-    switch (config.chain) {
-        case 'STACKS_MAINNET':
-            network = new StacksMainnet();
-            deployer = '';
-            api_base_extended = 'https://api.hiro.so/extended/v1';
-            break;
-        case 'STACKS_TESTNET':
-            network = new StacksTestnet();
-            deployer = 'ST1JHQ5GPQT249ZWG6V4AWETQW5DYA5RHJB0JSMQ3';
-            api_base_extended = 'https://api.testnet.hiro.so/extended/v1';
-            break;
-        case 'STACKS_MOCKNET':
-            network = new StacksMocknet({
-                url: `https://${getEnv('MOCKNET_ADDRESS')}`,
-            });
-            deployer = 'ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM';
-            api_base_extended = `https://${getEnv('MOCKNET_ADDRESS')}/extended/v1`;
-            break;
-        case 'STACKS_LOCAL':
-            network = new StacksMocknet();
-            deployer = 'ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM';
-            api_base_extended = 'http://localhost:3999/extended/v1';
-            break;
-        default:
-            throw new Error(`${config.chain} is not a valid chain.`);
-    }
+    const { network, deployer, api_base_extended } = await getNetworkInfo(config);
 
     return {
         setStatusFunded: async (uuid) => {
@@ -130,11 +99,12 @@ export default async (config: ConfigSet): Promise<WrappedContract> => {
                         uuidToCV(uuid),
                         contractPrincipalCV(addressToString(cbPrincipal.address), cbPrincipal.contractName.content),
                     ],
-                    senderKey: adminKey,
+                    senderKey: walletKey,
                     validateWithAbi: true,
                     network: network,
                     fee: 100000,
                     anchorMode: 1,
+                    nonce: await StacksNonceService.getNonce(),
                 };
 
                 const transaction2 = await makeContractCall(txOptions2);
@@ -151,17 +121,9 @@ export default async (config: ConfigSet): Promise<WrappedContract> => {
         postCloseDLC: async (uuid, btcTxId) => {
             try {
                 const callbackContractPrincipal = await getCallbackContract(uuid, contractName, deployer, network);
-
                 const functionName = 'post-close';
-                const contractNonFungiblePostCondition = makeContractNonFungiblePostCondition(
-                    deployer,
-                    contractName,
-                    NonFungibleConditionCode.Sends,
-                    createAssetInfo(deployer, contractName, dlcNFTName),
-                    bufferCV(hexToBytes(uuid))
-                );
 
-                function populateTxOptions() {
+                async function populateTxOptions() {
                     return {
                         contractAddress: deployer,
                         contractName: contractName,
@@ -174,16 +136,16 @@ export default async (config: ConfigSet): Promise<WrappedContract> => {
                                 callbackContractPrincipal.contractName.content
                             ),
                         ],
-                        // postConditions: [contractNonFungiblePostCondition],
-                        senderKey: adminKey,
+                        senderKey: walletKey,
                         validateWithAbi: true,
                         network: network,
                         fee: 100000, //0.1STX
                         anchorMode: 1,
+                        nonce: await StacksNonceService.getNonce(),
                     };
                 }
 
-                const transaction = await makeContractCall(populateTxOptions());
+                const transaction = await makeContractCall(await populateTxOptions());
                 console.log('Transaction payload:', transaction.payload);
                 const broadcastResponse = await broadcastTransaction(transaction, network);
                 console.log('Broadcast response: ', broadcastResponse);
