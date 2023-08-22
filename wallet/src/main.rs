@@ -3,8 +3,6 @@
 #![allow(unreachable_code)]
 
 use bdk::blockchain::{log_progress, Progress};
-use bdk::keys::DescriptorSecretKey;
-use bdk::miniscript::miniscript;
 // use log::warn;
 use bytes::Buf;
 use futures_util::{stream, StreamExt};
@@ -15,41 +13,28 @@ use tokio::sync::oneshot;
 use http_body_util::{BodyExt, Full};
 use hyper::body::Bytes;
 use hyper::client::HttpConnector;
-use hyper::header::{HeaderMap, HeaderValue};
 use hyper::service::{make_service_fn, service_fn};
 use hyper::Error;
 use hyper::{header, Body, Client, Method, Request, Response, Server, StatusCode};
-use std::marker::PhantomData;
-use std::pin::Pin;
-use std::task::{Context, Poll};
-use tokio::net::{TcpListener, TcpStream};
 
 extern crate pretty_env_logger;
 #[macro_use]
 extern crate log;
 
+use bdk::SyncOptions;
 use bdk::Wallet as BdkWallet;
-use bdk::{blockchain::esplora::EsploraBlockchain, SyncOptions};
 use bdk::{descriptor::IntoWalletDescriptor, wallet::AddressIndex};
-// use bdk::descriptor::DescriptorSecretKey::XPrv;
-use core::fmt;
 use serde::{Deserialize, Serialize};
-use std::collections::HashSet;
+
 use std::{
-    clone, cmp,
     collections::HashMap,
-    convert::Infallible,
-    env, panic,
-    str::FromStr,
+    env,
     sync::{Arc, Mutex},
     thread,
     time::Duration,
-    vec,
 };
-use tokio::sync::RwLock;
-use tokio::{runtime, task};
 
-use bitcoin::{hashes::Hash, KeyPair, Network, XOnlyPublicKey};
+use bitcoin::{KeyPair, XOnlyPublicKey};
 use dlc_bdk_wallet::DlcBdkWallet;
 // use dlc_link_manager::Manager;
 use dlc_link_manager::{AsyncOracle, AsyncStorage, Manager};
@@ -59,25 +44,20 @@ use dlc_manager::{
         Contract,
     },
     // manager::Manager,
-    Blockchain,
-    Oracle,
-    Storage,
     SystemTimeProvider,
 };
 use dlc_messages::{AcceptDlc, Message};
-use dlc_sled_storage_provider::SledStorageProvider;
 // use electrs_blockchain_provider::ElectrsBlockchainProvider;
 use esplora_async_blockchain_provider::EsploraAsyncBlockchainProvider;
 use log::{debug, error, info, warn};
 
 // use crate::storage::storage_provider::StorageProvider;
-use oracle_client::P2PDOracleClient;
-use serde_json::{json, Value};
+use attestor_client::AttestorClient;
+use serde_json::json;
 use std::fmt::Write as _;
 use storage::async_storage_api::AsyncStorageApiProvider;
 use utils::get_numerical_contract_info;
 
-mod oracle_client;
 mod storage;
 mod utils;
 #[macro_use]
@@ -98,7 +78,7 @@ type DlcManager<'a> = Manager<
     Arc<DlcBdkWallet>,
     Arc<EsploraAsyncBlockchainProvider>,
     Arc<AsyncStorageApiProvider>,
-    Arc<P2PDOracleClient>,
+    Arc<AttestorClient>,
     Arc<SystemTimeProvider>,
     // Arc<EsploraAsyncBlockchainProvider>,
 >;
@@ -176,13 +156,13 @@ async fn get_attestors() -> Result<Vec<String>, dlc_manager::error::Error> {
     }
 }
 
-async fn generate_p2pd_clients(
+async fn generate_attestor_client(
     attestor_urls: Vec<String>,
-) -> HashMap<XOnlyPublicKey, Arc<P2PDOracleClient>> {
+) -> HashMap<XOnlyPublicKey, Arc<AttestorClient>> {
     let mut attestor_clients = HashMap::new();
 
     for url in attestor_urls.iter() {
-        let p2p_client: P2PDOracleClient = P2PDOracleClient::new(url).await.unwrap();
+        let p2p_client: AttestorClient = AttestorClient::new(url).await.unwrap();
         let attestor = Arc::new(p2p_client);
         attestor_clients.insert(attestor.get_public_key().await, attestor.clone());
     }
@@ -261,14 +241,10 @@ async fn api_get_response() -> Result<Response<Body>, GenericError> {
 
 async fn run() {
     let client = Client::new();
-    // Using a !Send request counter is fine on 1 thread...
-    let counter = Rc::new(Cell::new(0));
 
     let wallet_backend_port: String = env::var("WALLET_BACKEND_PORT").unwrap_or("8085".to_string());
-
     let wallet_descriptor_string = env::var("WALLET_DESCRIPTOR")
         .expect("WALLET_DESCRIPTOR environment variable not set, please run `just generate-descriptor`, securely backup the output, and set this env_var accordingly");
-
     let wallet_pkey = env::var("WALLET_PKEY")
         .expect("WALLET_PKEY environment variable not set, please run `just generate-descriptor`, securely backup the output, and set this env_var accordingly");
 
@@ -360,7 +336,7 @@ async fn run() {
     ));
 
     // Set up Oracle Client
-    let protocol_wallet_attestors = generate_p2pd_clients(attestor_urls.clone()).await;
+    let protocol_wallet_attestors = generate_attestor_client(attestor_urls.clone()).await;
 
     // retry!(
     // blockchain.get_blockchain_height(),
@@ -440,7 +416,7 @@ async fn run() {
                             periodic_check(manager, dlc_store).await
                             //update funded uuids code goes here
                         }
-                        (&Method::GET, "/create_offer") => {
+                        (&Method::GET, "/offer") => {
                             create_new_offer(
                                 manager,
                                 protocol_wallet_attestors.clone(),
@@ -451,6 +427,57 @@ async fn run() {
                                 2,
                             )
                             .await
+                            //update funded uuids code goes here
+                        }
+                        (&Method::PUT, "/offer/accept") => {
+                            info!("Accepting offer");
+                            // Aggregate the body...
+                            let whole_body = hyper::body::aggregate(req).await?;
+                            // Decode as JSON...
+                            let mut data: serde_json::Value =
+                                serde_json::from_reader(whole_body.reader())?;
+                            // Change the JSON...
+                            // data["test"] = serde_json::Value::from("test_value");
+                            // And respond with the new JSON.
+                            info!("data: {:?}", data.clone());
+                            let json = serde_json::to_string(&data)?;
+                            let response = Response::builder()
+                                .status(StatusCode::OK)
+                                .header(header::CONTENT_TYPE, "application/json")
+                                .body(Body::from(json.clone()))?;
+                            info!("json: {}", json.clone());
+                            Ok(response)
+                            // let accept_dlc: AcceptDlc =
+                            //     match serde_json::from_str(&json.accept_message) {
+                            //         Ok(dlc) => dlc,
+                            //         Err(e) => {
+                            //             return add_access_control_headers(
+                            //                 Response::json(&ErrorsResponse {
+                            //                     status: 400,
+                            //                     errors: vec![ErrorResponse {
+                            //                         message: e.to_string(),
+                            //                         code: None,
+                            //                     }],
+                            //                 })
+                            //                 .with_status_code(400),
+                            //             )
+                            //         }
+                            //     };
+                            // let a = AcceptDlc {
+                            //     protocol_version: todo!(),
+                            //     temporary_contract_id: todo!(),
+                            //     accept_collateral: todo!(),
+                            //     funding_pubkey: todo!(),
+                            //     payout_spk: todo!(),
+                            //     payout_serial_id: todo!(),
+                            //     funding_inputs: todo!(),
+                            //     change_spk: todo!(),
+                            //     change_serial_id: todo!(),
+                            //     cet_adaptor_signatures: todo!(),
+                            //     refund_signature: todo!(),
+                            //     negotiation_fields: todo!(),
+                            // };
+                            // accept_offer(a, manager).await
                             //update funded uuids code goes here
                         }
                         _ => {
@@ -492,7 +519,7 @@ async fn run() {
 
 async fn create_new_offer(
     manager: Arc<Mutex<DlcManager<'_>>>,
-    attestors: HashMap<XOnlyPublicKey, Arc<P2PDOracleClient>>,
+    attestors: HashMap<XOnlyPublicKey, Arc<AttestorClient>>,
     active_network: bitcoin::Network,
     event_id: String,
     accept_collateral: u64,
@@ -595,6 +622,61 @@ async fn create_new_offer(
                     .to_string(),
                 ))?)
         }
+    }
+}
+
+async fn accept_offer(
+    accept_dlc: AcceptDlc,
+    manager: Arc<Mutex<DlcManager<'_>>>,
+) -> Result<Response<Body>, GenericError> {
+    println!("accept_dlc: {:?}", accept_dlc);
+    if let Some(Message::Sign(sign)) = match manager
+        .lock()
+        .unwrap()
+        .on_dlc_message(
+            &Message::Accept(accept_dlc),
+            STATIC_COUNTERPARTY_NODE_ID.parse().unwrap(),
+        )
+        .await
+    {
+        Ok(dlc) => dlc,
+        Err(e) => {
+            info!("DLC manager - accept offer error: {}", e.to_string());
+            return Ok(Response::builder()
+                .status(StatusCode::BAD_REQUEST)
+                .header(header::CONTENT_TYPE, "application/json")
+                .body(Body::from(
+                    json!({
+                        "status": 400,
+                        "errors": vec![ErrorResponse {
+                            message: e.to_string(),
+                            code: None,
+                        }],
+                    })
+                    .to_string(),
+                ))?);
+        }
+    } {
+        return Ok(Response::builder()
+            .status(StatusCode::OK)
+            .header(header::CONTENT_TYPE, "application/json")
+            .body(Body::from(serde_json::to_string(&sign)?))?);
+    } else {
+        return Ok(Response::builder()
+            .status(StatusCode::BAD_REQUEST)
+            .header(header::CONTENT_TYPE, "application/json")
+            .body(Body::from(
+                json!({
+                    "status": 400,
+                    "errors": vec![ErrorResponse {
+                        message: format!(
+                            "Error: invalid Sign message for accept_offer function",
+                        ),
+                        code: None,
+                    }],
+                })
+                .to_string(),
+            ))?);
     }
 }
 

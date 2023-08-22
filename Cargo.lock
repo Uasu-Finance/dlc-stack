@@ -386,6 +386,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "attestor-client"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "dlc 0.4.0 (git+https://github.com/dlc-link/rust-dlc)",
+ "dlc-link-manager",
+ "dlc-manager",
+ "dlc-messages 0.4.0 (git+https://github.com/dlc-link/rust-dlc)",
+ "lightning",
+ "log",
+ "reqwest",
+ "secp256k1-zkp",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "atty"
 version = "0.2.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1147,6 +1164,7 @@ dependencies = [
 name = "dlc-protocol-wallet"
 version = "0.4.0"
 dependencies = [
+ "attestor-client",
  "base64 0.13.1",
  "bdk",
  "bitcoin 0.29.2",
@@ -1254,6 +1272,7 @@ dependencies = [
 name = "dlc-wasm-wallet"
 version = "0.4.0"
 dependencies = [
+ "attestor-client",
  "base64 0.13.1",
  "bitcoin 0.29.2",
  "chrono",

@@ -4,6 +4,7 @@ extern crate console_error_panic_hook;
 extern crate log;
 
 use bitcoin::{Network, PrivateKey, XOnlyPublicKey};
+use dlc_link_manager::AsyncOracle;
 use dlc_messages::{Message, OfferDlc, SignDlc};
 use wasm_bindgen::prelude::*;
 
@@ -22,7 +23,7 @@ use std::{
 
 use dlc_manager::{
     contract::{signed_contract::SignedContract, Contract},
-    ContractId, Oracle, SystemTimeProvider,
+    ContractId, SystemTimeProvider,
 };
 
 use dlc_link_manager::{AsyncStorage, Manager};
@@ -35,25 +36,22 @@ use esplora_async_blockchain_provider::EsploraAsyncBlockchainProvider;
 
 use js_interface_wallet::JSInterfaceWallet;
 
-use oracle_client::P2PDOracleClient;
+use attestor_client::AttestorClient;
 use serde::{Deserialize, Serialize};
 
-mod oracle_client;
 mod storage;
 #[macro_use]
 mod macros;
 
-async fn generate_p2pd_clients(
+async fn generate_attestor_client(
     attestor_urls: Vec<String>,
-) -> HashMap<XOnlyPublicKey, Arc<P2PDOracleClient>> {
+) -> HashMap<XOnlyPublicKey, Arc<AttestorClient>> {
     let mut attestor_clients = HashMap::new();
 
     for url in attestor_urls.iter() {
-        let p2p_client: P2PDOracleClient = P2PDOracleClient::new(url)
-            .await
-            .expect("Error creating oracle client");
+        let p2p_client: AttestorClient = AttestorClient::new(url).await.unwrap();
         let attestor = Arc::new(p2p_client);
-        attestor_clients.insert(attestor.get_public_key(), attestor.clone());
+        attestor_clients.insert(attestor.get_public_key().await, attestor.clone());
     }
     return attestor_clients;
 }
@@ -62,7 +60,7 @@ type DlcManager = Manager<
     Arc<JSInterfaceWallet>,
     Arc<EsploraAsyncBlockchainProvider>,
     Box<AsyncStorageApiProvider>,
-    Arc<P2PDOracleClient>,
+    Arc<AttestorClient>,
     Arc<SystemTimeProvider>,
 >;
 
@@ -179,7 +177,7 @@ impl JsDLCInterface {
                 }
             };
 
-        let attestors = generate_p2pd_clients(attestor_urls_vec).await;
+        let attestors = generate_attestor_client(attestor_urls_vec).await;
 
         // Set up time provider
         let time_provider = SystemTimeProvider {};

@@ -12,6 +12,7 @@ crate-type = ["cdylib", "rlib"]
 default = ["console_error_panic_hook"]
 
 [dependencies]
+attestor-client = { path = "../attestor-client" }
 base64 = "0.13.1"
 bitcoin = {version = "0.29.2", features=["serde"]}
 chrono = {version = "0.4.19", features = ["serde"]}
