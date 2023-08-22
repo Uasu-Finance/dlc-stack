@@ -8,7 +8,6 @@ use dlc_manager::contract::signed_contract::SignedContract;
 use dlc_manager::contract::{Contract, PreClosedContract};
 use dlc_manager::error::Error;
 use dlc_manager::ContractId;
-use log::error;
 
 use crate::storage::utils::{get_contract_id_string, to_storage_error};
 
@@ -17,16 +16,6 @@ use super::utils::{deserialize_contract, get_contract_state_str, serialize_contr
 pub struct AsyncStorageApiProvider {
     client: StorageApiClient,
     key: String,
-}
-
-// implement clone for AsyncStorageApiProvider
-impl Clone for AsyncStorageApiProvider {
-    fn clone(&self) -> Self {
-        Self {
-            client: self.client.clone(),
-            key: self.key.clone(),
-        }
-    }
 }
 
 impl AsyncStorageApiProvider {
@@ -39,7 +28,6 @@ impl AsyncStorageApiProvider {
 
     // TODO: For testing only, delete before production
     pub async fn delete_contracts(&self) {
-        println!("Deleting all contracts");
         let _res = self.client.delete_contracts(self.key.clone());
     }
 

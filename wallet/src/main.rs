@@ -2,15 +2,12 @@
 #![feature(async_fn_in_trait)]
 #![allow(unreachable_code)]
 
-use bdk::blockchain::{log_progress, Progress};
+use bdk::blockchain::Progress;
 // use log::warn;
 use bytes::Buf;
 use futures_util::{stream, StreamExt};
-use std::cell::Cell;
-use std::rc::Rc;
 use tokio::sync::oneshot;
 
-use http_body_util::{BodyExt, Full};
 use hyper::body::Bytes;
 use hyper::client::HttpConnector;
 use hyper::service::{make_service_fn, service_fn};
@@ -416,15 +413,45 @@ async fn run() {
                             periodic_check(manager, dlc_store).await
                             //update funded uuids code goes here
                         }
-                        (&Method::GET, "/offer") => {
+                        (&Method::POST, "/offer") => {
+                            #[derive(Deserialize)]
+                            #[serde(rename_all = "camelCase")]
+                            struct OfferRequest {
+                                uuid: String,
+                                accept_collateral: u64,
+                                offer_collateral: u64,
+                                total_outcomes: u64,
+                                attestor_list: String,
+                            }
+
+                            let whole_body = hyper::body::aggregate(req).await?;
+
+                            let req: OfferRequest =
+                                serde_json::from_reader(whole_body.reader()).unwrap();
+
+                            let bitcoin_contract_attestor_urls: Vec<String> =
+                                match serde_json::from_str(&req.attestor_list.clone()) {
+                                    Ok(vec) => vec,
+                                    Err(e) => {
+                                        eprintln!("Error deserializing Attestor URLs: {}", e);
+                                        Vec::new()
+                                    }
+                                };
+
+                            let bitcoin_contract_attestors: HashMap<
+                                XOnlyPublicKey,
+                                Arc<AttestorClient>,
+                            > = generate_attestor_client(bitcoin_contract_attestor_urls.clone())
+                                .await;
+
                             create_new_offer(
                                 manager,
-                                protocol_wallet_attestors.clone(),
+                                bitcoin_contract_attestors,
                                 active_network,
-                                "0x1e9e6909f58fd76bed366442e8a4f6c03f2aedb902e057b1d697a2c29b876cb0".to_string(),
-                                100000,
-                                100000,
-                                2,
+                                req.uuid,
+                                req.accept_collateral,
+                                req.offer_collateral,
+                                req.total_outcomes,
                             )
                             .await
                             //update funded uuids code goes here
@@ -434,50 +461,36 @@ async fn run() {
                             // Aggregate the body...
                             let whole_body = hyper::body::aggregate(req).await?;
                             // Decode as JSON...
-                            let mut data: serde_json::Value =
-                                serde_json::from_reader(whole_body.reader())?;
-                            // Change the JSON...
-                            // data["test"] = serde_json::Value::from("test_value");
-                            // And respond with the new JSON.
-                            info!("data: {:?}", data.clone());
-                            let json = serde_json::to_string(&data)?;
-                            let response = Response::builder()
-                                .status(StatusCode::OK)
-                                .header(header::CONTENT_TYPE, "application/json")
-                                .body(Body::from(json.clone()))?;
-                            info!("json: {}", json.clone());
-                            Ok(response)
-                            // let accept_dlc: AcceptDlc =
-                            //     match serde_json::from_str(&json.accept_message) {
-                            //         Ok(dlc) => dlc,
-                            //         Err(e) => {
-                            //             return add_access_control_headers(
-                            //                 Response::json(&ErrorsResponse {
-                            //                     status: 400,
-                            //                     errors: vec![ErrorResponse {
-                            //                         message: e.to_string(),
-                            //                         code: None,
-                            //                     }],
-                            //                 })
-                            //                 .with_status_code(400),
-                            //             )
-                            //         }
-                            //     };
-                            // let a = AcceptDlc {
-                            //     protocol_version: todo!(),
-                            //     temporary_contract_id: todo!(),
-                            //     accept_collateral: todo!(),
-                            //     funding_pubkey: todo!(),
-                            //     payout_spk: todo!(),
-                            //     payout_serial_id: todo!(),
-                            //     funding_inputs: todo!(),
-                            //     change_spk: todo!(),
-                            //     change_serial_id: todo!(),
-                            //     cet_adaptor_signatures: todo!(),
-                            //     refund_signature: todo!(),
-                            //     negotiation_fields: todo!(),
-                            // };
-                            // accept_offer(a, manager).await
+                            #[derive(Deserialize)]
+                            #[serde(rename_all = "camelCase")]
+                            struct AcceptOfferRequest {
+                                accept_message: String,
+                            }
+                            let data: AcceptOfferRequest =
+                                serde_json::from_reader(whole_body.reader()).unwrap();
+                            let accept_dlc: AcceptDlc =
+                                match serde_json::from_str(&data.accept_message) {
+                                    Ok(data) => data,
+                                    Err(e) => {
+                                        return Ok(Response::builder()
+                                            .status(StatusCode::BAD_REQUEST)
+                                            .header(header::CONTENT_TYPE, "application/json")
+                                            .body(Body::from(
+                                                json!(
+                                                    {
+                                                        "status": 400,
+                                                        "errors": vec![ErrorResponse {
+                                                            message: e.to_string(),
+                                                            code: None,
+                                                        }],
+                                                    }
+                                                )
+                                                .to_string(),
+                                            ))?);
+                                    }
+                                };
+
+                            accept_offer(accept_dlc, manager).await
                             //update funded uuids code goes here
                         }
                         _ => {
