@@ -3,9 +3,12 @@ import { ConfigSet } from '../../config/models.js';
 import { StacksMainnet, StacksMocknet, StacksNetwork, StacksTestnet } from '@stacks/network';
 import { getEnv } from '../../config/read-env-configs.js';
 
+let networkConfig: { network: StacksNetwork; deployer: string; api_base_extended: string; walletAddress: string };
+
 export default async (
     config: ConfigSet
 ): Promise<{ network: StacksNetwork; deployer: string; api_base_extended: string; walletAddress: string }> => {
+    if (networkConfig) return networkConfig;
     const walletKey = getEnv('PRIVATE_KEY');
     let api_base_extended: string;
     let network: StacksNetwork;
@@ -39,5 +42,6 @@ export default async (
     }
 
     const walletAddress = getAddressFromPrivateKey(walletKey, network.version);
-    return { network, deployer, api_base_extended, walletAddress };
+    networkConfig = { network, deployer, api_base_extended, walletAddress };
+    return networkConfig;
 };
