@@ -2,23 +2,17 @@
 #![feature(async_fn_in_trait)]
 #![allow(unreachable_code)]
 
-use bdk::blockchain::{self, Progress};
 // use log::warn;
-use bdk::wallet::AddressIndex::New;
 use bytes::Buf;
-use dlc_manager::Wallet;
-use futures_util::{stream, StreamExt};
 use tokio::sync::oneshot;
 
-use hyper::body::Bytes;
-use hyper::client::HttpConnector;
 use hyper::service::{make_service_fn, service_fn};
 use hyper::Error;
-use hyper::{header, Body, Client, Method, Request, Response, Server, StatusCode};
+use hyper::{header, Body, Method, Response, Server, StatusCode};
 use url::form_urlencoded;
 
 extern crate pretty_env_logger;
-#[macro_use]
+
 extern crate log;
 
 use bdk::{descriptor::IntoWalletDescriptor, wallet::AddressIndex};
@@ -31,8 +25,6 @@ use std::{
     env,
     str::FromStr,
     sync::{Arc, Mutex},
-    thread,
-    time::Duration,
 };
 
 use bitcoin::{Address, KeyPair, XOnlyPublicKey};
@@ -73,16 +65,7 @@ impl fmt::Display for WalletError {
     }
 }
 impl std::error::Error for WalletError {}
-
-// type Result<T> = std::result::Result<T, GenericError>;
-type BoxBody = http_body_util::combinators::BoxBody<Bytes, hyper::Error>;
-
-static INDEX: &[u8] = b"<a href=\"test.html\">test.html</a>";
-static INTERNAL_SERVER_ERROR: &[u8] = b"Internal Server Error";
 static NOTFOUND: &[u8] = b"Not Found";
-static POST_DATA: &str = r#"{"original": "data"}"#;
-static URL: &str = "http://127.0.0.1:1337/json_api";
-
 // remove lifetime?
 type DlcManager<'a> = Manager<
     Arc<DlcBdkWallet>,
@@ -92,27 +75,6 @@ type DlcManager<'a> = Manager<
     Arc<SystemTimeProvider>,
     // Arc<EsploraAsyncBlockchainProvider>,
 >;
-
-// struct TestThing {
-//     test: String,
-//     hash: Arc<HashMap<String, Arc<Mutex<EsploraAsyncBlockchainProvider>>>>, // whahhaha
-// }
-// impl fmt::Debug for TestThing {
-//     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-//         f.debug_struct("TestThing")
-//             .field("test", &self.test)
-//             .finish()
-//     }
-// }
-// impl clone::Clone for TestThing {
-//     fn clone(&self) -> Self {
-//         TestThing {
-//             test: self.test.clone(),
-//             hash: self.hash.clone(),
-//         }
-//     }
-// }
-// type WrappedThing = TestThing;
 
 // The contracts in dlc-manager expect a node id, but web extensions often don't have this, so hardcode it for now. Should not have any ramifications.
 const STATIC_COUNTERPARTY_NODE_ID: &str =
@@ -193,65 +155,33 @@ fn main() {
     local.block_on(&rt, run());
 }
 
-async fn client_request_response(
-    client: &Client<HttpConnector>,
-) -> Result<Response<Body>, GenericError> {
-    let req = Request::builder()
-        .method(Method::POST)
-        .uri(URL)
-        .header(header::CONTENT_TYPE, "application/json")
-        .body(POST_DATA.into())
-        .unwrap();
-
-    let web_res = client.request(req).await?;
-    // Compare the JSON we sent (before) with what we received (after):
-    let before = stream::once(async {
-        Ok(format!(
-            "<b>POST request body</b>: {}<br><b>Response</b>: ",
-            POST_DATA,
-        )
-        .into())
-    });
-    let after = web_res.into_body();
-    let body = Body::wrap_stream(before.chain(after));
-
-    Ok(Response::new(body))
-}
-
-async fn process_post_params(req: Request<Body>) -> Result<Response<Body>, GenericError> {
-    // Aggregate the body...
-    let whole_body = hyper::body::aggregate(req).await?;
-    // Decode as JSON...
-    let mut data: serde_json::Value = serde_json::from_reader(whole_body.reader())?;
-    // Change the JSON...
-    data["test"] = serde_json::Value::from("test_value");
-    // And respond with the new JSON.
-    let json = serde_json::to_string(&data)?;
-    let response = Response::builder()
+fn return_success(message: String) -> Result<Response<Body>, GenericError> {
+    Ok(Response::builder()
         .status(StatusCode::OK)
         .header(header::CONTENT_TYPE, "application/json")
-        .body(Body::from(json))?;
-    Ok(response)
+        .body(Body::from(message.to_string()))
+        .unwrap())
 }
 
-async fn process_get_params() -> Result<Response<Body>, GenericError> {
-    let data = vec!["foo", "bar"];
-    let res = match serde_json::to_string(&data) {
-        Ok(json) => Response::builder()
-            .header(header::CONTENT_TYPE, "application/json")
-            .body(Body::from(json))
-            .unwrap(),
-        Err(_) => Response::builder()
-            .status(StatusCode::INTERNAL_SERVER_ERROR)
-            .body(INTERNAL_SERVER_ERROR.into())
-            .unwrap(),
-    };
-    Ok(res)
+fn return_error(message: String) -> Result<Response<Body>, GenericError> {
+    Ok(Response::builder()
+        .status(StatusCode::BAD_REQUEST)
+        .header(header::CONTENT_TYPE, "application/json")
+        .body(Body::from(
+            json!(
+                {
+                    "status": 400,
+                    "errors": vec![ErrorResponse {
+                        message: message.to_string(),
+                        code: None,
+                    }],
+                }
+            )
+            .to_string(),
+        ))?)
 }
 
 async fn run() {
-    let client = Client::new();
-
     let wallet_backend_port: String = env::var("WALLET_BACKEND_PORT").unwrap_or("8085".to_string());
     let wallet_descriptor_string = env::var("WALLET_DESCRIPTOR")
         .expect("WALLET_DESCRIPTOR environment variable not set, please run `just generate-descriptor`, securely backup the output, and set this env_var accordingly");
@@ -316,8 +246,10 @@ async fn run() {
         .expect("BLOCKCHAIN_INTERFACE_URL environment variable not set, couldn't get attestors");
 
     let funded_endpoint_url = format!("{}/set-status-funded", blockchain_interface_url);
+    let closed_endpoint_url = format!("{}/post-close-dlc", blockchain_interface_url);
 
-    let mut funded_uuids: Arc<Mutex<Vec<String>>> = Arc::new(Mutex::new(vec![]));
+    let funded_uuids: Box<Vec<String>> = Box::new(vec![]);
+    let closed_uuids: Box<Vec<String>> = Box::new(vec![]);
 
     // ELECTRUM / ELECTRS
     let electrs_host =
@@ -384,6 +316,10 @@ async fn run() {
         let blockchain = blockchain.clone();
         let dlc_store = dlc_store.clone();
         let wallet = wallet.clone();
+        let funded_endpoint_url = funded_endpoint_url.clone();
+        let funded_uuids = funded_uuids.clone();
+        let closed_endpoint_url = closed_endpoint_url.clone();
+        let closed_uuids = closed_uuids.clone();
 
         async move {
             Ok::<_, Error>(service_fn(move |req| {
@@ -391,6 +327,10 @@ async fn run() {
                 let blockchain = blockchain.clone();
                 let dlc_store = dlc_store.clone();
                 let wallet = wallet.clone();
+                let funded_endpoint_url = funded_endpoint_url.clone();
+                let mut funded_uuids = funded_uuids.clone();
+                let closed_endpoint_url = closed_endpoint_url.clone();
+                let mut closed_uuids = closed_uuids.clone();
                 async move {
                     match (req.method(), req.uri().path()) {
                         // (&Method::GET, "/cleanup") => {
@@ -435,53 +375,40 @@ async fn run() {
                                 empty_to_address(&address, wallet, blockchain).await
                             };
                             match result.await {
-                                Ok(message) => Ok(Response::builder()
-                                    .status(StatusCode::OK)
-                                    .header(header::CONTENT_TYPE, "application/json")
-                                    .body(Body::from(message.to_string()))
-                                    .unwrap()),
+                                Ok(message) => return_success(message),
                                 Err(e) => {
                                     warn!("Error emptying to address - {}", e);
-                                    return Ok(Response::builder()
-                                        .status(StatusCode::BAD_REQUEST)
-                                        .header(header::CONTENT_TYPE, "application/json")
-                                        .body(Body::from(
-                                            json!(
-                                                {
-                                                    "status": 400,
-                                                    "errors": vec![ErrorResponse {
-                                                        message: e.to_string(),
-                                                        code: None,
-                                                    }],
-                                                }
-                                            )
-                                            .to_string(),
-                                        ))?);
+                                    return_error(e.to_string())
                                 }
                             }
                         }
                         (&Method::GET, "/info") => get_wallet_info(dlc_store, wallet).await,
                         (&Method::GET, "/periodic_check") => {
                             // This needs to do the updates funding / post-close stuff
-                            if refresh_wallet(blockchain, wallet).await.is_err() {
-                                warn!("Error refreshing wallet: ");
-                                return Ok(Response::builder()
-                                    .status(StatusCode::BAD_REQUEST)
-                                    .header(header::CONTENT_TYPE, "application/json")
-                                    .body(Body::from(
-                                        json!(
-                                            {
-                                                "status": 400,
-                                                "errors": vec![ErrorResponse {
-                                                    message: "Error refreshing wallet".to_string(),
-                                                    code: None,
-                                                }],
-                                            }
-                                        )
-                                        .to_string(),
-                                    ))?);
+                            match refresh_wallet(blockchain, wallet).await {
+                                Ok(_) => (),
+                                Err(e) => {
+                                    warn!("Error refreshing wallet: {}", e.to_string());
+                                    return return_error(e.to_string());
+                                }
                             };
-                            periodic_check(manager, dlc_store).await
+                            match periodic_check(
+                                manager,
+                                dlc_store,
+                                funded_endpoint_url,
+                                &mut funded_uuids,
+                                closed_endpoint_url,
+                                &mut closed_uuids,
+                            )
+                            .await
+                            {
+                                Ok(_) => (),
+                                Err(e) => {
+                                    warn!("Error periodic check: {}", e.to_string());
+                                    return return_error(e.to_string());
+                                }
+                            };
+                            return_success("Periodic check complete".to_string())
                             //update funded uuids code goes here
                         }
                         (&Method::POST, "/offer") => {
@@ -876,12 +803,10 @@ async fn refresh_wallet(
         }
     };
 
-    // This doesn't work
-    let progress =
-        Some(Box::new(delay_progress()) as Box<(dyn bdk::blockchain::Progress + 'static)>);
-    let sync_options = SyncOptions { progress };
-
-    match wallet.sync(&blockchain.blockchain, sync_options).await {
+    match wallet
+        .sync(&blockchain.blockchain, SyncOptions::default())
+        .await
+    {
         Ok(_) => (),
         Err(e) => {
             error!("Error syncing wallet: {}", e.to_string());
@@ -910,50 +835,31 @@ async fn refresh_wallet(
     Ok(response)
 }
 
-/// Type that implements [`Progress`] and logs at level `INFO` every update received
-#[derive(Clone, Copy, Default, Debug)]
-pub struct DelayProgress;
-
-/// Create a new instance of [`DelayProgress`]
-pub fn delay_progress() -> DelayProgress {
-    DelayProgress
-}
-
-impl Progress for DelayProgress {
-    fn update(&self, progress: f32, message: Option<String>) -> Result<(), bdk::Error> {
-        println!(
-            "Super Sync {:.3}%: `{}`",
-            progress,
-            message.unwrap_or_else(|| "".into())
-        );
-
-        // Sleep for a bit to simulate a slow sync
-        thread::sleep(Duration::from_millis(1000));
-
-        Ok(())
-    }
-}
-
 async fn periodic_check(
     manager: Arc<Mutex<DlcManager<'_>>>,
     store: Arc<AsyncStorageApiProvider>,
-) -> Result<Response<Body>, GenericError> {
+    funded_url: String,
+    funded_uuids: &mut Vec<String>,
+    closed_url: String,
+    closed_uuids: &mut Vec<String>,
+) -> Result<String, GenericError> {
     debug!("Running periodic_check");
 
     // This should ideally not be done as a mutable ref as it could cause a runtime error
     // when you have a reference to an object as mut and not mut at the same time
     let mut man = manager.lock().unwrap();
 
-    let updated_contract_ids = match man.periodic_check().await {
-        Ok(updated_contract_ids) => updated_contract_ids,
+    let updated_contracts = match man.periodic_check().await {
+        Ok(updated_contracts) => updated_contracts,
         Err(e) => {
             info!("Error in periodic_check, will retry: {}", e.to_string());
             vec![]
         }
     };
-    let mut newly_confirmed_uuids = vec![];
+    let mut newly_confirmed_uuids: Vec<String> = vec![];
+    let mut newly_closed_uuids: Vec<(String, bitcoin::Txid)> = vec![];
 
-    for id in updated_contract_ids {
+    for (id, uuid) in updated_contracts {
         let contract = match store.get_contract(&id).await {
             Ok(Some(contract)) => contract,
             Ok(None) => {
@@ -966,35 +872,42 @@ async fn periodic_check(
             }
         };
 
-        let found_uuid = match contract {
-            Contract::Confirmed(c) => c
-                .accepted_contract
-                .offered_contract
-                .contract_info
-                .iter()
-                .next()
-                .map_or(None, |ci| {
-                    ci.oracle_announcements
-                        .iter()
-                        .next()
-                        .map_or(None, |oa| Some(oa.oracle_event.event_id.clone()))
-                }),
-            _ => None,
-        };
-        if found_uuid.is_none() {
-            error!(
+        match contract {
+            Contract::Confirmed(_c) => {
+                newly_confirmed_uuids.push(uuid);
+            }
+            Contract::Closed(c) => {
+                newly_closed_uuids.push((uuid, c.signed_cet.unwrap().txid()));
+            }
+            _ => error!(
                 "Error retrieving contract in periodic_check: {:?}, skipping",
                 id
-            );
-        }
-        newly_confirmed_uuids.push(found_uuid.unwrap());
+            ),
+        };
     }
-    let response = Response::builder()
-        .status(StatusCode::OK)
-        .header(header::CONTENT_TYPE, "application/json")
-        .body(Body::from(format!("{:?}", newly_confirmed_uuids)))?;
-    Ok(response)
-    // Ok(newly_confirmed_uuids)
+
+    for uuid in newly_confirmed_uuids {
+        if !funded_uuids.contains(&uuid) {
+            debug!("Contract is funded, setting funded to true: {}", uuid);
+            reqwest::Client::new()
+                .post(&funded_url)
+                .json(&json!({ "uuid": uuid }))
+                .send()
+                .await?;
+        }
+    }
+
+    for (uuid, txid) in newly_closed_uuids {
+        if !closed_uuids.contains(&uuid) {
+            debug!("Contract is closed, firing post-close url: {}", uuid);
+            reqwest::Client::new()
+                .post(&closed_url)
+                .json(&json!({"uuid": uuid, "btcTxId": txid.to_string()}))
+                .send()
+                .await?;
+        }
+    }
+    Ok("Success running periodic check".to_string())
 }
 
 // fn delete_all_offers(manager: Arc<Mutex<DlcManager>>) -> Result<Response<Body>, GenericError> {

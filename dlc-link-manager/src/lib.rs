@@ -331,8 +331,8 @@ where
 
     /// Function to call to check the state of the currently executing DLCs and
     /// update them if possible.
-    pub async fn periodic_check(&mut self) -> Result<Vec<ContractId>, Error> {
-        let mut affected_contracts = Vec::<ContractId>::new();
+    pub async fn periodic_check(&mut self) -> Result<Vec<(ContractId, String)>, Error> {
+        let mut affected_contracts = Vec::<(ContractId, String)>::new();
         affected_contracts.extend_from_slice(&self.check_signed_contracts().await?);
         affected_contracts.extend_from_slice(&self.check_confirmed_contracts().await?);
         affected_contracts.extend_from_slice(&self.check_preclosed_contracts().await?);
@@ -502,11 +502,24 @@ where
         Ok(false)
     }
 
-    async fn check_signed_contracts(&mut self) -> Result<Vec<ContractId>, Error> {
+    async fn check_signed_contracts(&mut self) -> Result<Vec<(ContractId, String)>, Error> {
         let mut contracts_to_confirm = Vec::new();
         for c in self.store.get_signed_contracts().await? {
             match self.check_signed_contract(&c).await {
-                Ok(true) => contracts_to_confirm.push(c.accepted_contract.get_contract_id()),
+                Ok(true) => contracts_to_confirm.push((
+                    c.accepted_contract.get_contract_id(),
+                    c.accepted_contract
+                        .offered_contract
+                        .contract_info
+                        .get(0)
+                        .unwrap()
+                        .oracle_announcements
+                        .get(0)
+                        .unwrap()
+                        .oracle_event
+                        .event_id
+                        .clone(),
+                )),
                 Ok(false) => (),
                 Err(e) => error!(
                     "Error checking confirmed contract {}: {}",
@@ -519,7 +532,7 @@ where
         Ok(contracts_to_confirm)
     }
 
-    async fn check_confirmed_contracts(&mut self) -> Result<Vec<ContractId>, Error> {
+    async fn check_confirmed_contracts(&mut self) -> Result<Vec<(ContractId, String)>, Error> {
         let mut contracts_to_close = Vec::new();
         for c in self.store.get_confirmed_contracts().await? {
             // Confirmed contracts from channel are processed in channel specific methods.
@@ -534,7 +547,20 @@ where
                         e
                     )
                 }
-                Ok(true) => contracts_to_close.push(c.accepted_contract.get_contract_id()),
+                Ok(true) => contracts_to_close.push((
+                    c.accepted_contract.get_contract_id(),
+                    c.accepted_contract
+                        .offered_contract
+                        .contract_info
+                        .get(0)
+                        .unwrap()
+                        .oracle_announcements
+                        .get(0)
+                        .unwrap()
+                        .oracle_event
+                        .event_id
+                        .clone(),
+                )),
                 Ok(false) => (),
             }
         }
@@ -616,13 +642,25 @@ where
         Ok(false)
     }
 
-    async fn check_preclosed_contracts(&mut self) -> Result<Vec<ContractId>, Error> {
+    async fn check_preclosed_contracts(&mut self) -> Result<Vec<(ContractId, String)>, Error> {
         let mut contracts_to_close = Vec::new();
         for c in self.store.get_preclosed_contracts().await? {
             match self.check_preclosed_contract(&c).await {
-                Ok(true) => {
-                    contracts_to_close.push(c.signed_contract.accepted_contract.get_contract_id())
-                }
+                Ok(true) => contracts_to_close.push((
+                    c.signed_contract.accepted_contract.get_contract_id(),
+                    c.signed_contract
+                        .accepted_contract
+                        .offered_contract
+                        .contract_info
+                        .get(0)
+                        .unwrap()
+                        .oracle_announcements
+                        .get(0)
+                        .unwrap()
+                        .oracle_event
+                        .event_id
+                        .clone(),
+                )),
                 Ok(false) => (),
                 Err(e) => error!(
                     "Error checking pre-closed contract {}: {}",
