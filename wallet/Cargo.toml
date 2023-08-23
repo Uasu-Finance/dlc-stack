@@ -40,6 +40,7 @@ dlc-bdk-wallet = { path = "../dlc-bdk-wallet" }
 sled = "0.34"
 tokio = {version = "1.31.0", features = ["rt"]}
 pretty_env_logger = "0.4.0"
+url = "2.2.2"
 
 [dev-dependencies]
 mockito = "0.31.0"

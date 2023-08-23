@@ -2,9 +2,11 @@
 #![feature(async_fn_in_trait)]
 #![allow(unreachable_code)]
 
-use bdk::blockchain::Progress;
+use bdk::blockchain::{self, Progress};
 // use log::warn;
+use bdk::wallet::AddressIndex::New;
 use bytes::Buf;
+use dlc_manager::Wallet;
 use futures_util::{stream, StreamExt};
 use tokio::sync::oneshot;
 
@@ -13,25 +15,27 @@ use hyper::client::HttpConnector;
 use hyper::service::{make_service_fn, service_fn};
 use hyper::Error;
 use hyper::{header, Body, Client, Method, Request, Response, Server, StatusCode};
+use url::form_urlencoded;
 
 extern crate pretty_env_logger;
 #[macro_use]
 extern crate log;
 
-use bdk::SyncOptions;
-use bdk::Wallet as BdkWallet;
 use bdk::{descriptor::IntoWalletDescriptor, wallet::AddressIndex};
+use bdk::{FeeRate, SyncOptions};
+use bdk::{SignOptions, Wallet as BdkWallet};
 use serde::{Deserialize, Serialize};
 
 use std::{
     collections::HashMap,
     env,
+    str::FromStr,
     sync::{Arc, Mutex},
     thread,
     time::Duration,
 };
 
-use bitcoin::{KeyPair, XOnlyPublicKey};
+use bitcoin::{Address, KeyPair, XOnlyPublicKey};
 use dlc_bdk_wallet::DlcBdkWallet;
 // use dlc_link_manager::Manager;
 use dlc_link_manager::{AsyncOracle, AsyncStorage, Manager};
@@ -51,7 +55,7 @@ use log::{debug, error, info, warn};
 // use crate::storage::storage_provider::StorageProvider;
 use attestor_client::AttestorClient;
 use serde_json::json;
-use std::fmt::Write as _;
+use std::fmt::{self, Write as _};
 use storage::async_storage_api::AsyncStorageApiProvider;
 use utils::get_numerical_contract_info;
 
@@ -61,6 +65,15 @@ mod utils;
 mod macros;
 
 type GenericError = Box<dyn std::error::Error + Send + Sync>;
+#[derive(Debug)]
+struct WalletError(String);
+impl fmt::Display for WalletError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "Wallet Error: {}", self.0)
+    }
+}
+impl std::error::Error for WalletError {}
+
 // type Result<T> = std::result::Result<T, GenericError>;
 type BoxBody = http_body_util::combinators::BoxBody<Bytes, hyper::Error>;
 
@@ -205,7 +218,7 @@ async fn client_request_response(
     Ok(Response::new(body))
 }
 
-async fn api_post_response(req: Request<Body>) -> Result<Response<Body>, GenericError> {
+async fn process_post_params(req: Request<Body>) -> Result<Response<Body>, GenericError> {
     // Aggregate the body...
     let whole_body = hyper::body::aggregate(req).await?;
     // Decode as JSON...
@@ -221,7 +234,7 @@ async fn api_post_response(req: Request<Body>) -> Result<Response<Body>, Generic
     Ok(response)
 }
 
-async fn api_get_response() -> Result<Response<Body>, GenericError> {
+async fn process_get_params() -> Result<Response<Body>, GenericError> {
     let data = vec!["foo", "bar"];
     let res = match serde_json::to_string(&data) {
         Ok(json) => Response::builder()
@@ -370,8 +383,6 @@ async fn run() {
         let manager = manager.clone();
         let blockchain = blockchain.clone();
         let dlc_store = dlc_store.clone();
-        let client = client.clone();
-        let protocol_wallet_attestors = protocol_wallet_attestors.clone();
         let wallet = wallet.clone();
 
         async move {
@@ -380,18 +391,78 @@ async fn run() {
                 let blockchain = blockchain.clone();
                 let dlc_store = dlc_store.clone();
                 let wallet = wallet.clone();
-                let protocol_wallet_attestors = protocol_wallet_attestors.clone();
-                let client = client.clone();
                 async move {
                     match (req.method(), req.uri().path()) {
-                        (&Method::GET, "/") | (&Method::GET, "/index.html") => {
-                            Ok(Response::new(INDEX.into()))
+                        // (&Method::GET, "/cleanup") => {
+                        //     let contract_cleanup_enabled: bool =
+                        //         env::var("CONTRACT_CLEANUP_ENABLED")
+                        //             .unwrap_or("false".to_string())
+                        //             .parse()
+                        //             .unwrap_or(false);
+                        //     if contract_cleanup_enabled {
+                        //         info!("Call cleanup contract offers.");
+                        //         delete_all_offers(manager)
+                        //     } else {
+                        //         info!("Call cleanup contract offers feature disabled.");
+                        //         return Ok(Response::builder()
+                        //             .status(StatusCode::BAD_REQUEST)
+                        //             .header(header::CONTENT_TYPE, "application/json")
+                        //             .body(Body::from(
+                        //                 json!(
+                        //                     {
+                        //                         "status": 400,
+                        //                         "errors": vec![ErrorResponse {
+                        //                             message: "Feature disabled".to_string(),
+                        //                             code: None,
+                        //                         }],
+                        //                     }
+                        //                 )
+                        //                 .to_string(),
+                        //             ))?);
+                        //     }
+                        // }
+                        (&Method::GET, "/empty_to_address") => {
+                            let result = async {
+                                let query = req.uri().query().ok_or(WalletError(
+                                    "Unable to find query on Request object".to_string(),
+                                ))?;
+                                let params = form_urlencoded::parse(query.as_bytes())
+                                    .into_owned()
+                                    .collect::<HashMap<String, String>>();
+                                let address = params.get("address").ok_or(WalletError(
+                                    "Unable to find address in query params".to_string(),
+                                ))?;
+                                empty_to_address(&address, wallet, blockchain).await
+                            };
+                            match result.await {
+                                Ok(message) => Ok(Response::builder()
+                                    .status(StatusCode::OK)
+                                    .header(header::CONTENT_TYPE, "application/json")
+                                    .body(Body::from(message.to_string()))
+                                    .unwrap()),
+                                Err(e) => {
+                                    warn!("Error emptying to address - {}", e);
+                                    return Ok(Response::builder()
+                                        .status(StatusCode::BAD_REQUEST)
+                                        .header(header::CONTENT_TYPE, "application/json")
+                                        .body(Body::from(
+                                            json!(
+                                                {
+                                                    "status": 400,
+                                                    "errors": vec![ErrorResponse {
+                                                        message: e.to_string(),
+                                                        code: None,
+                                                    }],
+                                                }
+                                            )
+                                            .to_string(),
+                                        ))?);
+                                }
+                            }
                         }
-                        (&Method::GET, "/test.html") => client_request_response(&client).await,
-                        (&Method::POST, "/json_api") => api_post_response(req).await,
-                        (&Method::GET, "/json_api") => api_get_response().await,
                         (&Method::GET, "/info") => get_wallet_info(dlc_store, wallet).await,
                         (&Method::GET, "/periodic_check") => {
+                            // This needs to do the updates funding / post-close stuff
                             if refresh_wallet(blockchain, wallet).await.is_err() {
                                 warn!("Error refreshing wallet: ");
                                 return Ok(Response::builder()
@@ -868,6 +939,9 @@ async fn periodic_check(
     store: Arc<AsyncStorageApiProvider>,
 ) -> Result<Response<Body>, GenericError> {
     debug!("Running periodic_check");
+
+    // This should ideally not be done as a mutable ref as it could cause a runtime error
+    // when you have a reference to an object as mut and not mut at the same time
     let mut man = manager.lock().unwrap();
 
     let updated_contract_ids = match man.periodic_check().await {
@@ -921,6 +995,64 @@ async fn periodic_check(
         .body(Body::from(format!("{:?}", newly_confirmed_uuids)))?;
     Ok(response)
     // Ok(newly_confirmed_uuids)
+}
+
+// fn delete_all_offers(manager: Arc<Mutex<DlcManager>>) -> Result<Response<Body>, GenericError> {
+//     info!("Deleting all contracts from dlc-store");
+//     let man = manager.lock().unwrap();
+//     man.get_store().delete_contracts();
+//     Ok(Response::builder()
+//         .status(StatusCode::OK)
+//         .body(Body::from("Success".to_string()))
+//         .unwrap())
+// }
+
+async fn empty_to_address(
+    address: &str,
+    wallet: Arc<DlcBdkWallet>,
+    blockchain: Arc<EsploraAsyncBlockchainProvider>,
+) -> Result<String, WalletError> {
+    info!("Emptying to address");
+    let bdk = match wallet.bdk_wallet.lock() {
+        Ok(wallet) => wallet,
+        Err(e) => {
+            error!("Error locking wallet: {}", e.to_string());
+            return Err(WalletError(e.to_string()));
+        }
+    };
+
+    let mut builder = bdk.build_tx();
+    builder
+        .add_recipient(
+            Address::from_str(address)
+                .map_err(|e| WalletError(e.to_string()))?
+                .script_pubkey(),
+            50_000,
+        )
+        .enable_rbf()
+        .do_not_spend_change()
+        .fee_rate(FeeRate::from_sat_per_vb(5.0));
+    let (mut psbt, details) = builder.finish().map_err(|e| WalletError(e.to_string()))?;
+
+    info!("Transaction details: {:#?}", details);
+    info!("Unsigned PSBT: {}", psbt);
+
+    let finalized = bdk
+        .sign(&mut psbt, SignOptions::default())
+        .map_err(|e| WalletError(e.to_string()))?;
+    assert!(finalized, "The PSBT was not finalized!");
+    info!("The PSBT has been signed and finalized.");
+
+    // Broadcast the transaction
+    let raw_transaction = psbt.extract_tx();
+    let txid = raw_transaction.txid();
+
+    blockchain
+        .blockchain
+        .broadcast(&raw_transaction)
+        .await
+        .map_err(|e| WalletError(e.to_string()))?;
+    Ok(format!("Transaction broadcast! TXID: {txid}.\nExplorer URL: https://mempool.space/testnet/tx/{txid}", txid = txid))
 }
 // Since the Server needs to spawn some background tasks, we needed
 // to configure an Executor that can spawn !Send futures...

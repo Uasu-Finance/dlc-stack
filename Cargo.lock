@@ -1196,6 +1196,7 @@ dependencies = [
  "serde_json",
  "sled",
  "tokio",
+ "url",
 ]
 
 [[package]]
