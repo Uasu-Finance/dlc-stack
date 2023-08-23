@@ -160,9 +160,11 @@ fn main() {
         .expect("BLOCKCHAIN_INTERFACE_URL environment variable not set, couldn't get attestors");
 
     let funded_endpoint_url = format!("{}/set-status-funded", blockchain_interface_url);
+    let closed_endpoint_url = format!("{}/post-close-dlc", blockchain_interface_url);
 
     let wallet_backend_port: String = env::var("WALLET_BACKEND_PORT").unwrap_or("8085".to_string());
     let mut funded_uuids: Vec<String> = vec![];
+    let mut closed_uuids: Vec<String> = vec![];
 
     // Setup Blockchain Connection Object
     let active_network = match env::var("BITCOIN_NETWORK").as_deref() {
@@ -246,6 +248,8 @@ fn main() {
             manager2.clone(),
             funded_endpoint_url.clone(),
             &mut funded_uuids,
+            closed_endpoint_url.clone(),
+            &mut closed_uuids,
         );
         wallet
             .refresh()
@@ -422,11 +426,13 @@ fn periodic_check(
     manager: Arc<Mutex<DlcManager>>,
     funded_url: String,
     funded_uuids: &mut Vec<String>,
+    closed_url: String,
+    closed_uuids: &mut Vec<String>,
 ) -> () {
     let mut man = manager.lock().unwrap();
 
-    let updated_contract_ids = match man.periodic_check() {
-        Ok(updated_contract_ids) => updated_contract_ids,
+    let updated_contracts = match man.periodic_check() {
+        Ok(updated_contracts) => updated_contracts,
         Err(e) => {
             info!("Error in periodic_check, will retry: {}", e.to_string());
             vec![]
@@ -435,7 +441,10 @@ fn periodic_check(
 
     let store = man.get_store();
 
-    for id in updated_contract_ids {
+    let mut newly_confirmed_uuids: Vec<String> = vec![];
+    let mut newly_closed_uuids: Vec<(String, bitcoin::Txid)> = vec![];
+
+    for (id, uuid) in updated_contracts {
         let contract = match store.get_contract(&id) {
             Ok(Some(contract)) => contract,
             Ok(None) => {
@@ -448,52 +457,92 @@ fn periodic_check(
             }
         };
 
-        let newly_confirmed_uuids = match contract {
-            Contract::Confirmed(c) => c
-                .accepted_contract
-                .offered_contract
-                .contract_info
-                .iter()
-                .map(|ci| {
-                    ci.oracle_announcements
-                        .iter()
-                        .map(|oa| oa.oracle_event.event_id.clone())
-                        .collect::<Vec<String>>() // May include duplicates as multiple oracles will each have the same uuid for the same event
-                })
-                .flatten()
-                .collect::<Vec<String>>(),
-            _ => vec![],
+        match contract {
+            Contract::Confirmed(c) => {
+                newly_confirmed_uuids.push(uuid);
+            }
+            Contract::Closed(c) => {
+                newly_closed_uuids.push((uuid, c.signed_cet.unwrap().txid()));
+            }
+            _ => error!(
+                "Error retrieving contract in periodic_check: {:?}, skipping",
+                id
+            ),
         };
+    }
 
-        for uuid in newly_confirmed_uuids {
-            if !funded_uuids.contains(&uuid) {
-                debug!("Contract is funded, setting funded to true: {}", uuid);
-                let mut post_body = HashMap::new();
-                post_body.insert("uuid", &uuid);
+    for uuid in newly_confirmed_uuids {
+        if !funded_uuids.contains(&uuid) {
+            debug!("Contract is funded, setting funded to true: {}", uuid);
+            let mut post_body = HashMap::new();
+            post_body.insert("uuid", &uuid);
 
-                let client = reqwest::blocking::Client::builder()
-                    .use_rustls_tls()
-                    .build();
-                if client.is_ok() {
-                    let res = client.unwrap().post(&funded_url).json(&post_body).send();
+            let client = reqwest::blocking::Client::builder()
+                .use_rustls_tls()
+                .build();
+            if client.is_ok() {
+                let res = client.unwrap().post(&funded_url).json(&post_body).send();
 
-                    match res {
-                        Ok(res) => match res.error_for_status() {
-                            Ok(_res) => {
-                                funded_uuids.push(uuid.clone());
-                                info!(
-                                    "Success setting funded to true: {}, {}",
-                                    uuid,
-                                    _res.status()
-                                );
-                            }
-                            Err(e) => {
-                                info!("Error setting funded to true: {}: {}", uuid, e.to_string());
-                            }
-                        },
+                match res {
+                    Ok(res) => match res.error_for_status() {
+                        Ok(_res) => {
+                            funded_uuids.push(uuid.clone());
+                            info!(
+                                "Success setting funded to true: {}, {}",
+                                uuid,
+                                _res.status()
+                            );
+                        }
                         Err(e) => {
                             info!("Error setting funded to true: {}: {}", uuid, e.to_string());
                         }
+                    },
+                    Err(e) => {
+                        info!("Error setting funded to true: {}: {}", uuid, e.to_string());
+                    }
+                }
+            }
+        }
+    }
+
+    for (uuid, txid) in newly_closed_uuids {
+        if !closed_uuids.contains(&uuid) {
+            debug!("Contract is closed, firing post-close url: {}", uuid);
+            let mut post_body = HashMap::new();
+            let txid = txid.to_string();
+            post_body.insert("uuid", &uuid);
+            post_body.insert("btcTxId", &txid);
+
+            let client = reqwest::blocking::Client::builder()
+                .use_rustls_tls()
+                .build();
+            if client.is_ok() {
+                let res = client.unwrap().post(&closed_url).json(&post_body).send();
+
+                match res {
+                    Ok(res) => match res.error_for_status() {
+                        Ok(_res) => {
+                            closed_uuids.push(uuid.clone());
+                            info!(
+                                "Success setting contract to closed: {}, {}",
+                                uuid,
+                                _res.status()
+                            );
+                        }
+                        Err(e) => {
+                            info!(
+                                "Error setting contract to closed: {}: {}",
+                                uuid,
+                                e.to_string()
+                            );
+                        }
+                    },
+                    Err(e) => {
+                        info!(
+                            "Error setting contract to closed: {}: {}",
+                            uuid,
+                            e.to_string()
+                        );
                     }
                 }
             }

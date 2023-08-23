@@ -1,4 +1,3 @@
-import { Chain } from '../config/models.js';
 import readEnvConfigs from '../config/read-env-configs.js';
 import getETHConfig from '../chains/ethereum/get-config.js';
 import getStacksConfig from '../chains/stacks/get-config.js';
@@ -8,6 +7,7 @@ import { TxBroadcastResult } from '@stacks/transactions';
 
 export default class BlockchainWriterService {
     private static blockchainWriter: BlockchainWriterService;
+    private static contractConfig: WrappedContract;
 
     private constructor() {}
 
@@ -16,7 +16,7 @@ export default class BlockchainWriterService {
         return this.blockchainWriter;
     }
 
-    public async getConfig(): Promise<WrappedContract> {
+    public async readConfig(): Promise<WrappedContract> {
         let configSet = readEnvConfigs();
 
         switch (configSet.chain) {
@@ -35,18 +35,25 @@ export default class BlockchainWriterService {
         }
     }
 
+    public async getWrappedContract(): Promise<WrappedContract> {
+        if (!BlockchainWriterService.contractConfig) {
+            BlockchainWriterService.contractConfig = await this.readConfig();
+        }
+        return BlockchainWriterService.contractConfig;
+    }
+
     public async setStatusFunded(uuid: string): Promise<TransactionReceipt | TxBroadcastResult> {
-        const contractConfig = await this.getConfig();
+        const contractConfig = await this.getWrappedContract();
         return await contractConfig.setStatusFunded(uuid);
     }
 
     public async postCloseDLC(uuid: string, btcTxId: string): Promise<TransactionReceipt | TxBroadcastResult> {
-        const contractConfig = await this.getConfig();
+        const contractConfig = await this.getWrappedContract();
         return await contractConfig.postCloseDLC(uuid, btcTxId);
     }
 
     public async getAllAttestors(): Promise<string[]> {
-        const contractConfig = await this.getConfig();
+        const contractConfig = await this.getWrappedContract();
         return await contractConfig.getAllAttestors();
     }
 }

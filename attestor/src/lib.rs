@@ -108,10 +108,9 @@ impl Attestor {
             .unwrap()
             .insert(uuid.to_string(), new_event.clone())
             .await
-            .expect("[WASM-ATTESTOR] Failed to insert to storage api")
         {
-            Some(_val) => Ok(()),
-            None => {
+            Ok(Some(_val)) => Ok(()),
+            _ => {
                 clog!(
                     "[WASM-ATTESTOR] Event was unable to update in StorageAPI with uuid: {}, failed to create event",
                     uuid
@@ -201,20 +200,21 @@ impl Attestor {
             Ok(val) => val,
             Err(e) => {
                 clog!(
-                    "[WASM-ATTESTOR] Error inserting event to StorageAPI: {:?}",
+                    "[WASM-ATTESTOR] Error updating event in StorageAPI: {:?}",
                     e
                 );
-                panic!();
+                None
             }
         };
         let _insert_event = match res {
-            Some(val) => val,
+            Some(val) => Some(val),
             None => {
                 clog!(
                     "[WASM-ATTESTOR] Event was unable to update in StorageAPI with uuid: {}",
                     uuid
                 );
-                panic!();
+                // panic!();
+                None
             }
         };
     }
