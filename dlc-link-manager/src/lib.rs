@@ -5,7 +5,7 @@ extern crate dlc_manager;
 
 use crate::dlc_manager::contract::{
     accepted_contract::AcceptedContract, contract_info::ContractInfo,
-    contract_input::ContractInput, contract_input::OracleInput, offered_contract::OfferedContract,
+    contract_input::ContractInput, offered_contract::OfferedContract,
     signed_contract::SignedContract, AdaptorInfo, ClosedContract, Contract, FailedAcceptContract,
     FailedSignContract, PreClosedContract,
 };
@@ -16,7 +16,7 @@ use crate::dlc_manager::{Blockchain, Time, Wallet};
 use bitcoin::Address;
 use bitcoin::Transaction;
 
-use dlc_manager::{contract, ContractId};
+use dlc_manager::ContractId;
 use dlc_messages::oracle_msgs::{OracleAnnouncement, OracleAttestation};
 use dlc_messages::{AcceptDlc, Message as DlcMessage, OfferDlc, SignDlc};
 
@@ -235,42 +235,7 @@ where
                 announcements.push(oracle.get_announcement(&event_id).await.unwrap());
             }
             oracle_announcements.push(announcements)
-            //     futures::future::join_all(
-            //         announcements
-            //             .iter()
-            //             .map(|oracle| async { oracle.get_announcement(&event_id).await.unwrap() }),
-            //     )
-            //     .await,
-            // )
         }
-
-        // .collect::<Vec<_>>()
-
-        // let oracle_announcements =
-        //     futures::future::join_all(contract_input.contract_infos.iter().map(
-        //         |x: &dlc_manager::contract::contract_input::ContractInputInfo| async move {
-        //             let mut announcements = Vec::new();
-        //             for pubkey in &x.oracles.public_keys {
-        //                 let oracle = self
-        //                     .oracles
-        //                     .get(pubkey)
-        //                     .ok_or_else(|| {
-        //                         Error::InvalidParameters("Unknown oracle public key".to_string())
-        //                     })
-        //                     .unwrap();
-        //                 announcements.push(
-        //                     oracle
-        //                         .get_announcement(&x.oracles.event_id)
-        //                         .await
-        //                         .unwrap()
-        //                         .clone(),
-        //                 );
-        //             }
-        //             announcements
-        //             // self.get_oracle_announcements(&x.oracles).await.unwrap()
-        //         },
-        //     ))
-        //     .await;
 
         let (offered_contract, offer_msg) = crate::dlc_manager::contract_updater::offer_contract(
             &self.secp,
@@ -432,27 +397,6 @@ where
         self.blockchain.send_transaction(&fund_tx)?;
 
         Ok(())
-    }
-
-    async fn get_oracle_announcements(
-        &self,
-        oracle_inputs: &OracleInput,
-    ) -> Result<Vec<OracleAnnouncement>, Error> {
-        let mut announcements = Vec::new();
-        for pubkey in &oracle_inputs.public_keys {
-            let oracle = self
-                .oracles
-                .get(pubkey)
-                .ok_or_else(|| Error::InvalidParameters("Unknown oracle public key".to_string()))?;
-            announcements.push(
-                oracle
-                    .get_announcement(&oracle_inputs.event_id)
-                    .await?
-                    .clone(),
-            );
-        }
-
-        Ok(announcements)
     }
 
     async fn sign_fail_on_error<R>(
