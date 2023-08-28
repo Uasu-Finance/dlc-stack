@@ -2,7 +2,8 @@
 #![feature(async_fn_in_trait)]
 #![allow(unreachable_code)]
 
-// use log::warn;
+use bdk::keys::DerivableKey;
+use bitcoin::util::bip32::{DerivationPath, ExtendedPrivKey};
 use bytes::Buf;
 use tokio::sync::oneshot;
 
@@ -15,11 +16,12 @@ extern crate pretty_env_logger;
 
 extern crate log;
 
-use bdk::{descriptor::IntoWalletDescriptor, wallet::AddressIndex};
-use bdk::{FeeRate, SyncOptions};
+use bdk::wallet::AddressIndex;
+use bdk::{descriptor, FeeRate, SyncOptions};
 use bdk::{SignOptions, Wallet as BdkWallet};
 use serde::{Deserialize, Serialize};
 
+use core::panic;
 use std::{
     collections::HashMap,
     env,
@@ -27,7 +29,7 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-use bitcoin::{Address, KeyPair, XOnlyPublicKey};
+use bitcoin::{Address, XOnlyPublicKey};
 use dlc_bdk_wallet::DlcBdkWallet;
 // use dlc_link_manager::Manager;
 use dlc_link_manager::{AsyncOracle, AsyncStorage, Manager};
@@ -183,10 +185,11 @@ fn return_error(message: String) -> Result<Response<Body>, GenericError> {
 
 async fn run() {
     let wallet_backend_port: String = env::var("WALLET_BACKEND_PORT").unwrap_or("8085".to_string());
-    let wallet_descriptor_string = env::var("WALLET_DESCRIPTOR")
-        .expect("WALLET_DESCRIPTOR environment variable not set, please run `just generate-descriptor`, securely backup the output, and set this env_var accordingly");
-    let wallet_pkey = env::var("WALLET_PKEY")
-        .expect("WALLET_PKEY environment variable not set, please run `just generate-descriptor`, securely backup the output, and set this env_var accordingly");
+    let xpriv_str = env::var("XPRIV")
+        .expect("XPRIV environment variable not set, please run `just generate-descriptor`, securely backup the output, and set this env_var accordingly");
+    let xpriv = ExtendedPrivKey::from_str(&xpriv_str).expect("Unable to decode xpriv env variable");
+    let fingerprint = env::var("FINGERPRINT")
+        .expect("FINGERPRINT environment variable not set, please run `just generate-descriptor`, securely backup the output, and set this env_var accordingly");
 
     // Setup Blockchain Connection Object
     let active_network = match env::var("BITCOIN_NETWORK").as_deref() {
@@ -200,41 +203,10 @@ async fn run() {
     };
 
     let secp = bitcoin::secp256k1::Secp256k1::new();
-    let (wallet_desc, keymap) = wallet_descriptor_string
-        .into_wallet_descriptor(&secp, active_network)
-        .unwrap();
-
-    println!("wallet_desc: {:?}", wallet_desc);
-    println!("\n\nkeymap: {:?}", keymap);
-    let x_pub_key = keymap.keys().next().unwrap();
-    let x_priv_key = keymap.get(x_pub_key).unwrap();
-    println!("x_pub_key: {:?}", x_pub_key);
-    println!("x_priv_key: {:?}", x_priv_key);
-
-    // match x_priv_key {
-    // miniscript::::Single(skey) => println!("SinglePriv"),
-    // /// Extended private key (xpriv).
-    // XPrv(xkey) => println!("XPrv"),
-    // }
-
-    //How to get a derived private_key from the keymap and xprivatekey of the descriptor
-
-    // this is creating a 66 hex-character pubkey, but in attestor we are currently creating an xpubkey with only 64 characters
-    let pubkey = x_pub_key
-        .clone()
-        .at_derivation_index(0)
-        .derive_public_key(&secp)
-        .unwrap()
-        .inner
-        .to_string();
-
-    let keypair = KeyPair::from_seckey_str(&secp, &wallet_pkey).unwrap();
-
-    let seckey = keypair.secret_key();
 
     // Set up wallet store
     let root_sled_path: String = env::var("SLED_WALLET_PATH").unwrap_or("wallet_db".to_string());
-    let sled_path = format!("{root_sled_path}_{}", active_network);
+    let sled_path = format!("{root_sled_path}_{active_network}_{fingerprint}");
     let sled = sled::open(sled_path)
         .unwrap()
         .open_tree("default_tree")
@@ -259,8 +231,44 @@ async fn run() {
         active_network,
     ));
 
+    let ext_path = DerivationPath::from_str("m/86h/0h/0h/0").expect("A valid derivation path");
+    let int_path = DerivationPath::from_str("m/86h/0h/0h/1").expect("A valid derivation path");
+    let derived_ext_pkey = xpriv.derive_priv(&secp, &ext_path).unwrap();
+    let seckey_ext = derived_ext_pkey.private_key;
+
+    let derived_int_pkey = xpriv.derive_priv(&secp, &int_path).unwrap();
+    let seckey_int = derived_int_pkey.private_key;
+
+    let pubkey_ext = seckey_ext.public_key(&secp);
+    let _pubkey_int = seckey_int.public_key(&secp);
+
+    let signing_external_descriptor = descriptor!(wpkh(
+        derived_ext_pkey
+            .into_descriptor_key(
+                Some((derived_ext_pkey.fingerprint(&secp), ext_path.clone())),
+                ext_path
+            )
+            .unwrap()
+    ))
+    .unwrap();
+    let signing_internal_descriptor = descriptor!(wpkh(
+        derived_int_pkey
+            .into_descriptor_key(
+                Some((derived_int_pkey.fingerprint(&secp), int_path.clone())),
+                int_path
+            )
+            .unwrap()
+    ))
+    .unwrap();
+
     let bdk_wallet = Arc::new(Mutex::new(
-        BdkWallet::new(wallet_desc, None, active_network, sled).unwrap(),
+        BdkWallet::new(
+            signing_external_descriptor,
+            Some(signing_internal_descriptor),
+            active_network,
+            sled,
+        )
+        .unwrap(),
     ));
 
     let static_address = bdk_wallet
@@ -273,7 +281,7 @@ async fn run() {
     let wallet: Arc<DlcBdkWallet> = Arc::new(DlcBdkWallet::new(
         bdk_wallet,
         static_address.clone(),
-        seckey.clone(),
+        seckey_ext.clone(),
         active_network,
     ));
 
@@ -288,13 +296,9 @@ async fn run() {
 
     // Set up DLC store
     let dlc_store = Arc::new(AsyncStorageApiProvider::new(
-        pubkey.to_string(),
+        pubkey_ext.to_string(),
         "https://devnet.dlc.link/storage-api".to_string(),
     ));
-
-    // Create the DLC Manager
-
-    // let addr = ([127, 0, 0, 1], 3000).into();
 
     // Set up time provider
     let time_provider = SystemTimeProvider {};
@@ -934,17 +938,16 @@ async fn empty_to_address(
         }
     };
 
+    let to_address = Address::from_str(address).map_err(|e| WalletError(e.to_string()))?;
+
+    info!("draining wallet to address: {}", to_address);
     let mut builder = bdk.build_tx();
     builder
-        .add_recipient(
-            Address::from_str(address)
-                .map_err(|e| WalletError(e.to_string()))?
-                .script_pubkey(),
-            50_000,
-        )
-        .enable_rbf()
-        .do_not_spend_change()
-        .fee_rate(FeeRate::from_sat_per_vb(5.0));
+        .drain_wallet()
+        .drain_to(to_address.script_pubkey())
+        // .do_not_spend_change()
+        .fee_rate(FeeRate::from_sat_per_vb(5.0))
+        .enable_rbf();
     let (mut psbt, details) = builder.finish().map_err(|e| WalletError(e.to_string()))?;
 
     info!("Transaction details: {:#?}", details);
@@ -953,6 +956,7 @@ async fn empty_to_address(
     let finalized = bdk
         .sign(&mut psbt, SignOptions::default())
         .map_err(|e| WalletError(e.to_string()))?;
+
     assert!(finalized, "The PSBT was not finalized!");
     info!("The PSBT has been signed and finalized.");
 

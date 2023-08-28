@@ -1,20 +1,15 @@
-use std::env;
-use std::str::FromStr;
-
-use bdk::descriptor;
-use bdk::descriptor::IntoWalletDescriptor;
 use bdk::keys::bip39::{Language, Mnemonic, WordCount};
-use bdk::keys::{DerivableKey, GeneratableKey, GeneratedKey};
+use bdk::keys::{DerivableKey, ExtendedKey, GeneratableKey, GeneratedKey};
 use bdk::miniscript::Segwitv0;
-use bdk::Error as BDK_Error;
+use std::env;
 
-use secp256k1_zkp::{All, Secp256k1};
+use secp256k1_zkp::Secp256k1;
 
-use bitcoin::util::bip32::DerivationPath;
+use serde_json::json;
 
 fn main() {
     // Setup Blockchain Connection Object
-    let active_network = match env::var("BITCOIN_NETWORK").as_deref() {
+    let network = match env::var("BITCOIN_NETWORK").as_deref() {
         Ok("bitcoin") => bitcoin::Network::Bitcoin,
         Ok("testnet") => bitcoin::Network::Testnet,
         Ok("signet") => bitcoin::Network::Signet,
@@ -24,42 +19,28 @@ fn main() {
         ),
     };
 
-    let secp: Secp256k1<All> = Secp256k1::new();
+    let secp = Secp256k1::new();
 
+    let mnemonic_type = match 24 {
+        12 => WordCount::Words12,
+        _ => WordCount::Words24,
+    };
     let mnemonic: GeneratedKey<_, Segwitv0> =
-        Mnemonic::generate((WordCount::Words18, Language::English))
-            .map_err(|_| BDK_Error::Generic("Mnemonic generation error".to_string()))
-            .unwrap();
+        Mnemonic::generate((mnemonic_type, Language::English)).expect("Mnemonic generation error");
+    let mnemonic = mnemonic.into_key();
+    let xkey: ExtendedKey = (mnemonic.clone(), None).into_extended_key().unwrap();
+    let xprv = xkey
+        .into_xprv(network)
+        .expect("Privatekey info not found (should not happen)");
+    let fingerprint = xprv.fingerprint(&secp);
+    let phrase = mnemonic
+        .word_iter()
+        .fold("".to_string(), |phrase, w| phrase + w + " ")
+        .trim()
+        .to_string();
 
-    println!("Mnemonic phrase: {}", *mnemonic);
-    let mnemonic_with_passphrase = (mnemonic.clone(), None);
-
-    // define external and internal derivation key path
-    let external_path = DerivationPath::from_str("m/86h/0h/0h/0").unwrap();
-    // let internal_path = DerivationPath::from_str("m/86h/0h/0h/1").unwrap();
-
-    // generate external and internal descriptor from mnemonic
-    let (external_descriptor, ext_keymap) =
-        descriptor!(wpkh((mnemonic_with_passphrase.clone(), external_path)))
-            .unwrap()
-            .into_wallet_descriptor(&secp, active_network)
-            .unwrap();
-
-    println!("tpub external descriptor: {}", external_descriptor);
-    // println!("tpub internal descriptor: {}", internal_descriptor);
     println!(
-        "tprv external descriptor: {}",
-        external_descriptor.to_string_with_secret(&ext_keymap)
-    );
-    // println!(
-    //     "tprv internal descriptor: {}",
-    //     internal_descriptor.to_string_with_secret(&int_keymap)
-    // );
-
-    let xkey = mnemonic.clone().into_extended_key().unwrap();
-    let xprv = xkey.into_xprv(active_network).unwrap();
-    println!(
-        "xprv: {:?}",
-        xprv.to_priv().inner.display_secret().to_string()
-    );
+        "{}",
+        json!({ "mnemonic": phrase, "xprv": xprv.to_string(), "fingerprint": fingerprint.to_string() })
+    )
 }
