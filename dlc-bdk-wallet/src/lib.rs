@@ -1,6 +1,6 @@
 use std::{
     ops::Deref,
-    sync::{Arc, Mutex},
+    sync::{Arc, Mutex, RwLock},
 };
 
 use bdk::{
@@ -17,7 +17,7 @@ type Result<T> = core::result::Result<T, Error>;
 
 pub struct DlcBdkWallet {
     pub bdk_wallet: Arc<Mutex<bdk::Wallet<sled::Tree>>>,
-    pub address: Address,
+    pub address: RwLock<Address>,
     seckey: SecretKey,
     secp_ctx: Secp256k1<All>,
     network: Network,
@@ -33,7 +33,7 @@ impl DlcBdkWallet {
     ) -> Self {
         Self {
             bdk_wallet,
-            address,
+            address: RwLock::new(address),
             seckey,
             secp_ctx: Secp256k1::new(),
             network,
@@ -67,7 +67,7 @@ impl Signer for DlcBdkWallet {
 
 impl Wallet for DlcBdkWallet {
     fn get_new_address(&self) -> Result<Address> {
-        Ok(self.address.clone())
+        Ok(self.address.read().unwrap().clone())
     }
 
     fn get_new_secret_key(&self) -> Result<SecretKey> {
@@ -115,11 +115,13 @@ impl Wallet for DlcBdkWallet {
 
         let mut res = Vec::new();
 
+        let address = self.address.read().unwrap();
+
         for utxo in selection.selected {
             res.push(dlc_manager::Utxo {
                 outpoint: utxo.outpoint(),
                 tx_out: utxo.txout().clone(),
-                address: self.address.clone(),
+                address: address.clone(),
                 redeem_script: Script::new(), // What is this for, and where can I get it when using BDK to manage UTXOs?
                 reserved: false,
             });

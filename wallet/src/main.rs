@@ -444,6 +444,7 @@ async fn run() {
 
                             let offer_string = create_new_offer(
                                 manager,
+                                wallet,
                                 bitcoin_contract_attestors,
                                 active_network,
                                 req.uuid,
@@ -517,6 +518,7 @@ async fn run() {
 
 async fn create_new_offer(
     manager: Arc<Mutex<DlcManager<'_>>>,
+    wallet: Arc<DlcBdkWallet>,
     attestors: HashMap<XOnlyPublicKey, Arc<AttestorClient>>,
     active_network: bitcoin::Network,
     event_id: String,
@@ -569,6 +571,10 @@ async fn create_new_offer(
 
     //had to make this mutable because of the borrow, not sure why
     let mut man = manager.lock().unwrap();
+
+    // Set cust dest addy here
+    // *wallet.address.try_write().unwrap() =
+    //     Address::from_str("bcrt1q39djsd0a58jct5dfv474p6s8lx9ldgq9lpl5l0").unwrap();
 
     let offer = man
         .send_offer(
