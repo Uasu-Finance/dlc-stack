@@ -20,13 +20,9 @@ fn main() {
     };
 
     let secp = Secp256k1::new();
-
-    let mnemonic_type = match 24 {
-        12 => WordCount::Words12,
-        _ => WordCount::Words24,
-    };
     let mnemonic: GeneratedKey<_, Segwitv0> =
-        Mnemonic::generate((mnemonic_type, Language::English)).expect("Mnemonic generation error");
+        Mnemonic::generate((WordCount::Words24, Language::English))
+            .expect("Mnemonic generation error");
     let mnemonic = mnemonic.into_key();
     let xkey: ExtendedKey = (mnemonic.clone(), None).into_extended_key().unwrap();
     let xprv = xkey
