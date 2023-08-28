@@ -233,14 +233,15 @@ async fn run() {
 
     let ext_path = DerivationPath::from_str("m/86h/0h/0h/0").expect("A valid derivation path");
     let int_path = DerivationPath::from_str("m/86h/0h/0h/1").expect("A valid derivation path");
+
     let derived_ext_pkey = xpriv.derive_priv(&secp, &ext_path).unwrap();
     let seckey_ext = derived_ext_pkey.private_key;
 
     let derived_int_pkey = xpriv.derive_priv(&secp, &int_path).unwrap();
-    let seckey_int = derived_int_pkey.private_key;
+    // let seckey_int = derived_int_pkey.private_key;
 
     let pubkey_ext = seckey_ext.public_key(&secp);
-    let _pubkey_int = seckey_int.public_key(&secp);
+    // let pubkey_int = seckey_int.public_key(&secp);
 
     let signing_external_descriptor = descriptor!(wpkh(
         derived_ext_pkey

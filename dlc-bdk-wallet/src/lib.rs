@@ -72,6 +72,22 @@ impl Wallet for DlcBdkWallet {
 
     fn get_new_secret_key(&self) -> Result<SecretKey> {
         Ok(self.seckey)
+
+        /*
+              let dlc_ext_path = DerivationPath::from_str("m/86h/0h/0h/2").expect("A valid derivation path");
+
+        let mut iter = dlc_ext_path.hardened_children();
+        for _ in 0..3 {
+            let newpath = iter.next().unwrap();
+            info!("{:?}", newpath);
+            let childnums: Vec<ChildNumber> = newpath.clone().into();
+            info!("{:?}", childnums);
+            let derived_xpriv = xpriv.derive_priv(&secp, &newpath);
+
+            info!("Child Number {}", derived_xpriv.unwrap().child_number);
+            info!("{:?}", xpriv.derive_priv(&secp, &newpath));
+        }
+         */
     }
 
     fn get_utxos_for_amount(
