@@ -929,7 +929,6 @@ async fn empty_to_address(
     wallet: Arc<DlcBdkWallet>,
     blockchain: Arc<EsploraAsyncBlockchainProvider>,
 ) -> Result<String, WalletError> {
-    info!("Emptying to address");
     let bdk = match wallet.bdk_wallet.lock() {
         Ok(wallet) => wallet,
         Err(e) => {
@@ -939,26 +938,18 @@ async fn empty_to_address(
     };
 
     let to_address = Address::from_str(address).map_err(|e| WalletError(e.to_string()))?;
-
     info!("draining wallet to address: {}", to_address);
     let mut builder = bdk.build_tx();
     builder
         .drain_wallet()
         .drain_to(to_address.script_pubkey())
-        // .do_not_spend_change()
         .fee_rate(FeeRate::from_sat_per_vb(5.0))
         .enable_rbf();
     let (mut psbt, details) = builder.finish().map_err(|e| WalletError(e.to_string()))?;
 
-    info!("Transaction details: {:#?}", details);
-    info!("Unsigned PSBT: {}", psbt);
-
     let finalized = bdk
         .sign(&mut psbt, SignOptions::default())
         .map_err(|e| WalletError(e.to_string()))?;
-
-    assert!(finalized, "The PSBT was not finalized!");
-    info!("The PSBT has been signed and finalized.");
 
     // Broadcast the transaction
     let raw_transaction = psbt.extract_tx();
@@ -969,7 +960,7 @@ async fn empty_to_address(
         .broadcast(&raw_transaction)
         .await
         .map_err(|e| WalletError(e.to_string()))?;
-    Ok(format!("Transaction broadcast! TXID: {txid}.\nExplorer URL: https://mempool.space/testnet/tx/{txid}", txid = txid))
+    Ok(format!("Transaction broadcast successfully, TXID: {txid}"))
 }
 // Since the Server needs to spawn some background tasks, we needed
 // to configure an Executor that can spawn !Send futures...
