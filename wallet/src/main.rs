@@ -157,7 +157,7 @@ fn main() {
     local.block_on(&rt, run());
 }
 
-fn return_success(message: String) -> Result<Response<Body>, GenericError> {
+fn build_success_response(message: String) -> Result<Response<Body>, GenericError> {
     Ok(Response::builder()
         .status(StatusCode::OK)
         .header(header::CONTENT_TYPE, "application/json")
@@ -165,7 +165,7 @@ fn return_success(message: String) -> Result<Response<Body>, GenericError> {
         .unwrap())
 }
 
-fn return_error(message: String) -> Result<Response<Body>, GenericError> {
+fn build_error_response(message: String) -> Result<Response<Body>, GenericError> {
     Ok(Response::builder()
         .status(StatusCode::BAD_REQUEST)
         .header(header::CONTENT_TYPE, "application/json")
@@ -379,10 +379,10 @@ async fn run() {
                                 empty_to_address(&address, wallet, blockchain).await
                             };
                             match result.await {
-                                Ok(message) => return_success(message),
+                                Ok(message) => build_success_response(message),
                                 Err(e) => {
                                     warn!("Error emptying to address - {}", e);
-                                    return_error(e.to_string())
+                                    build_error_response(e.to_string())
                                 }
                             }
                         }
@@ -393,7 +393,7 @@ async fn run() {
                                 Ok(_) => (),
                                 Err(e) => {
                                     warn!("Error refreshing wallet: {}", e.to_string());
-                                    return return_error(e.to_string());
+                                    return build_error_response(e.to_string());
                                 }
                             };
                             match periodic_check(
@@ -409,11 +409,10 @@ async fn run() {
                                 Ok(_) => (),
                                 Err(e) => {
                                     warn!("Error periodic check: {}", e.to_string());
-                                    return return_error(e.to_string());
+                                    return build_error_response(e.to_string());
                                 }
                             };
-                            return_success("Periodic check complete".to_string())
-                            //update funded uuids code goes here
+                            build_success_response("Periodic check complete".to_string())
                         }
                         (&Method::POST, "/offer") => {
                             #[derive(Deserialize)]
@@ -435,8 +434,10 @@ async fn run() {
                                 match serde_json::from_str(&req.attestor_list.clone()) {
                                     Ok(vec) => vec,
                                     Err(e) => {
-                                        eprintln!("Error deserializing Attestor URLs: {}", e);
-                                        Vec::new()
+                                        error!("Error deserializing Attestor URLs: {e}",);
+                                        return build_error_response(format!(
+                                            "Error deserializing Attestor URLs {e}"
+                                        ));
                                     }
                                 };
 
@@ -446,7 +447,7 @@ async fn run() {
                             > = generate_attestor_client(bitcoin_contract_attestor_urls.clone())
                                 .await;
 
-                            create_new_offer(
+                            let offer_string = create_new_offer(
                                 manager,
                                 bitcoin_contract_attestors,
                                 active_network,
@@ -455,8 +456,8 @@ async fn run() {
                                 req.offer_collateral,
                                 req.total_outcomes,
                             )
-                            .await
-                            //update funded uuids code goes here
+                            .await?;
+                            build_success_response(offer_string)
                         }
                         (&Method::PUT, "/offer/accept") => {
                             info!("Accepting offer");
@@ -474,26 +475,13 @@ async fn run() {
                                 match serde_json::from_str(&data.accept_message) {
                                     Ok(data) => data,
                                     Err(e) => {
-                                        return Ok(Response::builder()
-                                            .status(StatusCode::BAD_REQUEST)
-                                            .header(header::CONTENT_TYPE, "application/json")
-                                            .body(Body::from(
-                                                json!(
-                                                    {
-                                                        "status": 400,
-                                                        "errors": vec![ErrorResponse {
-                                                            message: e.to_string(),
-                                                            code: None,
-                                                        }],
-                                                    }
-                                                )
-                                                .to_string(),
-                                            ))?);
+                                        error!("Error deserializing AcceptDlc object: {e}",);
+                                        return build_error_response(e.to_string());
                                     }
                                 };
 
-                            accept_offer(accept_dlc, manager).await
-                            //update funded uuids code goes here
+                            let sign_string = accept_offer(accept_dlc, manager).await?;
+                            build_success_response(sign_string)
                         }
                         _ => {
                             // Return 404 not found response.
@@ -528,7 +516,7 @@ async fn run() {
 
     // The server would block on current thread to await !Send futures.
     if let Err(e) = server.await {
-        eprintln!("server error: {}", e);
+        panic!("server error: {}", e);
     }
 }
 
@@ -540,7 +528,7 @@ async fn create_new_offer(
     accept_collateral: u64,
     offer_collateral: u64,
     total_outcomes: u64,
-) -> Result<Response<Body>, GenericError> {
+) -> Result<String, GenericError> {
     let (_event_descriptor, descriptor) = get_numerical_contract_info(
         accept_collateral,
         offer_collateral,
@@ -566,30 +554,7 @@ async fn create_new_offer(
 
     for (_k, attestor) in attestors {
         // check if the oracle has an event with the id of event_id
-        match attestor.get_announcement(&event_id).await {
-            Ok(_announcement) => (),
-            Err(e) => {
-                info!("Error getting announcement: {}", event_id);
-                return Ok(Response::builder()
-                    .status(StatusCode::BAD_REQUEST)
-                    .header(header::CONTENT_TYPE, "application/json")
-                    .body(Body::from(
-                        json!(
-                           {
-                                "status": 400,
-                                "errors": vec![ErrorResponse {
-                                    message: format!(
-                                        "Error: unable to get announcement. Does it exist? -- {}",
-                                        e.to_string()
-                                    ),
-                                    code: None,
-                                }],
-                            }
-                        )
-                        .to_string(),
-                    ))?);
-            }
-        }
+        let _announcement = attestor.get_announcement(&event_id).await?;
     }
 
     // Some regtest networks have an unreliable fee estimation service
@@ -610,88 +575,33 @@ async fn create_new_offer(
     //had to make this mutable because of the borrow, not sure why
     let mut man = manager.lock().unwrap();
 
-    match man
+    let offer = man
         .send_offer(
             &contract_input,
             STATIC_COUNTERPARTY_NODE_ID.parse().unwrap(),
         )
-        .await
-    {
-        Ok(dlc) => Ok(Response::builder()
-            .status(StatusCode::OK)
-            .header(header::CONTENT_TYPE, "application/json")
-            .body(Body::from(serde_json::to_string(&dlc)?))?),
-        Err(e) => {
-            info!("DLC manager - send offer error: {}", e.to_string());
-            Ok(Response::builder()
-                .status(StatusCode::BAD_REQUEST)
-                .header(header::CONTENT_TYPE, "application/json")
-                .body(Body::from(
-                    json!({
-                        "status": 400,
-                        "errors": vec![ErrorResponse {
-                            message: e.to_string(),
-                            code: None,
-                        }],
-                    })
-                    .to_string(),
-                ))?)
-        }
-    }
+        .await?;
+    serde_json::to_string(&offer).map_err(|e| e.into())
 }
 
 async fn accept_offer(
     accept_dlc: AcceptDlc,
     manager: Arc<Mutex<DlcManager<'_>>>,
-) -> Result<Response<Body>, GenericError> {
-    println!("accept_dlc: {:?}", accept_dlc);
-    if let Some(Message::Sign(sign)) = match manager
+) -> Result<String, GenericError> {
+    debug!("accept_dlc: {:?}", accept_dlc);
+
+    let dlc = manager
         .lock()
         .unwrap()
         .on_dlc_message(
             &Message::Accept(accept_dlc),
             STATIC_COUNTERPARTY_NODE_ID.parse().unwrap(),
         )
-        .await
-    {
-        Ok(dlc) => dlc,
-        Err(e) => {
-            info!("DLC manager - accept offer error: {}", e.to_string());
-            return Ok(Response::builder()
-                .status(StatusCode::BAD_REQUEST)
-                .header(header::CONTENT_TYPE, "application/json")
-                .body(Body::from(
-                    json!({
-                        "status": 400,
-                        "errors": vec![ErrorResponse {
-                            message: e.to_string(),
-                            code: None,
-                        }],
-                    })
-                    .to_string(),
-                ))?);
-        }
-    } {
-        return Ok(Response::builder()
-            .status(StatusCode::OK)
-            .header(header::CONTENT_TYPE, "application/json")
-            .body(Body::from(serde_json::to_string(&sign)?))?);
-    } else {
-        return Ok(Response::builder()
-            .status(StatusCode::BAD_REQUEST)
-            .header(header::CONTENT_TYPE, "application/json")
-            .body(Body::from(
-                json!({
-                    "status": 400,
-                    "errors": vec![ErrorResponse {
-                        message: format!(
-                            "Error: invalid Sign message for accept_offer function",
-                        ),
-                        code: None,
-                    }],
-                })
-                .to_string(),
-            ))?);
+        .await?;
+
+    match dlc {
+        Some(Message::Sign(sign)) => serde_json::to_string(&sign).map_err(|e| e.into()),
+        _ => Err("Error: invalid Sign message for accept_offer function".into()),
     }
 }
 
@@ -945,9 +855,9 @@ async fn empty_to_address(
         .drain_to(to_address.script_pubkey())
         .fee_rate(FeeRate::from_sat_per_vb(5.0))
         .enable_rbf();
-    let (mut psbt, details) = builder.finish().map_err(|e| WalletError(e.to_string()))?;
+    let (mut psbt, _details) = builder.finish().map_err(|e| WalletError(e.to_string()))?;
 
-    let finalized = bdk
+    let _finalized = bdk
         .sign(&mut psbt, SignOptions::default())
         .map_err(|e| WalletError(e.to_string()))?;
 
