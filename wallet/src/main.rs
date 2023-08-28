@@ -389,13 +389,7 @@ async fn run() {
                         (&Method::GET, "/info") => get_wallet_info(dlc_store, wallet).await,
                         (&Method::GET, "/periodic_check") => {
                             // This needs to do the updates funding / post-close stuff
-                            match refresh_wallet(blockchain, wallet).await {
-                                Ok(_) => (),
-                                Err(e) => {
-                                    warn!("Error refreshing wallet: {}", e.to_string());
-                                    return build_error_response(e.to_string());
-                                }
-                            };
+                            refresh_wallet(blockchain, wallet).await?;
                             match periodic_check(
                                 manager,
                                 dlc_store,
@@ -694,59 +688,20 @@ async fn get_wallet_info(
 async fn refresh_wallet(
     blockchain: Arc<EsploraAsyncBlockchainProvider>,
     wallet: Arc<DlcBdkWallet>,
-) -> Result<Response<Body>, GenericError> {
-    let wallet = match wallet.bdk_wallet.lock() {
+) -> Result<(), WalletError> {
+    let bdk = match wallet.bdk_wallet.lock() {
         Ok(wallet) => wallet,
         Err(e) => {
             error!("Error locking wallet: {}", e.to_string());
-            return Ok(Response::builder()
-                .status(StatusCode::BAD_REQUEST)
-                .header(header::CONTENT_TYPE, "application/json")
-                .body(Body::from(
-                    json!(
-                        {
-                            "status": 400,
-                            "errors": vec![ErrorResponse {
-                                message: e.to_string(),
-                                code: None,
-                            }],
-                        }
-                    )
-                    .to_string(),
-                ))?);
+            return Err(WalletError(e.to_string()));
         }
     };
 
-    match wallet
-        .sync(&blockchain.blockchain, SyncOptions::default())
+    bdk.sync(&blockchain.blockchain, SyncOptions::default())
         .await
-    {
-        Ok(_) => (),
-        Err(e) => {
-            error!("Error syncing wallet: {}", e.to_string());
-            return Ok(Response::builder()
-                .status(StatusCode::BAD_REQUEST)
-                .header(header::CONTENT_TYPE, "application/json")
-                .body(Body::from(
-                    json!(
-                        {
-                            "status": 400,
-                            "errors": vec![ErrorResponse {
-                                message: e.to_string(),
-                                code: None,
-                            }],
-                        }
-                    )
-                    .to_string(),
-                ))?);
-        }
-    };
+        .map_err(|e| WalletError(e.to_string()))?;
 
-    let response = Response::builder()
-        .status(StatusCode::OK)
-        .header(header::CONTENT_TYPE, "application/json")
-        .body(Body::from("Refreshed wallet"))?;
-    Ok(response)
+    Ok(())
 }
 
 async fn periodic_check(
