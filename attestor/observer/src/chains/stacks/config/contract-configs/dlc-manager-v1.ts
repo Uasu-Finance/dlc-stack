@@ -34,13 +34,13 @@ export class DlcManagerV1 implements ContractConfig {
       'registered-contract'
     );
 
-    registeredContracts.results.forEach((result) => {
-      this.registeredContractSubscriptions.push({
-        address: result.value.repr.slice(1),
-        subscription: this._socket.subscribeAddressTransactions(result.value.repr.slice(1)),
-        handleTx: this.handleTx,
-      });
-    });
+    // registeredContracts.results.forEach((result) => {
+    //   this.registeredContractSubscriptions.push({
+    //     address: result.value.repr.slice(1),
+    //     subscription: this._socket.subscribeAddressTransactions(result.value.repr.slice(1)),
+    //     handleTx: this.handleTx,
+    //   });
+    // });
 
     this._socket.subscribeAddressTransactions(this._contractFullName);
     console.log(`[Stacks] Subscribed to ${this._contractFullName}`);

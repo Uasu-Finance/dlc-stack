@@ -375,9 +375,9 @@ dependencies = [
  "config",
  "console_error_panic_hook",
  "displaydoc",
- "dlc 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "dlc",
  "dlc-clients",
- "dlc-messages 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "dlc-messages",
  "futures",
  "getrandom",
  "hex",
@@ -1091,19 +1091,6 @@ dependencies = [
 [[package]]
 name = "dlc"
 version = "0.4.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "19c812e884d551a686e5c8d0273e6e2232a6a1665bc5ea07d9ca9f84d3b02fb5"
-dependencies = [
- "bitcoin 0.29.2",
- "miniscript 8.0.1",
- "secp256k1-sys 0.6.1",
- "secp256k1-zkp",
- "serde",
-]
-
-[[package]]
-name = "dlc"
-version = "0.4.0"
 source = "git+https://github.com/dlc-link/rust-dlc#31d6ff5d5c43ba60d4cdaaf331ea237da68419d7"
 dependencies = [
  "bitcoin 0.29.2",
@@ -1141,9 +1128,9 @@ name = "dlc-link-manager"
 version = "0.4.0"
 dependencies = [
  "bitcoin 0.29.2",
- "dlc 0.4.0 (git+https://github.com/dlc-link/rust-dlc)",
+ "dlc",
  "dlc-manager",
- "dlc-messages 0.4.0 (git+https://github.com/dlc-link/rust-dlc)",
+ "dlc-messages",
  "dlc-trie",
  "lightning",
  "log",
@@ -1159,8 +1146,8 @@ source = "git+https://github.com/dlc-link/rust-dlc#31d6ff5d5c43ba60d4cdaaf331ea2
 dependencies = [
  "async-trait",
  "bitcoin 0.29.2",
- "dlc 0.4.0 (git+https://github.com/dlc-link/rust-dlc)",
- "dlc-messages 0.4.0 (git+https://github.com/dlc-link/rust-dlc)",
+ "dlc",
+ "dlc-messages",
  "dlc-trie",
  "lightning",
  "log",
@@ -1173,25 +1160,12 @@ name = "dlc-memory-storage-provider"
 version = "0.1.0"
 dependencies = [
  "bitcoin 0.29.2",
- "dlc 0.4.0 (git+https://github.com/dlc-link/rust-dlc)",
+ "dlc",
  "dlc-link-manager",
  "dlc-manager",
- "dlc-messages 0.4.0 (git+https://github.com/dlc-link/rust-dlc)",
+ "dlc-messages",
  "lightning",
  "secp256k1-zkp",
-]
-
-[[package]]
-name = "dlc-messages"
-version = "0.4.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "179aeea57514dad634802716f6759febd88f78f111979747ddcb7d9afc9c9048"
-dependencies = [
- "bitcoin 0.29.2",
- "dlc 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "lightning",
- "secp256k1-zkp",
- "serde",
 ]
 
 [[package]]
@@ -1200,7 +1174,7 @@ version = "0.4.0"
 source = "git+https://github.com/dlc-link/rust-dlc#31d6ff5d5c43ba60d4cdaaf331ea237da68419d7"
 dependencies = [
  "bitcoin 0.29.2",
- "dlc 0.4.0 (git+https://github.com/dlc-link/rust-dlc)",
+ "dlc",
  "lightning",
  "secp256k1-zkp",
  "serde",
@@ -1213,11 +1187,11 @@ dependencies = [
  "base64 0.13.1",
  "bitcoin 0.29.2",
  "chrono",
- "dlc 0.4.0 (git+https://github.com/dlc-link/rust-dlc)",
+ "dlc",
  "dlc-clients",
  "dlc-link-manager",
  "dlc-manager",
- "dlc-messages 0.4.0 (git+https://github.com/dlc-link/rust-dlc)",
+ "dlc-messages",
  "dlc-sled-storage-provider",
  "dlc-trie",
  "electrs-blockchain-provider",
@@ -1302,7 +1276,7 @@ version = "0.4.0"
 source = "git+https://github.com/dlc-link/rust-dlc#31d6ff5d5c43ba60d4cdaaf331ea237da68419d7"
 dependencies = [
  "bitcoin 0.29.2",
- "dlc 0.4.0 (git+https://github.com/dlc-link/rust-dlc)",
+ "dlc",
  "secp256k1-zkp",
  "serde",
 ]
@@ -1319,7 +1293,7 @@ dependencies = [
  "dlc-link-manager",
  "dlc-manager",
  "dlc-memory-storage-provider",
- "dlc-messages 0.4.0 (git+https://github.com/dlc-link/rust-dlc)",
+ "dlc-messages",
  "dlc-trie",
  "env_logger",
  "esplora-async-blockchain-provider",
@@ -2074,7 +2048,7 @@ version = "0.1.0"
 dependencies = [
  "bdk",
  "bitcoin 0.29.2",
- "dlc 0.4.0 (git+https://github.com/dlc-link/rust-dlc)",
+ "dlc",
  "dlc-manager",
  "lightning",
  "miniscript 10.0.0",
@@ -2261,15 +2235,6 @@ name = "minimal-lexical"
 version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "68354c5c6bd36d73ff3feceb05efa59b6acb7626617f4962be322a825e61f79a"
-
-[[package]]
-name = "miniscript"
-version = "8.0.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0fe8d0ee3580c650aadd33400cfe2a3004462dca6b921ca9e9cef4e654ebc404"
-dependencies = [
- "bitcoin 0.29.2",
-]
 
 [[package]]
 name = "miniscript"
@@ -3321,7 +3286,7 @@ source = "git+https://github.com/dlc-link/rust-dlc#31d6ff5d5c43ba60d4cdaaf331ea2
 dependencies = [
  "bdk",
  "bitcoin 0.29.2",
- "dlc 0.4.0 (git+https://github.com/dlc-link/rust-dlc)",
+ "dlc",
  "dlc-manager",
  "lightning",
  "secp256k1-zkp",
