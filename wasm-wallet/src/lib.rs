@@ -418,25 +418,58 @@ impl JsDLCInterface {
 
 #[derive(Serialize, Deserialize)]
 #[wasm_bindgen]
+#[serde(rename_all = "camelCase")]
 struct JsContract {
     id: String,
     state: String,
+    acceptor_collateral: String,
+    tx_id: String,
 }
 
 // implement the from_contract method for JsContract
 impl JsContract {
     fn from_contract(contract: Contract) -> JsContract {
-        let state = match contract {
-            Contract::Offered(_) => "offered",
-            Contract::Accepted(_) => "accepted",
-            Contract::Signed(_) => "signed",
-            Contract::Confirmed(_) => "confirmed",
-            Contract::PreClosed(_) => "pre-closed",
-            Contract::Closed(_) => "closed",
-            Contract::Refunded(_) => "refunded",
-            Contract::FailedAccept(_) => "failed accept",
-            Contract::FailedSign(_) => "failed sign",
-            Contract::Rejected(_) => "rejected",
+        let state = match contract.clone() {
+            Contract::Offered(_) => "Offered",
+            Contract::Accepted(_) => "Accepted",
+            Contract::Signed(_) => "Signed",
+            Contract::Confirmed(_) => "Confirmed",
+            Contract::PreClosed(_) => "Pre-Closed",
+            Contract::Closed(_) => "Closed",
+            Contract::Refunded(_) => "Refunded",
+            Contract::FailedAccept(_) => "Accept Failed",
+            Contract::FailedSign(_) => "Sign Failed",
+            Contract::Rejected(_) => "Rejected",
+        };
+
+        let acceptor_collateral: String = match contract.clone() {
+            Contract::Accepted(c) => c.accept_params.collateral.to_string(),
+            Contract::Signed(c) | Contract::Confirmed(c) | Contract::Refunded(c) => {
+                c.accepted_contract.accept_params.collateral.to_string()
+            }
+            Contract::FailedSign(c) => c.accepted_contract.accept_params.collateral.to_string(),
+            Contract::PreClosed(c) => c
+                .signed_contract
+                .accepted_contract
+                .accept_params
+                .collateral
+                .to_string(),
+            _ => String::new(),
+        };
+
+        let tx_id: String = match contract.clone() {
+            Contract::Accepted(c) => c.dlc_transactions.fund.txid().to_string(),
+            Contract::Signed(c) | Contract::Confirmed(c) | Contract::Refunded(c) => {
+                c.accepted_contract.dlc_transactions.fund.txid().to_string()
+            }
+            Contract::FailedSign(c) => c.accepted_contract.dlc_transactions.fund.txid().to_string(),
+            Contract::PreClosed(c) => c
+                .signed_contract
+                .accepted_contract
+                .accept_params
+                .collateral
+                .to_string(),
+            _ => String::new(),
         };
 
         fn hex_str(value: &[u8]) -> String {
@@ -450,6 +483,8 @@ impl JsContract {
         JsContract {
             id: hex_str(&contract.get_id()),
             state: state.to_string(),
+            acceptor_collateral,
+            tx_id,
         }
     }
 }
