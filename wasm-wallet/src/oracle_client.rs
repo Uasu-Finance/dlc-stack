@@ -17,8 +17,6 @@ extern crate dlc_messages;
 extern crate secp256k1_zkp;
 extern crate serde;
 
-use crate::clog;
-
 // use wasm_bindgen::prelude::*;
 // use wasm_bindgen_futures::JsFuture;
 // use web_sys::{Request, RequestInit, RequestMode, Response};
@@ -143,8 +141,6 @@ impl P2PDOracleClient {
         let oracle_key = client.get(path).send().await.unwrap().text().await.unwrap();
 
         info!("Oracle Pub Key: {}", oracle_key.to_string());
-
-        clog!("Oracle Pub Key: {}", oracle_key.to_string());
 
         let public_key: XOnlyPublicKey = oracle_key
             .parse()
