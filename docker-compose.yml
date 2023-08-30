@@ -1,7 +1,10 @@
 version: '3.9'
 services:
   dlc-link-attestor-1:
-    image: attestor:local
+    container_name: attestor-1
+    build:
+      context: .
+      dockerfile: ./attestor/Dockerfile
     ports:
       - 8801:8801
     environment:
@@ -14,7 +17,10 @@ services:
       - ./attestor/observer/src:/app/attestor/observer/src
 
   dlc-link-attestor-2:
-    image: attestor:local
+    container_name: attestor-2
+    build:
+      context: .
+      dockerfile: ./attestor/Dockerfile
     ports:
       - 8802:8802
     environment:
@@ -27,7 +33,10 @@ services:
       - ./attestor/observer/src:/app/attestor/observer/src
 
   dlc-link-attestor-3:
-    image: attestor:local
+    container_name: attestor-3
+    build:
+      context: .
+      dockerfile: ./attestor/Dockerfile
     ports:
       - 8803:8803
     environment:
@@ -54,9 +63,9 @@ services:
       - dlc-link-attestor-2
       - dlc-link-attestor-3
 
-  rust-wallet:
-    container_name: rust-wallet
-    hostname: rust-wallet
+  router-wallet:
+    container_name: router-wallet
+    hostname: router-wallet
     build:
       context: .
       dockerfile: ./wallet/Dockerfile

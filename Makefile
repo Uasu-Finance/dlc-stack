@@ -17,5 +17,8 @@ clean: ## Cargo clean
 integration-test: ## Run integration tests (docker env required)
 	cd it && cargo test
 
-docker-build: ## Docker build
-	docker build -t dlc-link-stack:latest -f docker/Dockerfile .
+docker-build: ## Docker compose build
+	docker compose build
+
+docker-start: ## Docker compose start
+	docker compose up
