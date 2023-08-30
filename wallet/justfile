@@ -1,8 +1,11 @@
-generate-descriptor:
-    ./release/generate-descriptor
+generate-key:
+    ./release/generate-key
 
 wallet:
     ./release/dlc-protocol-wallet
+
+generate-address-from-key:
+    ./release/generate-address-from-key
 
 test:
     cargo test --package websocket-tcp-proxy

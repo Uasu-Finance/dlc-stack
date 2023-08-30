@@ -5,5 +5,7 @@
 .idea
 /contracts_db
 .vscode
+/www/dist/**
+
 
 node_modules

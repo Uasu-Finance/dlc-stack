@@ -4,13 +4,14 @@ use std::{
 };
 
 use bdk::{
-    database::AnyDatabase,
+    database::{AnyDatabase, MemoryDatabase},
     sled,
     wallet::coin_selection::{BranchAndBoundCoinSelection, CoinSelectionAlgorithm},
-    FeeRate,
+    FeeRate, WeightedUtxo,
 };
 use bitcoin::{hashes::Hash, Address, Network, Script};
 use dlc_manager::{error::Error, Signer, Utxo, Wallet};
+use log::debug;
 use secp256k1_zkp::{All, PublicKey, Secp256k1, SecretKey};
 
 type Result<T> = core::result::Result<T, Error>;
@@ -96,22 +97,42 @@ impl Wallet for DlcBdkWallet {
         fee_rate: Option<u64>,
         _lock_utxos: bool,
     ) -> Result<Vec<Utxo>> {
+        debug!(
+            "get_utxos_for_amount: amount: {} with fee_rate {:?}",
+            amount, fee_rate
+        );
         let dummy_pubkey: PublicKey =
             "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798"
                 .parse()
                 .unwrap();
         let dummy_drain =
             Script::new_v0_p2wpkh(&bitcoin::WPubkeyHash::hash(&dummy_pubkey.serialize()));
+
+        let org_utxos = self
+            .bdk_wallet
+            .lock()
+            .unwrap()
+            .list_unspent()
+            .unwrap()
+            .clone();
+        let utxos = org_utxos
+            .iter()
+            .map(|x| WeightedUtxo {
+                utxo: bdk::Utxo::Local(x.clone()),
+                satisfaction_weight: 107,
+            })
+            .collect::<Vec<_>>();
+
         let selection = BranchAndBoundCoinSelection::default()
             .coin_select(
                 &AnyDatabase::Sled(self.bdk_wallet.lock().unwrap().database().deref().clone()),
                 vec![],
-                vec![],
+                utxos,
                 FeeRate::from_sat_per_vb(fee_rate.unwrap_or(0) as f32),
                 amount,
                 &dummy_drain,
             )
-            .unwrap();
+            .map_err(|x| Error::WalletError(Box::new(x)))?;
 
         let mut res = Vec::new();
 
@@ -124,6 +145,8 @@ impl Wallet for DlcBdkWallet {
                 reserved: false,
             });
         }
+
+        debug!("returning found utxos: {:?}", res);
         Ok(res)
     }
 

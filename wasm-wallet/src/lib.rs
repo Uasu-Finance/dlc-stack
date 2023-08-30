@@ -6,6 +6,7 @@ extern crate log;
 use bitcoin::{Network, PrivateKey, XOnlyPublicKey};
 use dlc_link_manager::AsyncOracle;
 use dlc_messages::{Message, OfferDlc, SignDlc};
+use secp256k1_zkp::UpstreamError;
 use wasm_bindgen::prelude::*;
 
 use lightning::util::ser::Readable;
@@ -14,6 +15,7 @@ use secp256k1_zkp::hashes::*;
 use secp256k1_zkp::Secp256k1;
 
 use core::panic;
+use std::fmt;
 use std::{
     collections::HashMap,
     io::Cursor,
@@ -42,6 +44,15 @@ use serde::{Deserialize, Serialize};
 mod storage;
 #[macro_use]
 mod macros;
+
+#[derive(Debug)]
+struct WalletError(String);
+impl fmt::Display for WalletError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "Wallet Error: {}", self.0)
+    }
+}
+impl std::error::Error for WalletError {}
 
 async fn generate_attestor_client(
     attestor_urls: Vec<String>,
@@ -110,9 +121,9 @@ impl Default for JsDLCInterfaceOptions {
     // Default values for Manager Options
     fn default() -> Self {
         Self {
-            attestor_urls: "https://dev-oracle.dlc.link/oracle".to_string(),
+            attestor_urls: "https://devnet.dlc.link/oracle".to_string(),
             network: "regtest".to_string(),
-            electrs_url: "https://dev-oracle.dlc.link/electrs".to_string(),
+            electrs_url: "https://devnet.dlc.link/electrs".to_string(),
             address: "".to_string(),
         }
     }
@@ -194,7 +205,12 @@ impl JsDLCInterface {
             .unwrap(),
         ));
 
-        blockchain.refresh_chain_data(options.address.clone()).await;
+        match blockchain.refresh_chain_data(options.address.clone()).await {
+            Ok(_) => (),
+            Err(e) => {
+                log_to_console!("Error refreshing chain data: {}", e);
+            }
+        };
 
         JsDLCInterface {
             options,
@@ -209,13 +225,30 @@ impl JsDLCInterface {
     }
 
     pub async fn get_wallet_balance(&self) -> u64 {
-        self.blockchain
+        log_to_console!("get_wallet_balance");
+        match self
+            .blockchain
             .refresh_chain_data(self.options.address.clone())
-            .await;
-        self.wallet
-            .set_utxos(self.blockchain.get_utxos().unwrap())
-            .unwrap();
-        self.blockchain.get_balance().await.unwrap()
+            .await
+        {
+            Ok(_) => (),
+            Err(e) => {
+                log_to_console!("Error refreshing chain data: {}", e);
+            }
+        };
+        match self.wallet.set_utxos(self.blockchain.get_utxos().unwrap()) {
+            Ok(_) => (),
+            Err(e) => {
+                log_to_console!("Error setting utxos: {}", e);
+            }
+        };
+        match self.blockchain.get_balance().await {
+            Ok(balance) => balance,
+            Err(e) => {
+                log_to_console!("Error getting balance: {}", e);
+                0
+            }
+        }
     }
 
     // public async function for fetching all the contracts on the manager
@@ -255,35 +288,43 @@ impl JsDLCInterface {
     }
 
     pub async fn accept_offer(&self, offer_json: String) -> String {
-        let dlc_offer_message: OfferDlc = serde_json::from_str(&offer_json).unwrap();
+        log_to_console!("running accept_offer function1");
 
-        let temporary_contract_id = dlc_offer_message.temporary_contract_id;
+        let accept_msg_result = async {
+            let dlc_offer_message: OfferDlc =
+                serde_json::from_str(&offer_json).map_err(|e| WalletError(e.to_string()))?;
+            log_to_console!("running accept_offer function2");
+            let temporary_contract_id = dlc_offer_message.temporary_contract_id;
 
-        match self
-            .manager
-            .lock()
-            .unwrap()
-            .on_dlc_message(
-                &Message::Offer(dlc_offer_message.clone()),
-                STATIC_COUNTERPARTY_NODE_ID.parse().unwrap(),
-            )
-            .await
-        {
-            Ok(_) => (),
+            let counterparty = STATIC_COUNTERPARTY_NODE_ID
+                .parse()
+                .map_err(|e: UpstreamError| WalletError(e.to_string()))?;
+            log_to_console!("running accept_offer function3");
+            self.manager
+                .lock()
+                .unwrap()
+                .on_dlc_message(&Message::Offer(dlc_offer_message.clone()), counterparty)
+                .await
+                .map_err(|e| WalletError(e.to_string()))?;
+            log_to_console!("running accept_offer function4");
+            let (_contract_id, _public_key, accept_msg) = self
+                .manager
+                .lock()
+                .unwrap()
+                .accept_contract_offer(&temporary_contract_id)
+                .await
+                .expect("Error accepting contract offer");
+            log_to_console!("running accept_offer function5");
+            serde_json::to_string(&accept_msg).map_err(|e| WalletError(e.to_string()))
+        }
+        .await;
+        match accept_msg_result {
+            Ok(accept_msg) => accept_msg,
             Err(e) => {
-                return e.to_string();
+                log_to_console!("Error accepting offer: {}", e);
+                format!("Error accepting offer: {}", e)
             }
         }
-
-        let (_contract_id, _public_key, accept_msg) = self
-            .manager
-            .lock()
-            .unwrap()
-            .accept_contract_offer(&temporary_contract_id)
-            .await
-            .expect("Error accepting contract offer");
-
-        serde_json::to_string(&accept_msg).unwrap()
     }
 
     pub async fn countersign_and_broadcast(&self, dlc_sign_message: String) -> String {

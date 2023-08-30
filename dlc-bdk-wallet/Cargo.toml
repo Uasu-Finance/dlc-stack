@@ -10,6 +10,7 @@ bitcoin = "0.29"
 dlc = { git = "https://github.com/dlc-link/rust-dlc", features = ["use-serde"] }
 dlc-manager = { git = "https://github.com/dlc-link/rust-dlc", features = ["use-serde"] }
 lightning = {version = "0.0.113"}
+log = "0.4.17"
 bdk = {version = "0.28.0", default-features = false}
 secp256k1-zkp = {version = "0.7.0"}
 simple-wallet = {git = "https://github.com/dlc-link/rust-dlc"}

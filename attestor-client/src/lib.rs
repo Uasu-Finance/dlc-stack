@@ -122,7 +122,6 @@ impl AttestorClient {
     /// oracle uses an incompatible format.
     #[allow(dead_code)]
     pub async fn new(host: &str) -> Result<AttestorClient, DlcManagerError> {
-        // let client = reqwest::blocking::Client::new();
         let client = reqwest::Client::new();
         if host.is_empty() {
             return Err(DlcManagerError::InvalidParameters(
@@ -137,11 +136,15 @@ impl AttestorClient {
         info!("Creating p2pd oracle client (by getting public key first) ...");
         let path = pubkey_path(&host);
         info!("Getting pubkey from {}", path);
-        // let runtime = tokio::runtime::Runtime::new().expect("Unable to create a runtime");
-        // let public_key = runtime.block_on(get::<String>(&path))?;
-        // let public_key = get_object::<String>(&path)?; //.public_key;
 
-        let oracle_key = client.get(path).send().await.unwrap().text().await.unwrap();
+        let oracle_key = client
+            .get(path)
+            .send()
+            .await
+            .map_err(|e| DlcManagerError::OracleError(format!("Oracle PubKey Error: {e}")))?
+            .text()
+            .await
+            .map_err(|e| DlcManagerError::OracleError(format!("Oracle PubKey Error: {e}")))?;
 
         info!("Oracle Pub Key: {}", oracle_key.to_string());
 

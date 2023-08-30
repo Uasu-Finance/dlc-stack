@@ -1071,6 +1071,7 @@ dependencies = [
  "dlc 0.4.0 (git+https://github.com/dlc-link/rust-dlc)",
  "dlc-manager",
  "lightning",
+ "log",
  "mocks",
  "secp256k1-zkp",
  "simple-wallet",
@@ -1104,6 +1105,7 @@ name = "dlc-link-manager"
 version = "0.4.0"
 dependencies = [
  "bitcoin 0.29.2",
+ "console_error_panic_hook",
  "dlc 0.4.0 (git+https://github.com/dlc-link/rust-dlc)",
  "dlc-manager",
  "dlc-messages 0.4.0 (git+https://github.com/dlc-link/rust-dlc)",
@@ -1114,6 +1116,7 @@ dependencies = [
  "rand_chacha",
  "secp256k1-zkp",
  "serde",
+ "web-sys",
 ]
 
 [[package]]
@@ -1424,6 +1427,7 @@ dependencies = [
  "futures",
  "js-interface-wallet",
  "lightning",
+ "log",
  "miniscript 10.0.0",
  "reqwest",
  "serde",
