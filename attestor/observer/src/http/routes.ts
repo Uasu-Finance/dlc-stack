@@ -34,7 +34,7 @@ router.get('/publickey', async (req, res) => {
   res.status(200).send(data);
 });
 
-if (process.env.NODE_ENV === 'development') {
+if (process.env.DEV_ENDPOINTS_ENABLED === 'true') {
   router.get('/create-announcement/:uuid', async (req, res) => {
     if (!req.params.uuid) {
       res.status(400).send('Missing UUID');

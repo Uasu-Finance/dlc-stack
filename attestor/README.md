@@ -128,7 +128,7 @@ Output example:
 ### Get health
 
 ```sh
-$ curl -X GET http://localhost:8801/health
+$ curl -X GET http://localhost:8801/publickey
 ```
 
-This endpoint returns the [oracle config](#configure).
+This endpoint returns the `public_key` of the attestor.

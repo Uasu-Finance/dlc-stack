@@ -36,7 +36,6 @@ export interface DeploymentInfo {
 export interface ContractConfig {
   // contractFullName: string;
   init: () => Promise<void>;
-  registeredContractSubscriptions: Array<AddressSubscription>;
   checkAddresses: (address: string) => boolean;
   handleTx: (tx: ContractCallTransaction) => Promise<void>;
 }

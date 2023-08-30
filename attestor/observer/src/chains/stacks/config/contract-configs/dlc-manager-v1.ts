@@ -1,7 +1,6 @@
 import { StacksApiSocketClient } from '@stacks/blockchain-api-client';
 import type { ContractCallTransaction } from '@stacks/stacks-blockchain-api-types';
-import { ContractConfig, DeploymentInfo, AddressSubscription, FunctionName } from '../../models/interfaces.js';
-import { loadRegisteredContracts } from '../../utilities/api-calls.js';
+import { ContractConfig, DeploymentInfo, FunctionName } from '../../models/interfaces.js';
 import unwrapper from '../../utilities/unwrappers.js';
 import AttestorService from '../../../../services/attestor.service.js';
 
@@ -19,7 +18,6 @@ export class DlcManagerV1 implements ContractConfig {
   ];
   private _eventSourceAPIVersion = 'v1';
   private _eventSources = this._functionNames.map((name) => `dlclink:${name}:${this._eventSourceAPIVersion}`);
-  registeredContractSubscriptions: Array<AddressSubscription> = [];
 
   constructor(socket: StacksApiSocketClient, deploymentInfo: DeploymentInfo) {
     this._contractFullName = `${deploymentInfo.deployer}.dlc-manager-v1`;
@@ -28,30 +26,12 @@ export class DlcManagerV1 implements ContractConfig {
   }
 
   async init() {
-    let registeredContracts = await loadRegisteredContracts(
-      this._deploymentInfo.api_base_extended,
-      this._contractFullName,
-      'registered-contract'
-    );
-
-    registeredContracts.results.forEach((result) => {
-      this.registeredContractSubscriptions.push({
-        address: result.value.repr.slice(1),
-        subscription: this._socket.subscribeAddressTransactions(result.value.repr.slice(1)),
-        handleTx: this.handleTx,
-      });
-    });
-
     this._socket.subscribeAddressTransactions(this._contractFullName);
     console.log(`[Stacks] Subscribed to ${this._contractFullName}`);
-    console.log(`[Stacks] Loaded registered contracts:`, this.registeredContractSubscriptions);
   }
 
   checkAddresses(address: string): boolean {
-    return (
-      this._contractFullName == address ||
-      this.registeredContractSubscriptions.some((subscription) => subscription.address === address)
-    );
+    return this._contractFullName == address;
   }
 
   async handleTx(tx: ContractCallTransaction) {
@@ -111,11 +91,6 @@ export class DlcManagerV1 implements ContractConfig {
         case 'register-contract': {
           const _contractAddress = printEvent['contract-address']?.value;
           const _logMessage = `[${this._contractFullName}] ${currentTime} Contract registered on chain: ${_contractAddress}`;
-          this.registeredContractSubscriptions.push({
-            address: _contractAddress,
-            subscription: this._socket.subscribeAddressTransactions(_contractAddress),
-            handleTx: this.handleTx,
-          });
           console.log(_logMessage);
           break;
         }
@@ -123,13 +98,6 @@ export class DlcManagerV1 implements ContractConfig {
         case 'unregister-contract': {
           const _contractAddress = printEvent['contract-address']?.value;
           const _logMessage = `[${this._contractFullName}] ${currentTime} Contract registration removed on chain: ${_contractAddress}`;
-          const sub = this.registeredContractSubscriptions.find((sub) => sub.address === _contractAddress);
-          if (sub) {
-            sub.subscription.unsubscribe();
-            this.registeredContractSubscriptions = this.registeredContractSubscriptions.filter(
-              (sub) => sub.address !== _contractAddress
-            );
-          }
           console.log(_logMessage);
           break;
         }
