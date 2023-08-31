@@ -89,7 +89,11 @@ fn get_attestors() -> Result<Vec<String>, dlc_manager::error::Error> {
     let blockchain_interface_url = env::var("BLOCKCHAIN_INTERFACE_URL")
         .expect("BLOCKCHAIN_INTERFACE_URL environment variable not set, couldn't get attestors");
 
-    let get_all_attestors_endpoint_url = format!("{}/get-all-attestors", blockchain_interface_url);
+    let get_all_attestors_endpoint_url = match env::var("BLOCKCHAIN_INTERFACE_TEST_MODE").as_deref()
+    {
+        Ok("true") => format!("{}/get-all-attestors-test", blockchain_interface_url),
+        _ => format!("{}/get-all-attestors", blockchain_interface_url),
+    };
 
     let client = reqwest::blocking::Client::builder()
         .use_rustls_tls()

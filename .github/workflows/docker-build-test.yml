@@ -1,0 +1,57 @@
+#
+
+name: Run Integration Test
+
+on:
+  pull_request:
+    branches:
+      - 1.0/prerelease
+      - master
+    types:
+      - opened
+      - reopened
+      - synchronize
+
+jobs:
+  docker-compose-build:
+    name: Build & start docker compose
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v3
+      - name: Build
+        env:
+          REGISTRY_ALIAS: dlc-link
+          ECR_REPOSITORY: storage-api
+        run: |
+          docker compose --profile it up -d
+      - name: Wait for the test container to complete
+        run: |
+          while true; do
+            status=$(docker ps -a -f name=integration-test --format '{{.Status}}')
+            exit_code=$(echo $status | awk '{print $2}' | tr -d '()')
+
+            echo "Debug: status = $status"
+            echo "Debug: exit_code = $exit_code"
+
+            if [[ "$status" =~ "Exited" ]]; then
+              if [[ "$exit_code" == "0" ]]; then
+                echo "Test succeeded"
+                break
+              elif [[ "$exit_code" != "" ]]; then
+                echo "Test failed with exit code $exit_code"
+                docker logs integration-test
+                exit 1
+              fi
+            else
+              echo "Waiting for test to complete, current status: $status"
+            fi
+            sleep 5
+          done
+
+      - name: Retrieve test logs
+        run: |
+          docker logs integration-test
+
+      - name: Remove containers
+        run: docker compose down

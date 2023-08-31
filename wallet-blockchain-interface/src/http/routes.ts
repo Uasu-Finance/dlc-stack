@@ -27,6 +27,12 @@ router.get('/get-all-attestors', express.json(), async (req, res) => {
     res.status(200).send(data);
 });
 
+router.get('/get-all-attestors-test', express.json(), async (req, res) => {
+    console.log('GET /get-all-attestors-test');
+    const data = ['http://attestor-1:8801', 'http://attestor-2:8802', 'http://attestor-3:8803'];
+    res.status(200).send(data);
+});
+
 router.post('/post-close-dlc', express.json(), async (req, res) => {
     if (!req.body.uuid) {
         res.status(400).send('Missing UUID');

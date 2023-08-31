@@ -1,18 +1,25 @@
 import { JsDLCInterface } from 'dlc_protocol_wallet';
 
 const testWalletPrivateKey = 'bea4ecfec5cfa1e965ee1b3465ca4deff4f04b36a1fb5286a07660d5158789fb';
-const testWalletAddress = 'tb1q3tj2fr9scwmcw3rq5m6jslva65f2rqjxt2t0zh';
+const testWalletAddress = 'bcrt1q3tj2fr9scwmcw3rq5m6jslva65f2rqjxfrjz47';
+// const testWalletAddress = 'tb1q3tj2fr9scwmcw3rq5m6jslva65f2rqjxt2t0zh';
 
-const bitcoinNetwork = 'testnet';
-const bitcoinNetworkURL = 'https://blockstream.info/testnet/api/';
+const bitcoinNetwork = 'regtest';
+const bitcoinNetworkURL = 'https://devnet.dlc.link/electrs';
 
 const protocolWalletURL = 'http://localhost:8085';
+
+const attestorList = [
+    'https://devnet.dlc.link/attestor-1',
+    'https://devnet.dlc.link/attestor-2',
+    'https://devnet.dlc.link/attestor-3',
+];
 
 const handleAttestors = false;
 const successfulAttesting = false;
 
 // const testUUID = `test${Math.floor(Math.random() * 1000)}`;
-const testUUID = '0x9b428a04fb32afe892bc0a76b6eaeff394ca9c2792ec0dd1045b95b571db36c0';
+const testUUID = '0x99fa832bb683d21bce61e258d0f6b15f6dfe9b46d38cfc3f8c8d5ed31ff5d266';
 
 function createMaturationDate() {
     const maturationDate = new Date();
@@ -39,7 +46,7 @@ async function fetchOfferFromProtocolWallet() {
         acceptCollateral: 10000,
         offerCollateral: 0,
         totalOutcomes: 100,
-        attestorList: JSON.stringify(['http://localhost:8803', 'http://localhost:8802', 'http://localhost:8801']),
+        attestorList: JSON.stringify(attestorList),
     };
 
     return fetch(`${protocolWalletURL}/offer`, {
@@ -72,6 +79,11 @@ async function runDLCFlow(dlcManager, dlcOffer) {
     console.log('Starting DLC flow');
 
     const acceptedContract = await dlcManager.accept_offer(JSON.stringify(dlcOffer));
+    const pared_response = JSON.parse(acceptedContract);
+    if (!pared_response.protocolVersion) {
+        console.log('Error accepting offer: ', pared_response);
+        return;
+    }
     console.log('Accepted Contract:', acceptedContract);
 
     const signedContract = await sendAcceptedOfferToProtocolWallet(acceptedContract);
@@ -97,16 +109,19 @@ async function runDLCFlow(dlcManager, dlcOffer) {
 async function main() {
     console.log('DLC WASM Wallet Test');
 
-    if (handleAttestors) {
-        console.log('Creating Events');
-        const events = await Promise.all(exampleAttestorURLs.map((attestorURL) => createEvent(attestorURL, testUUID)));
-        console.log('Created Events: ', events);
-    }
+    // if (handleAttestors) {
+    //   console.log('Creating Events');
+    //   const events = await Promise.all(exampleAttestorURLs.map((attestorURL) => createEvent(attestorURL, testUUID)));
+    //   console.log('Created Events: ', events);
+    // }
 
     console.log('Fetching Offer from Protocol Wallet');
     const offerResponse = await fetchOfferFromProtocolWallet();
+    if (!offerResponse.temporaryContractId) {
+        console.log('Error fetching offer from protocol wallet: ', offerResponse);
+        return;
+    }
     console.log('Received Offer (JSON): ', offerResponse);
-    console.log('Received Attestor URLs: ');
 
     // creates a new instance of the JsDLCInterface
     const dlcManager = await JsDLCInterface.new(
@@ -114,13 +129,13 @@ async function main() {
         testWalletAddress,
         bitcoinNetwork,
         bitcoinNetworkURL,
-        JSON.stringify(offerResponse[1])
+        JSON.stringify(attestorList)
     );
 
     console.log('DLC Manager Interface Options: ', dlcManager.get_options());
 
     waitForBalance(dlcManager).then(() => {
-        runDLCFlow(dlcManager, offerResponse[0]);
+        runDLCFlow(dlcManager, offerResponse);
     });
 }
 
