@@ -177,8 +177,8 @@ services:
       dockerfile: ./it/Dockerfile
     environment:
       - ENV=docker
-    volumes:
-      - ./it:/app/it
+    # volumes:
+    #   - ./it:/app/it
     depends_on:
       router-wallet:
         condition: service_healthy
