@@ -107,7 +107,7 @@ services:
   blockchain-interface:
     container_name: blockchain-interface
     hostname: blockchain-interface
-    image: 903295530547.dkr.ecr.us-east-1.amazonaws.com/dlc-bockchain-interface:${IMAGE_TAG}
+    image: 903295530547.dkr.ecr.us-east-1.amazonaws.com/dlc-blockchain-interface:${IMAGE_TAG}
     volumes:
       - ./wallet-blockchain-interface:/usr/src/app
     ports:
