@@ -1,3 +1,5 @@
+import dotenv from "dotenv";
+dotenv.config();
 import { JsDLCInterface } from "./node_modules/wasm-wallet/dlc_wasm_wallet.js";
 import fetch from "cross-fetch";
 import config from "./config.js";
@@ -11,13 +13,13 @@ const {
   attestorList,
 } = config;
 
-const handleAttestors = process.env.HANDLE_ATTESTORS || true;
+const handleAttestors = process.env.HANDLE_ATTESTORS == "true";
 const testUUID = process.env.UUID || `test${Math.floor(Math.random() * 1000)}`;
-const successfulAttesting = process.env.SUCCESSFUL_ATTESTING || true;
+const successfulAttesting = process.env.SUCCESSFUL_ATTESTING == "true";
 
-const attestorListReplaced = attestorList.map((attestorURL) =>
-  attestorURL.replace("localhost", "host.docker.internal")
-);
+// const attestorListReplaced = attestorList.map((attestorURL) =>
+//   attestorURL.replace("localhost", "host.docker.internal")
+// );
 
 function createMaturationDate() {
   const maturationDate = new Date();
@@ -58,7 +60,7 @@ async function fetchOfferFromProtocolWallet() {
     acceptCollateral: 10000,
     offerCollateral: 0,
     totalOutcomes: 100,
-    attestorList: JSON.stringify(attestorListReplaced),
+    attestorList: JSON.stringify(attestorList),
   };
 
   try {
@@ -144,7 +146,7 @@ async function main() {
     testWalletAddress,
     bitcoinNetwork,
     bitcoinNetworkURL,
-    JSON.stringify(attestorListReplaced)
+    JSON.stringify(attestorList)
   );
 
   console.log("DLC Manager Interface Options: ", dlcManager.get_options());

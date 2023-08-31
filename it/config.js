@@ -1,7 +1,7 @@
 import dotenv from "dotenv";
 dotenv.config();
 
-const env = process.env.ENV || "local";
+const env = process.env.ENV || "devnet";
 
 const devnet = {
   testWalletPrivateKey:
@@ -63,11 +63,21 @@ const docker = {
   ],
 };
 
+const custom = {
+  testWalletPrivateKey: process.env.TEST_WALLET_PRIVATE_KEY,
+  testWalletAddress: process.env.TEST_WALLET_ADDRESS,
+  bitcoinNetwork: process.env.BITCOIN_NETWORK,
+  bitcoinNetworkURL: process.env.BITCOIN_NETWORK_URL,
+  protocolWalletURL: process.env.PROTOCOL_WALLET_URL,
+  attestorList: process.env.ATTESTOR_LIST.split(","),
+};
+
 const config = {
   devnet,
   testnet,
   local,
   docker,
+  custom,
 };
 
 export default config[env];
