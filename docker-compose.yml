@@ -19,7 +19,9 @@ services:
   storageapi:
     container_name: storageapi
     hostname: storageapi
-    image: storage-api:test
+    build:
+      context: .
+      dockerfile: ./storage/Dockerfile
     environment:
       RUST_LOG: "debug"
       DATABASE_URL: "postgresql://postgres:changeme@postgresdlc:5432/postgres"
