@@ -48,10 +48,6 @@ services:
       "CHAIN_1": "${CHAIN_1:-STACKS_MOCKNET}"
       "VERSION_1": "${VERSION_1:-1}"
       "API_KEY_1": "${API_KEY_1:-abcdef1234567890}"
-    # env_file:
-    #   - ./attestor/observer/.env
-    # volumes:
-    #   - ./attestor/observer/src:/app/attestor/observer/src
     restart: on-failure
     depends_on:
       - storageapi
@@ -72,10 +68,6 @@ services:
       "CHAIN_1": "${CHAIN_1:-STACKS_MOCKNET}"
       "VERSION_1": "${VERSION_1:-1}"
       "API_KEY_1": "${API_KEY_1:-abcdef1234567890}"
-    # env_file:
-    #   - ./attestor/observer/.env
-    # volumes:
-    #   - ./attestor/observer/src:/app/attestor/observer/src
     restart: on-failure
     depends_on:
       - storageapi
@@ -96,10 +88,6 @@ services:
       "CHAIN_1": "${CHAIN_1:-STACKS_MOCKNET}"
       "VERSION_1": "${VERSION_1:-1}"
       "API_KEY_1": "${API_KEY_1:-abcdef1234567890}"
-    # env_file:
-    #   - ./attestor/observer/.env
-    # volumes:
-    #   - ./attestor/observer/src:/app/attestor/observer/src
     restart: on-failure
     depends_on:
       - storageapi
@@ -114,6 +102,7 @@ services:
       - 3000:3000
     environment:
       - "PORT=3000"
+      - "TEST_MODE_ENABLED=true"
     depends_on:
       - dlc-link-attestor-1
       - dlc-link-attestor-2
@@ -143,7 +132,6 @@ services:
       - "STORAGE_API_ENDPOINT=http://storageapi:8100"
       - "CONTRACT_CLEANUP_ENABLED=false"
       - "BLOCKCHAIN_INTERFACE_URL=http://blockchain-interface:3000"
-      - "BLOCKCHAIN_INTERFACE_TEST_MODE=true"
     depends_on:
         - postgresdlc
         - storageapi
@@ -164,8 +152,8 @@ services:
     image: 903295530547.dkr.ecr.us-east-1.amazonaws.com/dlc-integration-test:${IMAGE_TAG}
     environment:
       - ENV=docker
-    # volumes:
-    #   - ./it:/app/it
+      - HANDLE_ATTESTORS=true
+      - SUCCESSFUL_ATTESTING=true
     depends_on:
       router-wallet:
         condition: service_healthy
