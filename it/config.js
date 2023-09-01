@@ -55,11 +55,11 @@ const docker = {
   testWalletAddress: "bcrt1q3tj2fr9scwmcw3rq5m6jslva65f2rqjxfrjz47",
   bitcoinNetwork: "regtest",
   bitcoinNetworkURL: "https://devnet.dlc.link/electrs",
-  protocolWalletURL: "http://host.docker.internal:8085",
+  protocolWalletURL: "http://172.17.0.1:8085",
   attestorList: [
-    "http://host.docker.internal:8801",
-    "http://host.docker.internal:8802",
-    "http://host.docker.internal:8803",
+    "http://172.17.0.1:8801",
+    "http://172.17.0.1:8802",
+    "http://172.17.0.1:8803",
   ],
 };
 

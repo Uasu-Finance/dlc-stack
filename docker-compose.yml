@@ -123,6 +123,7 @@ services:
       - 3000:3000
     environment:
       - "PORT=3000"
+      - "TEST_MODE_ENABLED=true"
     depends_on:
       - dlc-link-attestor-1
       - dlc-link-attestor-2
@@ -154,7 +155,6 @@ services:
       - "STORAGE_API_ENDPOINT=http://storageapi:8100"
       - "CONTRACT_CLEANUP_ENABLED=false"
       - "BLOCKCHAIN_INTERFACE_URL=http://blockchain-interface:3000"
-      - "BLOCKCHAIN_INTERFACE_TEST_MODE=true"
     depends_on:
         - postgresdlc
         - storageapi
@@ -177,6 +177,8 @@ services:
       dockerfile: ./it/Dockerfile
     environment:
       - ENV=docker
+      - HANDLE_ATTESTORS=true
+      - SUCCESSFUL_ATTESTING=true
     # volumes:
     #   - ./it:/app/it
     depends_on:

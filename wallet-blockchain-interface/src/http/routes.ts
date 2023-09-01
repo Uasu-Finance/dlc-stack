@@ -23,13 +23,12 @@ router.post('/set-status-funded', express.json(), async (req, res) => {
 
 router.get('/get-all-attestors', express.json(), async (req, res) => {
     console.log('GET /get-all-attestors');
-    const data = await blockchainWriter.getAllAttestors();
-    res.status(200).send(data);
-});
-
-router.get('/get-all-attestors-test', express.json(), async (req, res) => {
-    console.log('GET /get-all-attestors-test');
-    const data = ['http://attestor-1:8801', 'http://attestor-2:8802', 'http://attestor-3:8803'];
+    let data;
+    if (process.env.TEST_MODE_ENABLED === 'true') {
+        data = ['http://attestor-1:8801', 'http://attestor-2:8802', 'http://attestor-3:8803'];
+    } else {
+        data = await blockchainWriter.getAllAttestors();
+    }
     res.status(200).send(data);
 });
 
