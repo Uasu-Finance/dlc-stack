@@ -38,6 +38,7 @@ FROM node:16-alpine AS it
 
 COPY --from=it-build /app/it/index.js /app/it/index.js
 COPY --from=it-build /app/it/config.js /app/it/config.js
+COPY --from=it-build /app/it/polyfills.js /app/it/polyfills.js
 COPY --from=it-build /app/it/package.json /app/it/package.json
 COPY --from=it-build /app/it/node_modules /app/it/node_modules
 COPY --from=it-build /app/wasm-wallet/pkg /app/wasm-wallet/pkg
