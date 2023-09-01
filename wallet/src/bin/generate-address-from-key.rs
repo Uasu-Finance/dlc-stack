@@ -1,7 +1,8 @@
-use bitcoin::Address;
+use bitcoin::{Address, PrivateKey};
 use std::env;
 
 use secp256k1_zkp::{Secp256k1, SecretKey};
+use serde_json::json;
 
 fn main() {
     // Setup Blockchain Connection Object
@@ -19,13 +20,23 @@ fn main() {
     let secp = Secp256k1::new();
 
     let seckey = SecretKey::from_slice(&hex::decode(pkey).unwrap()).unwrap();
-    // seckey.keypair(&secp).
 
     println!("Secret Key: {:?}", seckey);
+    let pubkey = bitcoin::PublicKey::from_private_key(&secp, &PrivateKey::new(seckey, network));
+
+    println!(" Pubkey: {}", pubkey);
+
     let pubkey = seckey.public_key(&secp);
-    println!("Pubkey: {}", pubkey);
+    println!("another Pubkey: {}", pubkey);
 
-    let pubkey = bitcoin::PublicKey::from_slice(&pubkey.serialize()).unwrap();
+    let bitcoin_pubkey = bitcoin::PublicKey {
+        compressed: true,
+        inner: pubkey,
+    };
 
-    println!("address: {}", Address::p2wpkh(&pubkey, network).unwrap());
+    let address = Address::p2wpkh(&bitcoin_pubkey, network).unwrap();
+    println!(
+        "{}",
+        json!({ "public_key": pubkey, "network": network, "address": address })
+    )
 }
