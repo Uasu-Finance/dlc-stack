@@ -3,6 +3,7 @@
 #![allow(unreachable_code)]
 
 use bdk::keys::DerivableKey;
+use bdk::wallet::AddressIndex;
 use bitcoin::util::bip32::{DerivationPath, ExtendedPrivKey};
 use bytes::Buf;
 use tokio::sync::oneshot;
@@ -499,10 +500,11 @@ fn setup_wallets(
 
     // With this setup, I don't see UTXOs on my address when running wallet.get_balance!
     let pubkey = seckey_ext.public_key(&secp);
-    let pubkey = bitcoin::PublicKey::from_slice(&pubkey.serialize()).unwrap();
-    let static_address = Address::p2wpkh(&pubkey, active_network).unwrap();
-
-    println!("Address: {}", static_address);
+    // let pubkey = bitcoin::PublicKey::from_slice(&pubkey.serialize()).unwrap();
+    let pubkey = bitcoin::PublicKey {
+        compressed: true,
+        inner: pubkey,
+    };
 
     let bdk_wallet = Arc::new(Mutex::new(
         BdkWallet::new(
@@ -514,6 +516,15 @@ fn setup_wallets(
         )
         .unwrap(),
     ));
+
+    // let static_address = Address::p2wpkh(&pubkey, active_network).unwrap();
+    let static_address = bdk_wallet
+        .lock()
+        .unwrap()
+        .get_address(AddressIndex::Peek(0))
+        .unwrap();
+
+    println!("Address: {}", static_address);
 
     let wallet: Arc<DlcBdkWallet> = Arc::new(DlcBdkWallet::new(
         bdk_wallet,
@@ -686,6 +697,7 @@ async fn get_wallet_info(
     contracts_json["PreClosed"] = collected_contracts[8].clone().into();
 
     info_response["wallet"] = json!({
+        "unconfirmed_balance": wallet.bdk_wallet.lock().unwrap().get_balance().unwrap().untrusted_pending,
         "balance": wallet.bdk_wallet.lock().unwrap().get_balance().unwrap().confirmed,
         "address": wallet.address
     });
