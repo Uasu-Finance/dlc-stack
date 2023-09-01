@@ -69,7 +69,7 @@ const custom = {
   bitcoinNetwork: process.env.BITCOIN_NETWORK,
   bitcoinNetworkURL: process.env.BITCOIN_NETWORK_URL,
   protocolWalletURL: process.env.PROTOCOL_WALLET_URL,
-  attestorList: process.env.ATTESTOR_LIST.split(","),
+  attestorList: process.env.ATTESTOR_LIST?.split(","),
 };
 
 const config = {
