@@ -15,7 +15,7 @@ clean: ## Cargo clean
 	cargo clean
 
 integration-test: ## Run integration tests (docker env required)
-	cd it && cargo test
+	docker compose --profile it up
 
 docker-build: ## Docker compose build
 	docker compose build
