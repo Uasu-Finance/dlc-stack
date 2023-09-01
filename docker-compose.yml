@@ -23,7 +23,7 @@ services:
       context: .
       dockerfile: ./storage/Dockerfile
     environment:
-      RUST_LOG: "debug"
+      RUST_LOG: "info"
       DATABASE_URL: "postgresql://postgres:changeme@postgresdlc:5432/postgres"
       MIGRATE: "true"
     ports:
@@ -155,6 +155,7 @@ services:
       - "STORAGE_API_ENDPOINT=http://storageapi:8100"
       - "CONTRACT_CLEANUP_ENABLED=false"
       - "BLOCKCHAIN_INTERFACE_URL=http://blockchain-interface:3000"
+      - "XPRIV=${XPRIV}"
     depends_on:
         - postgresdlc
         - storageapi
@@ -179,8 +180,8 @@ services:
       - ENV=docker
       - HANDLE_ATTESTORS=true
       - SUCCESSFUL_ATTESTING=true
-    # volumes:
-    #   - ./it:/app/it
+    volumes:
+      - ./it:/app/it
     depends_on:
       router-wallet:
         condition: service_healthy

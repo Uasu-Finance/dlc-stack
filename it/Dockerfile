@@ -19,14 +19,16 @@ COPY ./it/ /app/it
 
 WORKDIR /app
 
-RUN rustup override set nightly-2023-03-31 && \
-  sudo chown -R circleci:circleci /app && \
-  wasm-pack build --target bundler /app/wasm-wallet
+RUN rustup override set nightly-2023-03-31
+RUN sudo chown -R circleci:circleci /app
+RUN wasm-pack build --target bundler /app/wasm-wallet
 
 WORKDIR /app/it
 
 RUN jq '. + {type: "module", main: "dlc-wasm-wallet.js"} | del(.module)' ../wasm-wallet/pkg/package.json > temp.json && \
-  mv temp.json ../wasm-wallet/pkg/package.json
+  mv temp.json ../wasm-wallet/pkg/package.json && \
+  echo 'import { webcrypto } from "node:crypto"; globalThis.crypto = webcrypto;' >> ../wasm-wallet/pkg/dlc_wasm_wallet_bg.js
+
 
 RUN npm install && \
   sudo npm ci wasm-wallet

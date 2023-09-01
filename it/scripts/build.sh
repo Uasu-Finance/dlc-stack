@@ -17,7 +17,7 @@ jq '. + {type: "module", main: "dlc-wasm-wallet.js"} | del(.module)' ../wasm-wal
 mv temp.json ../wasm-wallet/pkg/package.json
 
 # Adding the crypto shim
-# echo 'import { webcrypto } from "node:crypto"; globalThis.crypto = webcrypto;' >> ../wasm-wallet/pkg/dlc_wasm_wallet_bg.js
+echo 'import { webcrypto } from "node:crypto"; globalThis.crypto = webcrypto;' >> ../wasm-wallet/pkg/dlc_wasm_wallet_bg.js
 
 #  Compiling typescript
 # npx tsc -p .

@@ -2,6 +2,7 @@ FROM rust:1.70 AS build
 
 COPY ./wallet /app/dlc-protocol-wallet/
 COPY ./dlc-link-manager /app/dlc-link-manager/
+COPY ./dlc-simple-wallet /app/dlc-simple-wallet/
 COPY ./clients /app/clients/
 
 WORKDIR /app/dlc-protocol-wallet/

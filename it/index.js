@@ -3,6 +3,9 @@ dotenv.config();
 import { JsDLCInterface } from "./node_modules/wasm-wallet/dlc_wasm_wallet.js";
 import fetch from "cross-fetch";
 import config from "./config.js";
+import setupPolyfills from "./polyfills.js";
+
+setupPolyfills();
 
 const {
   testWalletPrivateKey,

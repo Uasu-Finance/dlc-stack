@@ -132,6 +132,7 @@ services:
       - "STORAGE_API_ENDPOINT=http://storageapi:8100"
       - "CONTRACT_CLEANUP_ENABLED=false"
       - "BLOCKCHAIN_INTERFACE_URL=http://blockchain-interface:3000"
+      - "XPRIV=${XPRIV}"
     depends_on:
         - postgresdlc
         - storageapi
