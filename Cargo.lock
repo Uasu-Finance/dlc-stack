@@ -475,7 +475,7 @@ checksum = "73290177011694f38ec25e165d0387ab7ea749a4b81cd4c80dae5988229f7a57"
 [[package]]
 name = "bitcoin-test-utils"
 version = "0.1.0"
-source = "git+https://github.com/dlc-link/rust-dlc#31d6ff5d5c43ba60d4cdaaf331ea237da68419d7"
+source = "git+https://github.com/dlc-link/rust-dlc#2e2708ba212a583f4f566b9d1a427513b96a9aec"
 dependencies = [
  "bitcoin 0.29.2",
  "bitcoincore-rpc",
@@ -906,7 +906,7 @@ dependencies = [
 [[package]]
 name = "dlc"
 version = "0.4.0"
-source = "git+https://github.com/dlc-link/rust-dlc#31d6ff5d5c43ba60d4cdaaf331ea237da68419d7"
+source = "git+https://github.com/dlc-link/rust-dlc#2e2708ba212a583f4f566b9d1a427513b96a9aec"
 dependencies = [
  "bitcoin 0.29.2",
  "miniscript 9.0.2",
@@ -945,7 +945,7 @@ dependencies = [
 [[package]]
 name = "dlc-manager"
 version = "0.4.0"
-source = "git+https://github.com/dlc-link/rust-dlc#31d6ff5d5c43ba60d4cdaaf331ea237da68419d7"
+source = "git+https://github.com/dlc-link/rust-dlc#2e2708ba212a583f4f566b9d1a427513b96a9aec"
 dependencies = [
  "async-trait",
  "bitcoin 0.29.2",
@@ -974,7 +974,7 @@ dependencies = [
 [[package]]
 name = "dlc-messages"
 version = "0.4.0"
-source = "git+https://github.com/dlc-link/rust-dlc#31d6ff5d5c43ba60d4cdaaf331ea237da68419d7"
+source = "git+https://github.com/dlc-link/rust-dlc#2e2708ba212a583f4f566b9d1a427513b96a9aec"
 dependencies = [
  "bitcoin 0.29.2",
  "dlc",
@@ -995,6 +995,7 @@ dependencies = [
  "dlc-link-manager",
  "dlc-manager",
  "dlc-messages",
+ "dlc-simple-wallet",
  "dlc-sled-storage-provider",
  "dlc-trie",
  "electrs-blockchain-provider",
@@ -1008,16 +1009,28 @@ dependencies = [
  "secp256k1-zkp",
  "serde",
  "serde_json",
- "simple-wallet",
  "sled",
  "tokio",
  "warp",
 ]
 
 [[package]]
+name = "dlc-simple-wallet"
+version = "0.1.0"
+dependencies = [
+ "bdk",
+ "bitcoin 0.29.2",
+ "dlc",
+ "dlc-manager",
+ "lightning",
+ "secp256k1-zkp",
+ "simple-wallet",
+]
+
+[[package]]
 name = "dlc-sled-storage-provider"
 version = "0.1.0"
-source = "git+https://github.com/dlc-link/rust-dlc#31d6ff5d5c43ba60d4cdaaf331ea237da68419d7"
+source = "git+https://github.com/dlc-link/rust-dlc#2e2708ba212a583f4f566b9d1a427513b96a9aec"
 dependencies = [
  "bitcoin 0.29.2",
  "dlc-manager",
@@ -1076,7 +1089,7 @@ dependencies = [
 [[package]]
 name = "dlc-trie"
 version = "0.4.0"
-source = "git+https://github.com/dlc-link/rust-dlc#31d6ff5d5c43ba60d4cdaaf331ea237da68419d7"
+source = "git+https://github.com/dlc-link/rust-dlc#2e2708ba212a583f4f566b9d1a427513b96a9aec"
 dependencies = [
  "bitcoin 0.29.2",
  "dlc",
@@ -1147,7 +1160,7 @@ checksum = "a26ae43d7bcc3b814de94796a5e736d4029efb0ee900c12e2d54c993ad1a1e07"
 [[package]]
 name = "electrs-blockchain-provider"
 version = "0.1.0"
-source = "git+https://github.com/dlc-link/rust-dlc#31d6ff5d5c43ba60d4cdaaf331ea237da68419d7"
+source = "git+https://github.com/dlc-link/rust-dlc#2e2708ba212a583f4f566b9d1a427513b96a9aec"
 dependencies = [
  "bitcoin 0.29.2",
  "bitcoin-test-utils",
@@ -1156,7 +1169,7 @@ dependencies = [
  "lightning-block-sync",
  "log",
  "reqwest",
- "rust-bitcoin-coin-selection 0.1.0 (git+https://github.com/p2pderivatives/rust-bitcoin-coin-selection)",
+ "rust-bitcoin-coin-selection",
  "serde",
  "serde_json",
  "simple-wallet",
@@ -1744,7 +1757,7 @@ dependencies = [
  "dlc-manager",
  "lightning",
  "miniscript 10.0.0",
- "rust-bitcoin-coin-selection 0.1.0 (git+https://github.com/p2pderivatives/rust-bitcoin-coin-selection?rev=4054519)",
+ "rust-bitcoin-coin-selection",
  "secp256k1-zkp",
 ]
 
@@ -2556,14 +2569,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "rust-bitcoin-coin-selection"
-version = "0.1.0"
-source = "git+https://github.com/p2pderivatives/rust-bitcoin-coin-selection#405451929568422f7df809e35d6ad8f36fccce90"
-dependencies = [
- "rand",
-]
-
-[[package]]
 name = "rust-ini"
 version = "0.18.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2885,7 +2890,7 @@ checksum = "420acb44afdae038210c99e69aae24109f32f15500aa708e81d46c9f29d55fcf"
 [[package]]
 name = "simple-wallet"
 version = "0.1.0"
-source = "git+https://github.com/dlc-link/rust-dlc#31d6ff5d5c43ba60d4cdaaf331ea237da68419d7"
+source = "git+https://github.com/dlc-link/rust-dlc#2e2708ba212a583f4f566b9d1a427513b96a9aec"
 dependencies = [
  "bdk",
  "bitcoin 0.29.2",

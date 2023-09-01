@@ -9,6 +9,7 @@ members = [
   "wallet",
   "wasm-wallet",
   "clients",
+  "dlc-simple-wallet",
   "storage/reader",
   "storage/writer",
   "storage/common",

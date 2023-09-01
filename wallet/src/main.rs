@@ -20,7 +20,10 @@ use std::{
     vec,
 };
 
-use bitcoin::{Address, XOnlyPublicKey};
+use bitcoin::{
+    util::bip32::{DerivationPath, ExtendedPrivKey},
+    Address, XOnlyPublicKey,
+};
 // use dlc_link_manager::Manager;
 use dlc_manager::{
     contract::{
@@ -31,11 +34,11 @@ use dlc_manager::{
     Blockchain, Oracle, Storage, SystemTimeProvider, Wallet,
 };
 use dlc_messages::{AcceptDlc, Message};
+use dlc_simple_wallet::DlcSimpleWallet;
 use dlc_sled_storage_provider::SledStorageProvider;
 use electrs_blockchain_provider::ElectrsBlockchainProvider;
 use log::{debug, error, info, warn};
-use secp256k1_zkp::{rand, All, PublicKey, Secp256k1, SecretKey};
-use simple_wallet::SimpleWallet;
+// use secp256k1_zkp::{rand, All, PublicKey, Secp256k1, SecretKey};
 
 use crate::storage::storage_provider::StorageProvider;
 use oracle_client::P2PDOracleClient;
@@ -52,7 +55,7 @@ mod utils;
 mod macros;
 
 type DlcManager<'a> = Manager<
-    Arc<SimpleWallet<Arc<ElectrsBlockchainProvider>, Arc<SledStorageProvider>>>,
+    Arc<DlcSimpleWallet<Arc<ElectrsBlockchainProvider>, Arc<SledStorageProvider>>>,
     Arc<ElectrsBlockchainProvider>,
     Box<StorageProvider>,
     Arc<P2PDOracleClient>,
@@ -111,31 +114,31 @@ fn get_attestors() -> Result<Vec<String>, dlc_manager::error::Error> {
     }
 }
 
-fn get_or_generate_secret_from_config(
-    secp: &Secp256k1<All>,
-    secret_key_file_path: std::path::PathBuf,
-) -> SecretKey {
-    let mut secret_key = String::new();
-    if secret_key_file_path.exists() {
-        info!(
-            "reading secret key from {} (default)",
-            secret_key_file_path.file_name().unwrap().to_string_lossy()
-        );
-        File::open(secret_key_file_path)
-            .unwrap()
-            .read_to_string(&mut secret_key)
-            .unwrap();
-        secret_key.retain(|c| !c.is_whitespace());
-        SecretKey::from_str(&secret_key).unwrap()
-    } else {
-        info!("no secret key file was found, generating secret key");
-        let new_key = secp.generate_keypair(&mut rand::thread_rng()).0;
-        let mut file = File::create(secret_key_file_path).unwrap();
-        file.write_all(new_key.display_secret().to_string().as_bytes())
-            .unwrap();
-        new_key
-    }
-}
+// fn get_or_generate_secret_from_config(
+//     secp: &Secp256k1<All>,
+//     secret_key_file_path: std::path::PathBuf,
+// ) -> SecretKey {
+//     let mut secret_key = String::new();
+//     if secret_key_file_path.exists() {
+//         info!(
+//             "reading secret key from {} (default)",
+//             secret_key_file_path.file_name().unwrap().to_string_lossy()
+//         );
+//         File::open(secret_key_file_path)
+//             .unwrap()
+//             .read_to_string(&mut secret_key)
+//             .unwrap();
+//         secret_key.retain(|c| !c.is_whitespace());
+//         SecretKey::from_str(&secret_key).unwrap()
+//     } else {
+//         info!("no secret key file was found, generating secret key");
+//         let new_key = secp.generate_keypair(&mut rand::thread_rng()).0;
+//         let mut file = File::create(secret_key_file_path).unwrap();
+//         file.write_all(new_key.display_secret().to_string().as_bytes())
+//             .unwrap();
+//         new_key
+//     }
+// }
 
 fn generate_p2pd_clients(
     attestor_urls: Vec<String>,
@@ -153,6 +156,9 @@ fn generate_p2pd_clients(
 
 fn main() {
     env_logger::init();
+    let xpriv_str = env::var("XPRIV")
+        .expect("XPRIV environment variable not set, please run `just generate-descriptor`, securely backup the output, and set this env_var accordingly");
+    let xpriv = ExtendedPrivKey::from_str(&xpriv_str).expect("Unable to decode xpriv env variable");
 
     let attestor_urls: Vec<String> = retry!(get_attestors(), 10, "Loading attestors");
 
@@ -191,15 +197,6 @@ fn main() {
     let wallet_store: Arc<SledStorageProvider> =
         Arc::new(SledStorageProvider::new(sled_path.as_str()).unwrap());
 
-    // Set up wallet
-    let wallet = Arc::new(SimpleWallet::new(
-        blockchain.clone(),
-        wallet_store.clone(),
-        active_network,
-    ));
-
-    let static_address = wallet.get_new_address().unwrap();
-
     // Set up Oracle Client
     let protocol_wallet_attestors = generate_p2pd_clients(attestor_urls.clone());
 
@@ -212,9 +209,37 @@ fn main() {
         "get blockchain height"
     );
 
-    let secp: Secp256k1<All> = Secp256k1::new();
-    let secret_key = get_or_generate_secret_from_config(&secp, PathBuf::from("secret.key"));
-    let pubkey = PublicKey::from_secret_key(&secp, &secret_key);
+    // let secret_key = get_or_generate_secret_from_config(&secp, PathBuf::from("secret.key"));
+    let secp = bitcoin::secp256k1::Secp256k1::new();
+
+    let external_path = DerivationPath::from_str("m/44h/0h/0h/0").expect("A valid derivation path");
+    // let int_path = DerivationPath::from_str("m/44h/0h/0h/1").expect("A valid derivation path");
+
+    let derived_external_xpriv = xpriv.derive_priv(&secp, &external_path).unwrap();
+    let seckey_ext = derived_external_xpriv.private_key;
+    let pubkey_raw = seckey_ext.public_key(&secp);
+    // info!("pubkey_raw: {:?}", pubkey_raw.serialize());
+    let pubkey = bitcoin::PublicKey {
+        compressed: true,
+        inner: pubkey_raw,
+    };
+    // info!("pubkey: {:?}", pubkey);
+
+    // let pubkey = bitcoin::PublicKey::from_slice(&seckey_ext.public_key(&secp).serialize()).unwrap();
+
+    // Set up wallet
+    let wallet = Arc::new(DlcSimpleWallet::new(
+        blockchain.clone(),
+        wallet_store.clone(),
+        active_network,
+        Address::p2wpkh(&pubkey, active_network).unwrap(),
+        seckey_ext,
+    ));
+    let static_address = wallet.get_new_address().unwrap();
+    info!(
+        "Starting Wallet with address: {}",
+        static_address.to_string()
+    );
 
     info!("Starting DLC Manager with pubkey: {}", pubkey.to_string());
 
@@ -342,7 +367,7 @@ fn main() {
 
 fn get_wallet_info(
     manager: Arc<Mutex<DlcManager>>,
-    wallet: Arc<SimpleWallet<Arc<ElectrsBlockchainProvider>, Arc<SledStorageProvider>>>,
+    wallet: Arc<DlcSimpleWallet<Arc<ElectrsBlockchainProvider>, Arc<SledStorageProvider>>>,
     static_address: String,
 ) -> Response {
     let mut info_response = json!({});
@@ -459,7 +484,7 @@ fn periodic_check(
         };
 
         match contract {
-            Contract::Confirmed(c) => {
+            Contract::Confirmed(_c) => {
                 newly_confirmed_uuids.push(uuid);
             }
             Contract::Closed(c) => {
@@ -687,7 +712,7 @@ fn delete_all_offers(manager: Arc<Mutex<DlcManager>>, response: Response) -> Res
 }
 
 fn unlock_utxos(
-    wallet: Arc<SimpleWallet<Arc<ElectrsBlockchainProvider>, Arc<SledStorageProvider>>>,
+    wallet: Arc<DlcSimpleWallet<Arc<ElectrsBlockchainProvider>, Arc<SledStorageProvider>>>,
     response: Response,
 ) -> Response {
     info!("Unlocking UTXOs");
@@ -697,7 +722,7 @@ fn unlock_utxos(
 
 fn empty_to_address(
     address: String,
-    wallet: Arc<SimpleWallet<Arc<ElectrsBlockchainProvider>, Arc<SledStorageProvider>>>,
+    wallet: Arc<DlcSimpleWallet<Arc<ElectrsBlockchainProvider>, Arc<SledStorageProvider>>>,
     response: Response,
 ) -> Response {
     info!("Unlocking UTXOs");
