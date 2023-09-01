@@ -457,7 +457,7 @@ fn setup_wallets(
     xpriv: ExtendedPrivKey,
     active_network: bitcoin::Network,
     sled: sled::Tree,
-) -> (secp256k1_zkp::PublicKey, Arc<DlcBdkWallet>) {
+) -> (bitcoin::PublicKey, Arc<DlcBdkWallet>) {
     // Setup KEYS!
     let secp = bitcoin::secp256k1::Secp256k1::new();
 
@@ -470,8 +470,8 @@ fn setup_wallets(
     // let derived_int_pkey = xpriv.derive_priv(&secp, &int_path).unwrap();
     // let seckey_int = derived_int_pkey.private_key;
 
-    let pubkey_ext = seckey_ext.public_key(&secp);
-    // let pubkey_int = seckey_int.public_key(&secp);
+    // let pubkey_ext = seckey_ext.public_key(&secp);
+    // // let pubkey_int = seckey_int.public_key(&secp);
 
     let signing_external_descriptor = descriptor!(wpkh(
         derived_ext_xpriv
@@ -532,7 +532,7 @@ fn setup_wallets(
         seckey_ext.clone(),
         active_network,
     ));
-    (pubkey_ext, wallet)
+    (pubkey, wallet)
 }
 
 async fn create_new_offer(

@@ -13,11 +13,10 @@ const protocolWalletURL = 'http://localhost:8085';
 
 const attestorList = ['https://devnet.dlc.link/attestor-1', 'https://devnet.dlc.link/attestor-2', 'https://devnet.dlc.link/attestor-3'];
 
-const handleAttestors = true;
+const handleAttestors = false;
 const successfulAttesting = false;
 
-// const testUUID = `test${Math.floor(Math.random() * 1000)}`;
-const testUUID = '0x99fa832bb683d21bce61e258d0f6b15f6dfe9b46d38cfc3f8c8d5ed31ff5d123';
+const testUUID = '0x8fc9286ca55310c73dfdd175108f7b604c9c23f6f83922829bbd1114b07ea070';
 
 function createMaturationDate() {
   const maturationDate = new Date();

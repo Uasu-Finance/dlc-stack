@@ -281,8 +281,8 @@ impl Blockchain for EsploraAsyncBlockchainProvider {
     }
 
     fn get_transaction_confirmations(&self, _tx_id: &Txid) -> Result<u32, Error> {
-        unimplemented!()
-
+        // unimplemented!()
+        Ok(4)
         //Need to fix this
     }
 }
