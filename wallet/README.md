@@ -37,8 +37,10 @@ Some functions of the DLC.Link Router Wallet require accessing a smart-contract 
 ### Generate a Key
 Use [Just](https://github.com/casey/just) to generate a key and a cooresponding fingerprint for your wallet. Back this up securely. Pass this into the env vars as described below. This takes an env variable for BITCOIN_NETWORK.
 
-To run `BITCOIN_NETWORK=tesnet just generate-key` successfully, you will first need to compile the wallet apps into binaries with the following command.
-`cargo build --release --bins --target-dir .` After this, the generate-key function should work.
+You can run with the following command
+```sh
+$ BITCOIN_NETWORK=regtest cargo run --bin generate-key
+```
 
 ### Setup ENV vars
 
@@ -87,7 +89,7 @@ $ BITCOIN_NETWORK=[network] BLOCKCHAIN_INTERFACE_URL=[...] <etc>  cargo run
 ```
 
 #### Production Build
-As mentioned in the [generate-key](#generate-a-key) section, you can build a binary for production like this:
+You can build a binary for production like this:
 `cargo build --release --bins --target-dir .` Then run the following:
 ```sh
 $ BITCOIN_NETWORK=[network] BLOCKCHAIN_INTERFACE_URL=[...] <etc>  ./router-wallet
