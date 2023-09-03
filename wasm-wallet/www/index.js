@@ -16,7 +16,7 @@ const attestorList = ['https://devnet.dlc.link/attestor-1', 'https://devnet.dlc.
 const handleAttestors = false;
 const successfulAttesting = false;
 
-const testUUID = '0x8fc9286ca55310c73dfdd175108f7b604c9c23f6f83922829bbd1114b07ea070';
+const testUUID = '0x9b5433920e0a7cdab5d52040ff21867597eda3c47247f6a80298ccc54510ce64';
 
 function createMaturationDate() {
   const maturationDate = new Date();

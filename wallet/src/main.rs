@@ -500,6 +500,7 @@ fn setup_wallets(
 
     // With this setup, I don't see UTXOs on my address when running wallet.get_balance!
     let pubkey = seckey_ext.public_key(&secp);
+    // let pubkey = secp256k1_zkp::PublicKey::from_secret_key(&secp, &seckey_ext); //equiv to prev line
     // let pubkey = bitcoin::PublicKey::from_slice(&pubkey.serialize()).unwrap();
     let pubkey = bitcoin::PublicKey {
         compressed: true,
