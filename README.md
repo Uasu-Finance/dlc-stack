@@ -25,10 +25,6 @@ The `storage-api` module provides an API for hiding storage operations. Currentl
 
 The `clients` module provides re-usable clients for the attestor / wallet / storage-api.
 
-### Oracle-discovery (WIP)
-
-The `oracle-discovery` module is responsible for discovering and registering oracles on the network. It provides an API for finding and connecting to available oracles.
-
 ### IT (WIP)
 
 The `it` module provides basic integration tests using BDD (Behavior-Driven Development) with Cucumber.
