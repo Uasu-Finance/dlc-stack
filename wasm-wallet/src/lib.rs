@@ -4,7 +4,9 @@ extern crate console_error_panic_hook;
 extern crate log;
 
 use bitcoin::{Network, PrivateKey, XOnlyPublicKey};
+use dlc_link_manager::AsyncOracle;
 use dlc_messages::{Message, OfferDlc, SignDlc};
+use secp256k1_zkp::UpstreamError;
 use wasm_bindgen::prelude::*;
 
 use lightning::util::ser::Readable;
@@ -13,6 +15,7 @@ use secp256k1_zkp::hashes::*;
 use secp256k1_zkp::Secp256k1;
 
 use core::panic;
+use std::fmt;
 use std::{
     collections::HashMap,
     io::Cursor,
@@ -22,41 +25,43 @@ use std::{
 
 use dlc_manager::{
     contract::{signed_contract::SignedContract, Contract},
-    ContractId, Oracle, SystemTimeProvider,
+    ContractId, SystemTimeProvider,
 };
 
 use dlc_link_manager::{AsyncStorage, Manager};
 
 use std::fmt::Write as _;
 
-use storage::async_storage_api::AsyncStorageApiProvider;
-// use dlc_memory_storage_provider::DlcMemoryStorageProvider;
+use dlc_clients::async_storage_provider::AsyncStorageApiProvider;
 
 use esplora_async_blockchain_provider::EsploraAsyncBlockchainProvider;
 
 use js_interface_wallet::JSInterfaceWallet;
 
-use oracle_client::P2PDOracleClient;
+use attestor_client::AttestorClient;
 use serde::{Deserialize, Serialize};
-use serde_json::{json, Value};
 
-mod oracle_client;
-mod storage;
-mod utils;
 #[macro_use]
 mod macros;
 
-async fn generate_p2pd_clients(
+#[derive(Debug)]
+struct WalletError(String);
+impl fmt::Display for WalletError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "Wallet Error: {}", self.0)
+    }
+}
+impl std::error::Error for WalletError {}
+
+async fn generate_attestor_client(
     attestor_urls: Vec<String>,
-) -> HashMap<XOnlyPublicKey, Arc<P2PDOracleClient>> {
+) -> HashMap<XOnlyPublicKey, Arc<AttestorClient>> {
     let mut attestor_clients = HashMap::new();
 
     for url in attestor_urls.iter() {
-        let p2p_client: P2PDOracleClient = P2PDOracleClient::new(url)
-            .await
-            .expect("Error creating oracle client");
+        let p2p_client: AttestorClient = AttestorClient::new(url).await.unwrap();
         let attestor = Arc::new(p2p_client);
-        attestor_clients.insert(attestor.get_public_key(), attestor.clone());
+        attestor_clients.insert(attestor.get_public_key().await, attestor.clone());
     }
     return attestor_clients;
 }
@@ -65,7 +70,7 @@ type DlcManager = Manager<
     Arc<JSInterfaceWallet>,
     Arc<EsploraAsyncBlockchainProvider>,
     Box<AsyncStorageApiProvider>,
-    Arc<P2PDOracleClient>,
+    Arc<AttestorClient>,
     Arc<SystemTimeProvider>,
 >;
 
@@ -115,9 +120,9 @@ impl Default for JsDLCInterfaceOptions {
     // Default values for Manager Options
     fn default() -> Self {
         Self {
-            attestor_urls: "https://dev-oracle.dlc.link/oracle".to_string(),
+            attestor_urls: "https://devnet.dlc.link/oracle".to_string(),
             network: "regtest".to_string(),
-            electrs_url: "https://dev-oracle.dlc.link/electrs".to_string(),
+            electrs_url: "https://devnet.dlc.link/electrs".to_string(),
             address: "".to_string(),
         }
     }
@@ -168,7 +173,6 @@ impl JsDLCInterface {
         // Set up wallet
         let wallet = Arc::new(JSInterfaceWallet::new(
             options.address.to_string(),
-            active_network,
             PrivateKey::new(seckey, active_network),
         ));
 
@@ -182,7 +186,7 @@ impl JsDLCInterface {
                 }
             };
 
-        let attestors = generate_p2pd_clients(attestor_urls_vec).await;
+        let attestors = generate_attestor_client(attestor_urls_vec).await;
 
         // Set up time provider
         let time_provider = SystemTimeProvider {};
@@ -199,7 +203,12 @@ impl JsDLCInterface {
             .unwrap(),
         ));
 
-        blockchain.refresh_chain_data(options.address.clone()).await;
+        match blockchain.refresh_chain_data(options.address.clone()).await {
+            Ok(_) => (),
+            Err(e) => {
+                log_to_console!("Error refreshing chain data: {}", e);
+            }
+        };
 
         JsDLCInterface {
             options,
@@ -214,13 +223,30 @@ impl JsDLCInterface {
     }
 
     pub async fn get_wallet_balance(&self) -> u64 {
-        self.blockchain
+        log_to_console!("get_wallet_balance");
+        match self
+            .blockchain
             .refresh_chain_data(self.options.address.clone())
-            .await;
-        self.wallet
-            .set_utxos(self.blockchain.get_utxos().unwrap())
-            .unwrap();
-        self.blockchain.get_balance().await.unwrap()
+            .await
+        {
+            Ok(_) => (),
+            Err(e) => {
+                log_to_console!("Error refreshing chain data: {}", e);
+            }
+        };
+        match self.wallet.set_utxos(self.blockchain.get_utxos().unwrap()) {
+            Ok(_) => (),
+            Err(e) => {
+                log_to_console!("Error setting utxos: {}", e);
+            }
+        };
+        match self.blockchain.get_balance().await {
+            Ok(balance) => balance,
+            Err(e) => {
+                log_to_console!("Error getting balance: {}", e);
+                0
+            }
+        }
     }
 
     // public async function for fetching all the contracts on the manager
@@ -260,35 +286,43 @@ impl JsDLCInterface {
     }
 
     pub async fn accept_offer(&self, offer_json: String) -> String {
-        let dlc_offer_message: OfferDlc = serde_json::from_str(&offer_json).unwrap();
+        log_to_console!("running accept_offer function1");
 
-        let temporary_contract_id = dlc_offer_message.temporary_contract_id;
+        let accept_msg_result = async {
+            let dlc_offer_message: OfferDlc =
+                serde_json::from_str(&offer_json).map_err(|e| WalletError(e.to_string()))?;
+            log_to_console!("running accept_offer function2");
+            let temporary_contract_id = dlc_offer_message.temporary_contract_id;
 
-        match self
-            .manager
-            .lock()
-            .unwrap()
-            .on_dlc_message(
-                &Message::Offer(dlc_offer_message.clone()),
-                STATIC_COUNTERPARTY_NODE_ID.parse().unwrap(),
-            )
-            .await
-        {
-            Ok(_) => (),
+            let counterparty = STATIC_COUNTERPARTY_NODE_ID
+                .parse()
+                .map_err(|e: UpstreamError| WalletError(e.to_string()))?;
+            log_to_console!("running accept_offer function3");
+            self.manager
+                .lock()
+                .unwrap()
+                .on_dlc_message(&Message::Offer(dlc_offer_message.clone()), counterparty)
+                .await
+                .map_err(|e| WalletError(e.to_string()))?;
+            log_to_console!("running accept_offer function4");
+            let (_contract_id, _public_key, accept_msg) = self
+                .manager
+                .lock()
+                .unwrap()
+                .accept_contract_offer(&temporary_contract_id)
+                .await
+                .expect("Error accepting contract offer");
+            log_to_console!("running accept_offer function5");
+            serde_json::to_string(&accept_msg).map_err(|e| WalletError(e.to_string()))
+        }
+        .await;
+        match accept_msg_result {
+            Ok(accept_msg) => accept_msg,
             Err(e) => {
-                return e.to_string();
+                log_to_console!("Error accepting offer: {}", e);
+                format!("Error accepting offer: {}", e)
             }
         }
-
-        let (_contract_id, _public_key, accept_msg) = self
-            .manager
-            .lock()
-            .unwrap()
-            .accept_contract_offer(&temporary_contract_id)
-            .await
-            .expect("Error accepting contract offer");
-
-        serde_json::to_string(&accept_msg).unwrap()
     }
 
     pub async fn countersign_and_broadcast(&self, dlc_sign_message: String) -> String {
@@ -351,69 +385,6 @@ impl JsDLCInterface {
             _ => (),
         }
     }
-
-    // fn accept_offer(&self, offer_json: String, utxos: String) -> String {
-    // self.blockchain.refresh_chain_data(address.clone()).await;
-    // let utxo_inputs: Vec<UtxoInput> = serde_json::from_str(&utxos).unwrap();
-
-    // log out utxo_inputs
-    // clog!("utxo_inputs {:?}", utxo_inputs);
-
-    // let utxos: Vec<Utxo> = utxo_inputs
-    //     .into_iter()
-    //     .map(|utxo| Utxo {
-    //         address: address.clone(),
-    //         outpoint: OutPoint {
-    //             txid: utxo
-    //                 .txid
-    //                 .parse()
-    //                 .expect("To be able to parse the txid from the utxo"),
-    //             vout: utxo.vout,
-    //         },
-    //         redeem_script: Script::default(),
-    //         reserved: false,
-    //         tx_out: TxOut {
-    //             value: utxo.value,
-    //             script_pubkey: address.script_pubkey(),
-    //         },
-    //     })
-    //     .collect();
-
-    // log out utxos
-    // clog!("utxos {:?}", utxos);
-
-    // Then the utxos can be set in the js-interface-wallet as the current utxos, overwriting the previous ones
-    // the wallet should use that list for the remainder of the operation.
-    // self.wallet.set_utxos(utxos).unwrap();
-
-    //     let dlc_offer_message: OfferDlc = serde_json::from_str(&offer_json).unwrap();
-    //     clog!("Offer to accept: {:?}", dlc_offer_message);
-    //     match self.manager.lock().unwrap().on_dlc_message(
-    //         &Message::Offer(dlc_offer_message.clone()),
-    //         STATIC_COUNTERPARTY_NODE_ID.parse().unwrap(),
-    //     ) {
-    //         Ok(_) => (),
-    //         Err(e) => {
-    //             clog!("DLC manager - receive offer error: {}", e.to_string());
-    //             return "".to_string();
-    //         }
-    //     }
-
-    //     clog!("receive_offer - after on_dlc_message");
-    //     let temporary_contract_id = dlc_offer_message.temporary_contract_id;
-
-    //     clog!("accepting contract with id {:?}", temporary_contract_id);
-
-    //     let (_contract_id, _public_key, accept_msg) = self
-    //         .manager
-    //         .lock()
-    //         .unwrap()
-    //         .accept_contract_offer(&temporary_contract_id)
-    //         .expect("Error accepting contract offer");
-
-    //     clog!("receive_offer - after accept_contract_offer");
-    //     serde_json::to_string(&accept_msg).unwrap()
-    // }
 }
 
 #[derive(Serialize, Deserialize)]

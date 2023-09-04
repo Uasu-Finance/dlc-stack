@@ -3,37 +3,45 @@
 ![build workflow](https://github.com/dlc-link/dlc-stack/actions/workflows/docker-build.yml/badge.svg)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
-It is composed of multiple modules that work together to provide a seamless lending experience for DLC.Link stack.
+Modules that work together to provide a seamless lending experience for DLC.Link.
 
 ## Modules
 
-### Oracle
+### Attestor
 
-The `oracle` module is providing a numeric oracle implementation for bitcoin. (creating events / announcements / attestations).
+The `attestor` module is providing a numeric oracle implementation for Bitcoin, creating  announcements / attestations, triggered by events on a blockchain. It is primarily a NodeJs application, which is using a wasm module for the actual oracle implementation. See its [README](./attestor/README.md) for more details.
 
-### Oracle-discovery
+### Router Wallet
+The `wallet` module is responsible for communicating with the `dlc-manager` contracts on the smart-chain side, and the Attestor Layer. It provides an API for creating and managing DLCs. See its [README](./wallet/README.md) for more details.
 
-The `oracle-discovery` module is responsible for discovering and registering oracles on the network. It provides an API for finding and connecting to available oracles.
-
-## Wallet backend
-The wallet module is responsible for communicating with the dlc-manager and oracle. It provides an API for creating and managing loan transactions.
+### WASM Wallet
+The `wasm-wallet` module is a compact solution to be used in browser wallets. See its [README](./wasm-wallet/README.md) for more details.
 
 ### Storage-API
 
-The `storage-api `module provides an API for hiding storage operations. Currently, it is implemented to work with Postgres as the underlying storage engine.
+The `storage-api` module provides an API for hiding storage operations. Currently, it is implemented to work with Postgres as the underlying storage engine. See its [README](./storage/README.md) for more details.
 
 ### Clients
 
-The `clients` module provies re-usable clients for the oracle / wallet / storage-api.
+The `clients` module provides re-usable clients for the attestor / wallet / storage-api.
 
-### IT
+### Oracle-discovery (WIP)
 
-The it module provides basic integration tests using BDD (Behavior-Driven Development) with Cucumber.
+The `oracle-discovery` module is responsible for discovering and registering oracles on the network. It provides an API for finding and connecting to available oracles.
+
+### IT (WIP)
+
+The `it` module provides basic integration tests using BDD (Behavior-Driven Development) with Cucumber.
 
 ## Build
 
 ```bash
+# build all modules (rust)
 make build
+# build using docker
+make docker-build
+# build & run docker compose (see docker-compose.yml)
+make docker-start
 ```
 
 ## Known Build Errors

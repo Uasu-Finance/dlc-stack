@@ -1,0 +1,23 @@
+[package]
+edition = "2018"
+name = "attestor-client"
+version = "0.1.0"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+chrono = {version = "0.4.19", features = ["serde"]}
+dlc = { git = "https://github.com/dlc-link/rust-dlc", features = ["use-serde"] }
+dlc-link-manager = { path = "../dlc-link-manager" }
+dlc-manager = { git = "https://github.com/dlc-link/rust-dlc", features = ["use-serde"] }
+dlc-messages = { git = "https://github.com/dlc-link/rust-dlc", features = ["use-serde"] }
+lightning = {version = "0.0.113"}
+log = "0.4.14"
+reqwest = {version = "0.11.16", default-features = false, features = ["json"] }
+secp256k1-zkp = {version = "0.7.0"}
+serde = {version = "*", features = ["derive"]}
+serde_json = "1.0.81"
+
+[dev-dependencies]
+#mocks = {git = "https://github.com/dlc-link/rust-dlc"}
+#secp256k1-zkp = {version = "0.7.0", features = ["global-context"]}

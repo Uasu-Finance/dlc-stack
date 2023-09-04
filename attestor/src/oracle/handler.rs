@@ -79,7 +79,7 @@ impl MemoryApiConn {
             match res {
                 Ok(_) => Ok(Some(new_event.clone())),
                 Err(err) => {
-                    return Err(OracleError::StorageApiError(err));
+                    Err(OracleError::StorageApiError(err))
                 }
             }
         } else {
@@ -92,7 +92,7 @@ impl MemoryApiConn {
             match res {
                 Ok(_) => Ok(Some(new_event.clone())),
                 Err(err) => {
-                    return Err(OracleError::StorageApiError(err));
+                    Err(OracleError::StorageApiError(err))
                 }
             }
         }
@@ -115,7 +115,7 @@ impl MemoryApiConn {
             let content = base64::decode(event.content).unwrap();
             result.push((event.event_id, content));
         }
-        return Ok(Some(result));
+        Ok(Some(result))
     }
 }
 
@@ -161,7 +161,7 @@ impl StorageApiConn {
             match res {
                 Ok(_) => Ok(Some(new_event.clone())),
                 Err(err) => {
-                    return Err(OracleError::StorageApiError(err));
+                    Err(OracleError::StorageApiError(err))
                 }
             }
         } else {
@@ -174,7 +174,7 @@ impl StorageApiConn {
             match res {
                 Ok(_) => Ok(Some(new_event.clone())),
                 Err(err) => {
-                    return Err(OracleError::StorageApiError(err));
+                    Err(OracleError::StorageApiError(err))
                 }
             }
         }
@@ -212,6 +212,6 @@ impl StorageApiConn {
             let content = base64::decode(event.content).unwrap();
             result.push((event.event_id, content));
         }
-        return Ok(Some(result));
+        Ok(Some(result))
     }
 }

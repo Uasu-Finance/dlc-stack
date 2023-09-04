@@ -4,8 +4,8 @@ pub mod schema;
 use crate::models::*;
 use diesel::expression_methods::ExpressionMethods;
 use diesel::query_dsl::QueryDsl;
+use diesel::RunQueryDsl;
 use diesel::{r2d2::Error, PgConnection};
-use diesel::{BoolExpressionMethods, RunQueryDsl};
 use diesel_migrations::{embed_migrations, EmbeddedMigrations, MigrationHarness};
 use log::warn;
 
@@ -24,12 +24,10 @@ pub fn get_contracts(
     let mut query = contracts.into_boxed();
     query = query.filter(key.eq(contract_params.key));
 
-    let cstate = contract_params.state.clone();
     if let Some(cstate) = contract_params.state {
         query = query.filter(state.eq(cstate));
     }
 
-    let cuuid = contract_params.uuid.clone();
     if let Some(cuuid) = contract_params.uuid {
         query = query.filter(uuid.eq(cuuid));
     }
@@ -142,7 +140,6 @@ pub fn get_events(
     let mut query = events.into_boxed();
     query = query.filter(key.eq(event.key));
 
-    let cuuid = event.event_id.clone();
     if let Some(cevent_id) = event.event_id {
         query = query.filter(event_id.eq(cevent_id));
     }

@@ -125,7 +125,7 @@ Output example:
     }
 ```
 
-### Get health
+### Get public key
 
 ```sh
 $ curl -X GET http://localhost:8801/publickey

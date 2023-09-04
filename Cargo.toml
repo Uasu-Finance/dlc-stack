@@ -1,17 +1,16 @@
 [workspace]
 members = [
   "attestor",
+  "attestor-client",
   "esplora-async-blockchain-provider",
   "js-interface-wallet",
-  "dlc-memory-storage-provider",
   "dlc-link-manager",
-  # "oracle-discovery",
   "wallet",
   "wasm-wallet",
   "clients",
+  "dlc-bdk-wallet",
   "storage/reader",
   "storage/writer",
   "storage/common",
   "storage/api",
-  "it",
 ]

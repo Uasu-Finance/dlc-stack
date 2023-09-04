@@ -179,7 +179,7 @@ impl Attestor {
         let attestation = build_attestation(
             outstanding_sk_nonces,
             self.oracle.get_keypair(),
-            &self.oracle.get_secp(),
+            self.oracle.get_secp(),
             outcomes,
         );
 
@@ -233,7 +233,7 @@ impl Attestor {
 
         let events: Vec<ApiOracleEvent> = events
             .iter()
-            .map(|event| parse_database_entry(event.clone().1.into()))
+            .map(|event| parse_database_entry(event.clone().1))
             .collect();
 
         serde_wasm_bindgen::to_value(&events).unwrap()
@@ -252,7 +252,7 @@ impl Attestor {
 
         match result {
             Some(event) => {
-                serde_wasm_bindgen::to_value(&parse_database_entry(event.into())).unwrap()
+                serde_wasm_bindgen::to_value(&parse_database_entry(event)).unwrap()
             }
             None => JsValue::NULL,
         }
