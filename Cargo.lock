@@ -770,9 +770,7 @@ dependencies = [
  "dlc-manager",
  "lightning",
  "log",
- "mocks",
  "secp256k1-zkp",
- "simple-wallet",
 ]
 
 [[package]]
@@ -794,7 +792,6 @@ name = "dlc-link-manager"
 version = "0.4.0"
 dependencies = [
  "bitcoin 0.29.2",
- "console_error_panic_hook",
  "dlc",
  "dlc-manager",
  "dlc-messages",
@@ -895,10 +892,8 @@ version = "0.1.0"
 dependencies = [
  "diesel",
  "diesel_migrations",
- "dotenvy",
  "log",
  "serde",
- "serde_json",
 ]
 
 [[package]]
@@ -962,12 +957,6 @@ name = "dotenv"
 version = "0.15.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "77c90badedccf4105eca100756a0b1289e191f6fcbdadd3cee1d2f614f97da8f"
-
-[[package]]
-name = "dotenvy"
-version = "0.15.7"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1aaf95b3e5c8f23aa320147307562d361db0ae0d51242340f558153b4eb2439b"
 
 [[package]]
 name = "either"
@@ -1048,7 +1037,6 @@ dependencies = [
  "js-interface-wallet",
  "lightning",
  "log",
- "miniscript 10.0.0",
  "reqwest",
  "serde",
  "wasm-bindgen-futures",
@@ -1672,20 +1660,6 @@ dependencies = [
  "log",
  "wasi 0.11.0+wasi-snapshot-preview1",
  "windows-sys",
-]
-
-[[package]]
-name = "mocks"
-version = "0.1.0"
-source = "git+https://github.com/dlc-link/rust-dlc#2e2708ba212a583f4f566b9d1a427513b96a9aec"
-dependencies = [
- "bitcoin 0.29.2",
- "dlc",
- "dlc-manager",
- "dlc-messages",
- "lightning",
- "secp256k1-zkp",
- "simple-wallet",
 ]
 
 [[package]]
@@ -2337,19 +2311,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d8229b473baa5980ac72ef434c4415e70c4b5e71b423043adb4ba059f89c99a1"
 dependencies = [
  "libc",
-]
-
-[[package]]
-name = "simple-wallet"
-version = "0.1.0"
-source = "git+https://github.com/dlc-link/rust-dlc#2e2708ba212a583f4f566b9d1a427513b96a9aec"
-dependencies = [
- "bdk",
- "bitcoin 0.29.2",
- "dlc",
- "dlc-manager",
- "lightning",
- "secp256k1-zkp",
 ]
 
 [[package]]

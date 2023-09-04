@@ -2,7 +2,6 @@ FROM rustlang/rust:nightly-bullseye AS build
 
 COPY ./wallet /app/dlc-protocol-wallet/
 COPY ./dlc-link-manager /app/dlc-link-manager/
-COPY ./dlc-simple-wallet /app/dlc-simple-wallet/
 COPY ./clients /app/clients/
 COPY ./attestor-client /app/attestor-client/
 COPY ./dlc-bdk-wallet /app/dlc-bdk-wallet/
