@@ -142,32 +142,32 @@ services:
       - 8085:8085
     environment:
       # For Internal DLC.Link Bitcoin Mocknet
-      - "ELECTRUM_API_URL=https://devnet.dlc.link/electrs/"
+      - "ELECTRUM_API_URL=https://devnet.dlc.link/electrs"
       # For Bitcoin Testnet
-      # - "ELECTRUM_API_URL=https://blockstream.info/testnet/api/"
+      # - "ELECTRUM_API_URL=https://blockstream.info/testnet/api"
       # For Bitcoin Mainnet
-      # ELECTRUM_API_URL="https://blockstream.info/api/"
+      # ELECTRUM_API_URL="https://blockstream.info/api"
       - "BITCOIN_CHECK_INTERVAL_SECONDS=10"
       - "BITCOIN_NETWORK=regtest"
-      - "RUST_LOG=warn,dlc_protocol_wallet=debug"
+      - "RUST_LOG=debug,dlc_protocol_wallet=debug"
       - "RUST_BACKTRACE=full"
       - "STORAGE_API_ENABLED=true"
       - "STORAGE_API_ENDPOINT=http://storageapi:8100"
       - "CONTRACT_CLEANUP_ENABLED=false"
       - "BLOCKCHAIN_INTERFACE_URL=http://blockchain-interface:3000"
-      - "XPRIV=${XPRIV}"
-      - "FINGERPRINT=${FINGERPRINT}"
+      - "XPRIV=${XPRIV:-tprv8ZgxMBicQKsPf84Xd96WTXpNrc83cjkhcLsscPZkykkytiuTKdoKzspDnwQKtmtYAx86rFoDqXSxeY9Y6FRAJezYqb1pTzdGyVCr6hDhw9y}"
+      - "FINGERPRINT=${FINGERPRINT:-28ed60b3}"
     depends_on:
         - postgresdlc
         - storageapi
         - blockchain-interface
     restart: on-failure
     healthcheck:
-      test: curl --fail http://localhost:8085/health || exit 1
+      test: curl --fail http://localhost:8085/info || exit 1
       interval: 3s
       timeout: 10s
       retries: 10
-      start_period: 5s
+      start_period: 10s
 
   integration-test:
     profiles:
