@@ -133,7 +133,7 @@ async fn generate_attestor_client(
         let attestor = Arc::new(p2p_client);
         attestor_clients.insert(attestor.get_public_key().await, attestor.clone());
     }
-    return attestor_clients;
+    attestor_clients
 }
 
 fn main() {
@@ -210,8 +210,8 @@ async fn run() {
     // Setup DLC UUID state tracking
     let funded_endpoint_url = format!("{}/set-status-funded", blockchain_interface_url);
     let closed_endpoint_url = format!("{}/post-close-dlc", blockchain_interface_url);
-    let funded_uuids: Box<Vec<String>> = Box::new(vec![]);
-    let closed_uuids: Box<Vec<String>> = Box::new(vec![]);
+    let funded_uuids: Box<Vec<String>> = Box::default();
+    let closed_uuids: Box<Vec<String>> = Box::default();
 
     // Set up wallet store
     let sled_path = format!("{root_sled_path}_{active_network}_{fingerprint}");
@@ -298,7 +298,7 @@ async fn run() {
                                 let address = params.get("address").ok_or(WalletError(
                                     "Unable to find address in query params".to_string(),
                                 ))?;
-                                empty_to_address(&address, wallet, blockchain).await
+                                empty_to_address(address, wallet, blockchain).await
                             };
                             match result.await {
                                 Ok(message) => build_success_response(message),
@@ -530,7 +530,7 @@ fn setup_wallets(
     let wallet: Arc<DlcBdkWallet> = Arc::new(DlcBdkWallet::new(
         bdk_wallet,
         static_address.clone(),
-        seckey_ext.clone(),
+        seckey_ext,
         active_network,
     ));
     (pubkey, wallet)
