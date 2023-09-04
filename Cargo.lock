@@ -956,7 +956,6 @@ name = "dlc-protocol-wallet"
 version = "0.4.0"
 dependencies = [
  "attestor-client",
- "base64 0.13.1",
  "bdk",
  "bitcoin 0.29.2",
  "bytes",
@@ -967,7 +966,6 @@ dependencies = [
  "dlc-link-manager",
  "dlc-manager",
  "dlc-messages",
- "dlc-sled-storage-provider",
  "dlc-trie",
  "env_logger 0.9.3",
  "esplora-async-blockchain-provider",
@@ -975,11 +973,9 @@ dependencies = [
  "hex",
  "http",
  "http-body 1.0.0-rc.2",
- "http-body-util",
  "hyper",
  "lightning",
  "log",
- "mockito",
  "pretty_env_logger",
  "reqwest",
  "secp256k1-zkp",
@@ -988,19 +984,6 @@ dependencies = [
  "sled",
  "tokio",
  "url",
-]
-
-[[package]]
-name = "dlc-sled-storage-provider"
-version = "0.1.0"
-source = "git+https://github.com/dlc-link/rust-dlc#2e2708ba212a583f4f566b9d1a427513b96a9aec"
-dependencies = [
- "bitcoin 0.29.2",
- "dlc-manager",
- "lightning",
- "secp256k1-zkp",
- "simple-wallet",
- "sled",
 ]
 
 [[package]]
@@ -1194,22 +1177,6 @@ dependencies = [
  "js-interface-wallet",
  "lightning",
  "log",
- "miniscript 10.0.0",
- "reqwest",
- "serde",
- "wasm-bindgen-futures",
-]
-
-[[package]]
-name = "esplora-async-blockchain-provider-locking"
-version = "0.1.0"
-dependencies = [
- "bdk",
- "bitcoin 0.29.2",
- "dlc-manager",
- "futures",
- "js-interface-wallet",
- "lightning",
  "miniscript 10.0.0",
  "reqwest",
  "serde",
@@ -1521,19 +1488,6 @@ checksum = "951dfc2e32ac02d67c90c0d65bd27009a635dc9b381a2cc7d284ab01e3a0150d"
 dependencies = [
  "bytes",
  "http",
-]
-
-[[package]]
-name = "http-body-util"
-version = "0.1.0-rc.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "08ef12f041acdd397010e5fb6433270c147d3b8b2d0a840cd7fff8e531dca5c8"
-dependencies = [
- "bytes",
- "futures-util",
- "http",
- "http-body 1.0.0-rc.2",
- "pin-project-lite",
 ]
 
 [[package]]
