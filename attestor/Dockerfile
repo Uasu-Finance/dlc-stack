@@ -10,6 +10,7 @@ RUN sudo apt-get update && \
   sudo apt-get clean
 
 COPY ./clients/ /app/clients
+COPY ./dlc-link-manager/ /app/dlc-link-manager
 
 COPY ./attestor/observer/src /app/attestor/observer/src
 COPY ./attestor/observer/package.json /app/attestor/observer/package.json
@@ -19,9 +20,9 @@ COPY ./attestor/Cargo.toml /app/attestor/Cargo.toml
 
 WORKDIR /app/attestor
 
-RUN rustup override set nightly-2023-03-31 && \
-  sudo chown -R circleci:circleci /app/attestor && \
-  wasm-pack build --target bundler .
+RUN rustup override set nightly
+RUN sudo chown -R circleci:circleci /app/attestor
+RUN wasm-pack build --target bundler .
 
 RUN jq '. + {type: "module", main: "attestor.js"} | del(.module)' ./pkg/package.json > temp.json && \
   mv temp.json ./pkg/package.json && \
@@ -41,8 +42,6 @@ COPY --from=attestor-build /app/attestor/observer/package.json /app/attestor/obs
 COPY --from=attestor-build /app/attestor/observer/tsconfig.json /app/attestor/observer/tsconfig.json
 COPY --from=attestor-build /app/attestor/observer/node_modules /app/attestor/observer/node_modules
 COPY --from=attestor-build /app/attestor/pkg /app/attestor/pkg
-
-RUN mkdir ./config
 
 WORKDIR /app/attestor/observer
 

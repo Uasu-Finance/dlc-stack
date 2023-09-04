@@ -156,6 +156,7 @@ services:
       - "CONTRACT_CLEANUP_ENABLED=false"
       - "BLOCKCHAIN_INTERFACE_URL=http://blockchain-interface:3000"
       - "XPRIV=${XPRIV}"
+      - "FINGERPRINT=${FINGERPRINT}"
     depends_on:
         - postgresdlc
         - storageapi
