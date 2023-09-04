@@ -2,7 +2,6 @@ use bdk::keys::bip39::{Language, Mnemonic, WordCount};
 use bdk::keys::{DerivableKey, ExtendedKey, GeneratableKey, GeneratedKey};
 use bdk::miniscript::Segwitv0;
 use bitcoin::util::bip32::DerivationPath;
-use bitcoin::Address;
 use std::env;
 use std::str::FromStr;
 
@@ -39,26 +38,14 @@ fn main() {
         .to_string();
 
     let ext_path = DerivationPath::from_str("m/44h/0h/0h/0").expect("A valid derivation path");
-    // let int_path = DerivationPath::from_str("m/44h/0h/0h/1").expect("A valid derivation path");
 
     let derived_ext_xpriv = xprv.derive_priv(&secp, &ext_path).unwrap();
     let seckey_ext = derived_ext_xpriv.private_key;
 
-    // let derived_int_pkey = xpriv.derive_priv(&secp, &int_path).unwrap();
-    // let seckey_int = derived_int_pkey.private_key;
-
     let pubkey_ext = seckey_ext.public_key(&secp);
-
-    let bitcoin_pubkey = bitcoin::PublicKey {
-        compressed: true,
-        inner: pubkey_ext,
-    };
-
-    let address = Address::p2wpkh(&bitcoin_pubkey, network).unwrap();
-    // println!("address: {}", Address::p2wpkh(&pubkey, network).unwrap());
 
     println!(
         "{}",
-        json!({ "mnemonic": phrase, "xprv": xprv.to_string(), "fingerprint": fingerprint.to_string(), "secret_key": seckey_ext, "public_key": pubkey_ext, "network": network, "address": address })
+        json!({ "mnemonic": phrase, "xprv": xprv.to_string(), "fingerprint": fingerprint.to_string(), "secret_key": seckey_ext, "public_key": pubkey_ext, "network": network })
     )
 }
