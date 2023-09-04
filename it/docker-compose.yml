@@ -119,11 +119,11 @@ services:
       - 8085:8085
     environment:
       # For Internal DLC.Link Bitcoin Mocknet
-      - "ELECTRUM_API_URL=https://devnet.dlc.link/electrs/"
+      - "ELECTRUM_API_URL=https://devnet.dlc.link/electrs"
       # For Bitcoin Testnet
-      # - "ELECTRUM_API_URL=https://blockstream.info/testnet/api/"
+      # - "ELECTRUM_API_URL=https://blockstream.info/testnet/api"
       # For Bitcoin Mainnet
-      # ELECTRUM_API_URL="https://blockstream.info/api/"
+      # ELECTRUM_API_URL="https://blockstream.info/api"
       - "BITCOIN_CHECK_INTERVAL_SECONDS=10"
       - "BITCOIN_NETWORK=regtest"
       - "RUST_LOG=warn,dlc_protocol_wallet=debug"
