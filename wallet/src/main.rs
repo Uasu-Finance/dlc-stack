@@ -186,10 +186,10 @@ async fn run() {
     // Setup env vars
     let wallet_backend_port: String = env::var("WALLET_BACKEND_PORT").unwrap_or("8085".to_string());
     let xpriv_str = env::var("XPRIV")
-        .expect("XPRIV environment variable not set, please run `just generate-descriptor`, securely backup the output, and set this env_var accordingly");
+        .expect("XPRIV environment variable not set, please run `just generate-key`, securely backup the output, and set this env_var accordingly");
     let xpriv = ExtendedPrivKey::from_str(&xpriv_str).expect("Unable to decode xpriv env variable");
     let fingerprint = env::var("FINGERPRINT")
-        .expect("FINGERPRINT environment variable not set, please run `just generate-descriptor`, securely backup the output, and set this env_var accordingly");
+        .expect("FINGERPRINT environment variable not set, please run `just generate-key`, securely backup the output, and set this env_var accordingly");
 
     // assert fingerprint matches xpriv.fingerprint
     let blockchain_interface_url = env::var("BLOCKCHAIN_INTERFACE_URL")

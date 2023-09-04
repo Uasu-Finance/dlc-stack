@@ -1,18 +1,17 @@
-generate-key:
-    ./release/generate-key
+build:
+  cargo build --release --bins --target-dir .
 
-wallet:
-    ./release/dlc-protocol-wallet
+generate-key: build
+  ./release/generate-key
 
-generate-address-from-key:
-    ./release/generate-address-from-key
+wallet: build
+  ./release/dlc-protocol-wallet
 
-test:
-    cargo test --package websocket-tcp-proxy
-    wasm-pack test --headless --chrome ./node-manager
+generate-address-from-key: build
+  ./release/generate-address-from-key
 
 clippy:
-    cargo clippy -- -Aclippy::drop_non_drop
+  cargo clippy -- -Aclippy::drop_non_drop
 
 clippy-mac:
-    cd ./node-manager && AR=/opt/homebrew/opt/llvm/bin/llvm-ar CC=/opt/homebrew/opt/llvm/bin/clang cargo clippy -- -Aclippy::drop_non_drop
+  cd ./node-manager && AR=/opt/homebrew/opt/llvm/bin/llvm-ar CC=/opt/homebrew/opt/llvm/bin/clang cargo clippy -- -Aclippy::drop_non_drop
