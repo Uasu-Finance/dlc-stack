@@ -770,9 +770,7 @@ dependencies = [
  "dlc-manager",
  "lightning",
  "log",
- "mocks",
  "secp256k1-zkp",
- "simple-wallet",
 ]
 
 [[package]]
@@ -794,7 +792,6 @@ name = "dlc-link-manager"
 version = "0.4.0"
 dependencies = [
  "bitcoin 0.29.2",
- "console_error_panic_hook",
  "dlc",
  "dlc-manager",
  "dlc-messages",
@@ -1675,20 +1672,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "mocks"
-version = "0.1.0"
-source = "git+https://github.com/dlc-link/rust-dlc#2e2708ba212a583f4f566b9d1a427513b96a9aec"
-dependencies = [
- "bitcoin 0.29.2",
- "dlc",
- "dlc-manager",
- "dlc-messages",
- "lightning",
- "secp256k1-zkp",
- "simple-wallet",
-]
-
-[[package]]
 name = "native-tls"
 version = "0.2.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2337,19 +2320,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d8229b473baa5980ac72ef434c4415e70c4b5e71b423043adb4ba059f89c99a1"
 dependencies = [
  "libc",
-]
-
-[[package]]
-name = "simple-wallet"
-version = "0.1.0"
-source = "git+https://github.com/dlc-link/rust-dlc#2e2708ba212a583f4f566b9d1a427513b96a9aec"
-dependencies = [
- "bdk",
- "bitcoin 0.29.2",
- "dlc",
- "dlc-manager",
- "lightning",
- "secp256k1-zkp",
 ]
 
 [[package]]
