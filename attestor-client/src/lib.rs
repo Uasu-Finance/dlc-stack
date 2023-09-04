@@ -13,15 +13,8 @@
 extern crate chrono;
 extern crate dlc_manager;
 extern crate dlc_messages;
-// use reqwest::blocking::Response;
 extern crate secp256k1_zkp;
 extern crate serde;
-
-// use crate::clog;
-
-// use wasm_bindgen::prelude::*;
-// use wasm_bindgen_futures::JsFuture;
-// use web_sys::{Request, RequestInit, RequestMode, Response};
 
 use std::{fmt, io::Cursor, num::ParseIntError};
 
@@ -137,7 +130,7 @@ impl AttestorClient {
         let path = pubkey_path(&host);
         info!("Getting pubkey from {}", path);
 
-        let oracle_key = client
+        let attestor_key = client
             .get(path)
             .send()
             .await
@@ -146,11 +139,9 @@ impl AttestorClient {
             .await
             .map_err(|e| DlcManagerError::OracleError(format!("Oracle PubKey Error: {e}")))?;
 
-        info!("Oracle Pub Key: {}", oracle_key.to_string());
+        info!("Attestor Pub Key: {}", attestor_key.to_string());
 
-        // clog!("Oracle Pub Key: {}", oracle_key.to_string());
-
-        let public_key: XOnlyPublicKey = oracle_key
+        let public_key: XOnlyPublicKey = attestor_key
             .parse()
             .map_err(|_| DlcManagerError::OracleError("Oracle PubKey Error".to_string()))?;
         info!("The p2pd oracle client has been created successfully");

@@ -1,9 +1,7 @@
 import { JsDLCInterface } from 'dlc_protocol_wallet';
-// import { off } from 'npm';
 
 const testWalletPrivateKey = 'bea4ecfec5cfa1e965ee1b3465ca4deff4f04b36a1fb5286a07660d5158789fb';
 const testWalletAddress = 'bcrt1q3tj2fr9scwmcw3rq5m6jslva65f2rqjxfrjz47';
-// Pubkey: 03ab37f5b606931d7828855affe75199d952bc6174b4a23861b7ac94132210508c
 // const testWalletAddress = 'tb1q3tj2fr9scwmcw3rq5m6jslva65f2rqjxt2t0zh';
 
 const bitcoinNetwork = 'regtest';
@@ -11,12 +9,17 @@ const bitcoinNetworkURL = 'https://devnet.dlc.link/electrs';
 
 const protocolWalletURL = 'http://localhost:8085';
 
-const attestorList = ['https://devnet.dlc.link/attestor-1', 'https://devnet.dlc.link/attestor-2', 'https://devnet.dlc.link/attestor-3'];
+const attestorList = [
+  'https://devnet.dlc.link/attestor-1',
+  'https://devnet.dlc.link/attestor-2',
+  'https://devnet.dlc.link/attestor-3',
+];
 
 const handleAttestors = false;
 const successfulAttesting = false;
 
-const testUUID = '0x9b5433920e0a7cdab5d52040ff21867597eda3c47247f6a80298ccc54510ce64';
+// const testUUID = `test${Math.floor(Math.random() * 1000)}`;
+const testUUID = '0x99fa832bb683d21bce61e258d0f6b15f6dfe9b46d38cfc3f8c8d5ed31ff5d266';
 
 function createMaturationDate() {
   const maturationDate = new Date();
@@ -26,16 +29,9 @@ function createMaturationDate() {
 
 async function createEvent(attestorURL, uuid) {
   const maturationDate = createMaturationDate();
-  try {
-    const url = `${attestorURL}/create-announcement/${uuid}`;
-    console.log("Creating event at: ", url);
-    const response = await fetch(url);
-    const event = await response.json();
-    return event;
-  } catch (error) {
-    console.error("Error creating event: ", error);
-    process.exit(1);
-  }
+  const response = await fetch(`${attestorURL}/v1/create_event/${uuid}?maturation=${maturationDate}`);
+  const event = await response.json();
+  return event;
 }
 
 async function attest(attestorURL, uuid, outcome) {
@@ -113,13 +109,12 @@ async function runDLCFlow(dlcManager, dlcOffer) {
 async function main() {
   console.log('DLC WASM Wallet Test');
 
-  if (handleAttestors) {
-    console.log("Creating Events");
-    const events = await Promise.all(
-      attestorList.map((attestorURL) => createEvent(attestorURL, testUUID))
-    );
-    console.log("Created Events: ", events);
-  }
+  // if (handleAttestors) {
+  //   console.log('Creating Events');
+  //   const events = await Promise.all(exampleAttestorURLs.map((attestorURL) => createEvent(attestorURL, testUUID)));
+  //   console.log('Created Events: ', events);
+  // }
+
   console.log('Fetching Offer from Protocol Wallet');
   const offerResponse = await fetchOfferFromProtocolWallet();
   if (!offerResponse.temporaryContractId) {

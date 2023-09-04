@@ -1,9 +1,12 @@
 #!/bin/bash
 
+# Save the current working directory
+cwd=$(pwd)
+
 # Change to the directory of the current script
 cd "$(dirname "$0")"
 
-npm i
+npm ci
 
 # Building wasm in the folder above
 AR=/opt/homebrew/opt/llvm/bin/llvm-ar CC=/opt/homebrew/opt/llvm/bin/clang wasm-pack build --target bundler ..
@@ -21,3 +24,6 @@ npx tsc -p .
 
 # Reinstalling updated attestor pkg
 npm ci attestor
+
+# Return to the original working directory
+cd "$cwd"
