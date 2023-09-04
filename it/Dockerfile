@@ -10,7 +10,6 @@ RUN sudo apt-get update && \
 
 COPY ./clients/ /app/clients
 COPY ./dlc-link-manager/ /app/dlc-link-manager
-COPY ./dlc-memory-storage-provider/ /app/dlc-memory-storage-provider
 COPY ./js-interface-wallet/ /app/js-interface-wallet
 COPY ./esplora-async-blockchain-provider/ /app/esplora-async-blockchain-provider
 COPY ./wasm-wallet/ /app/wasm-wallet
