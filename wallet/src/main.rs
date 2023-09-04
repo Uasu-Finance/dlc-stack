@@ -2,9 +2,7 @@
 #![feature(async_fn_in_trait)]
 #![allow(unreachable_code)]
 
-use bdk::keys::DerivableKey;
-use bdk::wallet::AddressIndex;
-use bitcoin::util::bip32::{DerivationPath, ExtendedPrivKey};
+use bitcoin::util::bip32::{ChildNumber, DerivationPath, ExtendedPrivKey, ExtendedPubKey};
 use bytes::Buf;
 use tokio::sync::oneshot;
 
@@ -230,6 +228,10 @@ async fn run() {
 
     let (pubkey_ext, wallet) = setup_wallets(xpriv, active_network, sled);
 
+    refresh_wallet(blockchain.clone(), wallet.clone())
+        .await
+        .unwrap();
+
     // Set up Attestor Clients
     let attestor_urls: Vec<String> = retry!(
         get_attestors(blockchain_interface_url.clone()).await,
@@ -425,21 +427,18 @@ async fn run() {
                         }
                     }
                 }
-                // response_examples(req, client.to_owned())
             }))
         }
     });
 
     let addr = (
-        [127, 0, 0, 1],
+        [0, 0, 0, 0],
         wallet_backend_port.parse().expect("Correct port value"),
     )
         .into();
 
     let server = Server::bind(&addr).executor(LocalExec).serve(make_service);
 
-    // Just shows that with_graceful_shutdown compiles with !Send,
-    // !Sync HttpBody.
     let (_tx, rx) = oneshot::channel::<()>();
     let server = server.with_graceful_shutdown(async move {
         rx.await.ok();
@@ -457,75 +456,35 @@ fn setup_wallets(
     xpriv: ExtendedPrivKey,
     active_network: bitcoin::Network,
     sled: sled::Tree,
-) -> (bitcoin::PublicKey, Arc<DlcBdkWallet>) {
-    // Setup KEYS!
+) -> (ExtendedPubKey, Arc<DlcBdkWallet>) {
     let secp = bitcoin::secp256k1::Secp256k1::new();
 
-    let ext_path = DerivationPath::from_str("m/44h/0h/0h/0").expect("A valid derivation path");
-    // let int_path = DerivationPath::from_str("m/44h/0h/0h/1").expect("A valid derivation path");
+    let external_derivation_path =
+        DerivationPath::from_str("m/44h/0h/0h/0").expect("A valid derivation path");
 
-    let derived_ext_xpriv = xpriv.derive_priv(&secp, &ext_path).unwrap();
-    let seckey_ext = derived_ext_xpriv.private_key;
-
-    // let derived_int_pkey = xpriv.derive_priv(&secp, &int_path).unwrap();
-    // let seckey_int = derived_int_pkey.private_key;
-
-    // let pubkey_ext = seckey_ext.public_key(&secp);
-    // // let pubkey_int = seckey_int.public_key(&secp);
-
-    let signing_external_descriptor = descriptor!(wpkh(
-        derived_ext_xpriv
-            .into_descriptor_key(
-                Some((derived_ext_xpriv.fingerprint(&secp), ext_path.clone())),
-                ext_path
-            )
-            .unwrap()
-    ))
+    let signing_external_descriptor = descriptor!(wpkh((
+        xpriv,
+        external_derivation_path.extend([ChildNumber::Normal { index: 0 }])
+    )))
     .unwrap();
-    // let signing_internal_descriptor = descriptor!(wpkh(
-    //     derived_int_pkey
-    //         .into_descriptor_key(
-    //             Some((derived_int_pkey.fingerprint(&secp), int_path.clone())),
-    //             int_path
-    //         )
-    //         .unwrap()
-    // ))
-    // .unwrap();
 
-    // let static_address = bdk_wallet
-    //     .lock()
-    //     .unwrap()
-    //     .get_address(AddressIndex::Peek(0))
-    //     .unwrap();
-
-    // With this setup, I don't see UTXOs on my address when running wallet.get_balance!
-    let pubkey = seckey_ext.public_key(&secp);
-    // let pubkey = secp256k1_zkp::PublicKey::from_secret_key(&secp, &seckey_ext); //equiv to prev line
-    // let pubkey = bitcoin::PublicKey::from_slice(&pubkey.serialize()).unwrap();
-    let pubkey = bitcoin::PublicKey {
-        compressed: true,
-        inner: pubkey,
-    };
+    let x = signing_external_descriptor.0.clone();
 
     let bdk_wallet = Arc::new(Mutex::new(
-        BdkWallet::new(
-            signing_external_descriptor,
-            // Some(signing_internal_descriptor),
-            None,
-            active_network,
-            sled,
-        )
-        .unwrap(),
+        BdkWallet::new(signing_external_descriptor, None, active_network, sled).unwrap(),
     ));
 
-    // let static_address = Address::p2wpkh(&pubkey, active_network).unwrap();
-    let static_address = bdk_wallet
-        .lock()
-        .unwrap()
-        .get_address(AddressIndex::Peek(0))
+    let static_address = x.at_derivation_index(0).address(active_network).unwrap();
+    let derived_ext_xpriv = xpriv
+        .derive_priv(
+            &secp,
+            &external_derivation_path.extend([
+                ChildNumber::Normal { index: 0 },
+                ChildNumber::Normal { index: 0 },
+            ]),
+        )
         .unwrap();
-
-    println!("Address: {}", static_address);
+    let seckey_ext = derived_ext_xpriv.private_key;
 
     let wallet: Arc<DlcBdkWallet> = Arc::new(DlcBdkWallet::new(
         bdk_wallet,
@@ -533,6 +492,8 @@ fn setup_wallets(
         seckey_ext,
         active_network,
     ));
+
+    let pubkey = ExtendedPubKey::from_priv(&secp, &derived_ext_xpriv);
     (pubkey, wallet)
 }
 

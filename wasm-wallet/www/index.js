@@ -19,7 +19,7 @@ const handleAttestors = false;
 const successfulAttesting = false;
 
 // const testUUID = `test${Math.floor(Math.random() * 1000)}`;
-const testUUID = '0x99fa832bb683d21bce61e258d0f6b15f6dfe9b46d38cfc3f8c8d5ed31ff5d266';
+const testUUID = '0x25aa9052bdd11d12261b01e4bf38382dc07ea7833b214fbc8b425be34345c5c5';
 
 function createMaturationDate() {
   const maturationDate = new Date();
