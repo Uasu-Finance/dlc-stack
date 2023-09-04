@@ -41,7 +41,7 @@ const local = {
   testWalletAddress: "bcrt1qpnuck30uakpc0ffcmd3nwdd59y547qlzsmf34l",
   bitcoinNetwork: "regtest",
   bitcoinNetworkURL: "https://devnet.dlc.link/electrs",
-  protocolWalletURL: "http://localhost:8085",
+  protocolWalletURL: "http://127.0.0.1:8085",
   attestorList: [
     "http://localhost:8801",
     "http://localhost:8802",
@@ -64,12 +64,12 @@ const docker = {
 };
 
 const custom = {
-  testWalletPrivateKey: process.env.TEST_WALLET_PRIVATE_KEY,
-  testWalletAddress: process.env.TEST_WALLET_ADDRESS,
-  bitcoinNetwork: process.env.BITCOIN_NETWORK,
-  bitcoinNetworkURL: process.env.BITCOIN_NETWORK_URL,
-  protocolWalletURL: process.env.PROTOCOL_WALLET_URL,
-  attestorList: process.env.ATTESTOR_LIST?.split(","),
+  testWalletPrivateKey: devnet.testWalletPrivateKey,
+  testWalletAddress: devnet.testWalletAddress,
+  bitcoinNetwork: local.bitcoinNetwork,
+  bitcoinNetworkURL: devnet.bitcoinNetworkURL,
+  protocolWalletURL: local.protocolWalletURL,
+  attestorList: devnet.attestorList,
 };
 
 const config = {
