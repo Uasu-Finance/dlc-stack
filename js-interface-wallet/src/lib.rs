@@ -4,7 +4,7 @@ use bdk::{
     wallet::coin_selection::{decide_change, CoinSelectionResult},
     FeeRate, KeychainKind, LocalUtxo, Utxo as BdkUtxo, WeightedUtxo,
 };
-use bitcoin::{hashes::Hash, Address, Network, PrivateKey, Script, Txid};
+use bitcoin::{hashes::Hash, Address, PrivateKey, Script, Txid};
 use dlc_manager::{error::Error, Blockchain, Signer, Utxo, Wallet};
 use lightning::chain::chaininterface::FeeEstimator;
 use secp256k1_zkp::{All, PublicKey, Secp256k1, SecretKey};
@@ -22,22 +22,15 @@ pub struct JSInterfaceWallet {
     address: Address,
     secp_ctx: Secp256k1<All>,
     seckey: SecretKey,
-    network: Network,
     utxos: RefCell<Option<Vec<Utxo>>>,
 }
 
 impl JSInterfaceWallet {
-    pub fn new(address_str: String, network: Network, privkey: PrivateKey) -> Self {
+    pub fn new(address_str: String, privkey: PrivateKey) -> Self {
         Self {
             address: Address::from_str(&address_str).unwrap(),
-            // address: Address::p2wpkh(
-            //     &bitcoin::PublicKey::from_private_key(&secp_ctx, &privkey),
-            //     network,
-            // )
-            // .unwrap(),
             secp_ctx: Secp256k1::new(),
             seckey: privkey.inner,
-            network,
             utxos: Some(vec![]).into(),
         }
     }
@@ -47,34 +40,6 @@ impl JSInterfaceWallet {
         self.utxos.borrow_mut().as_mut().unwrap().append(&mut utxos);
         Ok(())
     }
-
-    // Refresh the wallet checking and updating the UTXO states.
-    // pub fn refresh(&self) -> Result<()> {
-    //     let utxos: Vec<Utxo> = self.storage.get_utxos()?;
-
-    //     for utxo in &utxos {
-    //         let is_spent = self
-    //             .blockchain
-    //             .is_output_spent(&utxo.outpoint.txid, utxo.outpoint.vout)?;
-    //         if is_spent {
-    //             self.storage.delete_utxo(utxo)?;
-    //         }
-    //     }
-
-    //     let addresses = self.storage.get_addresses()?;
-
-    //     for address in &addresses {
-    //         let utxos = self.blockchain.get_utxos_for_address(address)?;
-
-    //         for utxo in &utxos {
-    //             if !self.storage.has_utxo(utxo)? {
-    //                 self.storage.upsert_utxo(utxo)?;
-    //             }
-    //         }
-    //     }
-
-    //     Ok(())
-    // }
 
     // Returns the sum of all UTXOs value.
     pub fn get_balance(&self) -> u64 {
@@ -86,65 +51,6 @@ impl JSInterfaceWallet {
             .map(|x| x.tx_out.value)
             .sum()
     }
-
-    // Mark all UTXOs as unreserved.
-    // pub fn unreserve_all_utxos(&self) {
-    //     let utxos = self.storage.get_utxos().unwrap();
-    //     for utxo in utxos {
-    //         self.storage
-    //             .unreserve_utxo(&utxo.outpoint.txid, utxo.outpoint.vout)
-    //             .unwrap();
-    //     }
-    // }
-
-    // / Creates a transaction with all wallet UTXOs as inputs and a single output
-    // / sending everything to the given address.
-    // pub fn empty_to_address(&self, address: &Address) -> Result<()> {
-    //     let utxos = self
-    //         .storage
-    //         .get_utxos()
-    //         .expect("to be able to retrieve all utxos");
-    //     if utxos.is_empty() {
-    //         return Err(Error::InvalidState("No utxo in wallet".to_string()));
-    //     }
-
-    //     let mut total_value = 0;
-    //     let input = utxos
-    //         .iter()
-    //         .map(|x| {
-    //             total_value += x.tx_out.value;
-    //             TxIn {
-    //                 previous_output: x.outpoint,
-    //                 script_sig: Script::default(),
-    //                 sequence: Sequence::MAX,
-    //                 witness: Witness::default(),
-    //             }
-    //         })
-    //         .collect::<Vec<_>>();
-    //     let output = vec![TxOut {
-    //         value: total_value,
-    //         script_pubkey: address.script_pubkey(),
-    //     }];
-    //     let mut tx = Transaction {
-    //         version: 2,
-    //         lock_time: PackedLockTime::ZERO,
-    //         input,
-    //         output,
-    //     };
-    //     // Signature + pubkey size assuming P2WPKH.
-    //     let weight = (tx.weight() + tx.input.len() * (74 + 33)) as u64;
-    //     let fee_rate = self
-    //         .blockchain
-    //         .get_est_sat_per_1000_weight(ConfirmationTarget::Normal) as u64;
-    //     let fee = (weight * fee_rate) / 1000;
-    //     tx.output[0].value -= fee;
-
-    //     for (i, utxo) in utxos.iter().enumerate().take(tx.input.len()) {
-    //         self.sign_tx_input(&mut tx, i, &utxo.tx_out, None)?;
-    //     }
-
-    //     self.blockchain.send_transaction(&tx)
-    // }
 }
 
 impl Signer for JSInterfaceWallet {
@@ -155,12 +61,6 @@ impl Signer for JSInterfaceWallet {
         tx_out: &bitcoin::TxOut,
         _: Option<bitcoin::Script>,
     ) -> Result<()> {
-        // let address = Address::from_script(&tx_out.script_pubkey, self.network)
-        //     .expect("a valid scriptpubkey");
-        // let seckey = self
-        //     .storage
-        //     .get_priv_key_for_address(&address)?
-        //     .expect("to have the requested private key");
         dlc::util::sign_p2wpkh_input(
             &self.secp_ctx,
             &self.seckey,
@@ -172,7 +72,7 @@ impl Signer for JSInterfaceWallet {
         Ok(())
     }
 
-    fn get_secret_key_for_pubkey(&self, pubkey: &PublicKey) -> Result<SecretKey> {
+    fn get_secret_key_for_pubkey(&self, _pubkey: &PublicKey) -> Result<SecretKey> {
         Ok(self.seckey)
     }
 }
@@ -231,7 +131,7 @@ impl Wallet for JSInterfaceWallet {
         &self,
         amount: u64,
         fee_rate: Option<u64>,
-        lock_utxos: bool,
+        _lock_utxos: bool,
     ) -> Result<Vec<Utxo>> {
         let org_utxos = self.utxos.borrow().as_ref().unwrap().clone();
         let mut utxos = org_utxos

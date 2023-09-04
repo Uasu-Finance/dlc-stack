@@ -40,12 +40,12 @@ use esplora_async_blockchain_provider::EsploraAsyncBlockchainProvider;
 use log::{debug, error, info, warn};
 
 use attestor_client::AttestorClient;
+use dlc_clients::async_storage_provider::AsyncStorageApiProvider;
 use serde_json::json;
 use std::fmt::{self, Write as _};
-use storage::async_storage_api::AsyncStorageApiProvider;
+
 use utils::get_numerical_contract_info;
 
-mod storage;
 mod utils;
 #[macro_use]
 mod macros;

@@ -32,7 +32,7 @@ use dlc_link_manager::{AsyncStorage, Manager};
 
 use std::fmt::Write as _;
 
-use storage::async_storage_api::AsyncStorageApiProvider;
+use dlc_clients::async_storage_provider::AsyncStorageApiProvider;
 
 use esplora_async_blockchain_provider::EsploraAsyncBlockchainProvider;
 
@@ -41,7 +41,6 @@ use js_interface_wallet::JSInterfaceWallet;
 use attestor_client::AttestorClient;
 use serde::{Deserialize, Serialize};
 
-mod storage;
 #[macro_use]
 mod macros;
 
@@ -174,7 +173,6 @@ impl JsDLCInterface {
         // Set up wallet
         let wallet = Arc::new(JSInterfaceWallet::new(
             options.address.to_string(),
-            active_network,
             PrivateKey::new(seckey, active_network),
         ));
 
@@ -387,69 +385,6 @@ impl JsDLCInterface {
             _ => (),
         }
     }
-
-    // fn accept_offer(&self, offer_json: String, utxos: String) -> String {
-    // self.blockchain.refresh_chain_data(address.clone()).await;
-    // let utxo_inputs: Vec<UtxoInput> = serde_json::from_str(&utxos).unwrap();
-
-    // log out utxo_inputs
-    // clog!("utxo_inputs {:?}", utxo_inputs);
-
-    // let utxos: Vec<Utxo> = utxo_inputs
-    //     .into_iter()
-    //     .map(|utxo| Utxo {
-    //         address: address.clone(),
-    //         outpoint: OutPoint {
-    //             txid: utxo
-    //                 .txid
-    //                 .parse()
-    //                 .expect("To be able to parse the txid from the utxo"),
-    //             vout: utxo.vout,
-    //         },
-    //         redeem_script: Script::default(),
-    //         reserved: false,
-    //         tx_out: TxOut {
-    //             value: utxo.value,
-    //             script_pubkey: address.script_pubkey(),
-    //         },
-    //     })
-    //     .collect();
-
-    // log out utxos
-    // clog!("utxos {:?}", utxos);
-
-    // Then the utxos can be set in the js-interface-wallet as the current utxos, overwriting the previous ones
-    // the wallet should use that list for the remainder of the operation.
-    // self.wallet.set_utxos(utxos).unwrap();
-
-    //     let dlc_offer_message: OfferDlc = serde_json::from_str(&offer_json).unwrap();
-    //     clog!("Offer to accept: {:?}", dlc_offer_message);
-    //     match self.manager.lock().unwrap().on_dlc_message(
-    //         &Message::Offer(dlc_offer_message.clone()),
-    //         STATIC_COUNTERPARTY_NODE_ID.parse().unwrap(),
-    //     ) {
-    //         Ok(_) => (),
-    //         Err(e) => {
-    //             clog!("DLC manager - receive offer error: {}", e.to_string());
-    //             return "".to_string();
-    //         }
-    //     }
-
-    //     clog!("receive_offer - after on_dlc_message");
-    //     let temporary_contract_id = dlc_offer_message.temporary_contract_id;
-
-    //     clog!("accepting contract with id {:?}", temporary_contract_id);
-
-    //     let (_contract_id, _public_key, accept_msg) = self
-    //         .manager
-    //         .lock()
-    //         .unwrap()
-    //         .accept_contract_offer(&temporary_contract_id)
-    //         .expect("Error accepting contract offer");
-
-    //     clog!("receive_offer - after accept_contract_offer");
-    //     serde_json::to_string(&accept_msg).unwrap()
-    // }
 }
 
 #[derive(Serialize, Deserialize)]

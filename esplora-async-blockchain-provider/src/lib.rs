@@ -3,7 +3,6 @@ use bitcoin::{Address, Block, Network, OutPoint, Script, Transaction, TxOut, Txi
 use dlc_manager::{error::Error, Blockchain, Utxo};
 
 use js_interface_wallet::WalletBlockchainProvider;
-use lightning::chain;
 use lightning::chain::chaininterface::FeeEstimator;
 use reqwest::Response;
 

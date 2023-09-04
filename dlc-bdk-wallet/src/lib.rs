@@ -4,7 +4,7 @@ use std::{
 };
 
 use bdk::{
-    database::{AnyDatabase, MemoryDatabase},
+    database::AnyDatabase,
     sled,
     wallet::coin_selection::{BranchAndBoundCoinSelection, CoinSelectionAlgorithm},
     FeeRate, WeightedUtxo,
@@ -21,7 +21,7 @@ pub struct DlcBdkWallet {
     pub address: Address,
     seckey: SecretKey,
     secp_ctx: Secp256k1<All>,
-    network: Network,
+    _network: Network,
 }
 
 impl DlcBdkWallet {
@@ -30,14 +30,14 @@ impl DlcBdkWallet {
         bdk_wallet: Arc<Mutex<bdk::Wallet<sled::Tree>>>,
         address: Address,
         seckey: SecretKey,
-        network: Network,
+        _network: Network,
     ) -> Self {
         Self {
             bdk_wallet,
             address,
             seckey,
             secp_ctx: Secp256k1::new(),
-            network,
+            _network,
         }
     }
 }
@@ -73,22 +73,6 @@ impl Wallet for DlcBdkWallet {
 
     fn get_new_secret_key(&self) -> Result<SecretKey> {
         Ok(self.seckey)
-
-        /*
-              let dlc_ext_path = DerivationPath::from_str("m/86h/0h/0h/2").expect("A valid derivation path");
-
-        let mut iter = dlc_ext_path.hardened_children();
-        for _ in 0..3 {
-            let newpath = iter.next().unwrap();
-            info!("{:?}", newpath);
-            let childnums: Vec<ChildNumber> = newpath.clone().into();
-            info!("{:?}", childnums);
-            let derived_xpriv = xpriv.derive_priv(&secp, &newpath);
-
-            info!("Child Number {}", derived_xpriv.unwrap().child_number);
-            info!("{:?}", xpriv.derive_priv(&secp, &newpath));
-        }
-         */
     }
 
     fn get_utxos_for_amount(

@@ -1,15 +1,16 @@
-use dlc_clients::{
-    ApiError, ContractRequestParams, ContractsRequestParams, NewContract, StorageApiClient,
-    UpdateContract,
-};
 use dlc_link_manager::AsyncStorage;
 use dlc_manager::contract::offered_contract::OfferedContract;
 use dlc_manager::contract::signed_contract::SignedContract;
-use dlc_manager::contract::{Contract, PreClosedContract};
+use dlc_manager::contract::Contract as DlcContract;
+use dlc_manager::contract::PreClosedContract;
 use dlc_manager::error::Error;
 use dlc_manager::ContractId;
 
-use crate::storage::utils::{get_contract_id_string, to_storage_error};
+use crate::utils::{get_contract_id_string, to_storage_error};
+use crate::{
+    ApiError, Contract, ContractRequestParams, ContractsRequestParams, NewContract,
+    StorageApiClient, UpdateContract,
+};
 
 use super::utils::{deserialize_contract, get_contract_state_str, serialize_contract};
 
@@ -26,13 +27,13 @@ impl AsyncStorageApiProvider {
         }
     }
 
-    // TODO: For testing only, delete before production
-    pub async fn delete_contracts(&self) {
-        let _res = self.client.delete_contracts(self.key.clone());
-    }
+    // // TODO: For testing only, delete before production
+    // pub async fn delete_contracts(&self) {
+    //     let _res = self.client.delete_contracts(self.key.clone());
+    // }
 
-    pub async fn get_contracts_by_state(&self, state: String) -> Result<Vec<Contract>, Error> {
-        let contracts_res: Result<Vec<dlc_clients::Contract>, ApiError> = self
+    pub async fn get_contracts_by_state(&self, state: String) -> Result<Vec<DlcContract>, Error> {
+        let contracts_res: Result<Vec<Contract>, ApiError> = self
             .client
             .get_contracts(ContractsRequestParams {
                 state: Some(state),
@@ -41,7 +42,7 @@ impl AsyncStorageApiProvider {
             })
             .await;
         let mut contents: Vec<String> = vec![];
-        let mut contracts: Vec<Contract> = vec![];
+        let mut contracts: Vec<DlcContract> = vec![];
         for c in contracts_res.unwrap() {
             contents.push(c.content);
         }
@@ -55,9 +56,9 @@ impl AsyncStorageApiProvider {
 }
 
 impl AsyncStorage for AsyncStorageApiProvider {
-    async fn get_contract(&self, id: &ContractId) -> Result<Option<Contract>, Error> {
+    async fn get_contract(&self, id: &ContractId) -> Result<Option<DlcContract>, Error> {
         let cid = get_contract_id_string(*id);
-        let contract_res: Result<Option<dlc_clients::Contract>, ApiError> = self
+        let contract_res: Result<Option<Contract>, ApiError> = self
             .client
             .get_contract(ContractRequestParams {
                 key: self.key.clone(),
@@ -73,8 +74,8 @@ impl AsyncStorage for AsyncStorageApiProvider {
         }
     }
 
-    async fn get_contracts(&self) -> Result<Vec<Contract>, Error> {
-        let contracts_res: Result<Vec<dlc_clients::Contract>, ApiError> = self
+    async fn get_contracts(&self) -> Result<Vec<DlcContract>, Error> {
+        let contracts_res: Result<Vec<Contract>, ApiError> = self
             .client
             .get_contracts(ContractsRequestParams {
                 key: self.key.clone(),
@@ -83,7 +84,7 @@ impl AsyncStorage for AsyncStorageApiProvider {
             })
             .await;
         let mut contents: Vec<String> = vec![];
-        let mut contracts: Vec<Contract> = vec![];
+        let mut contracts: Vec<DlcContract> = vec![];
         let unpacked_contracts = contracts_res.map_err(to_storage_error)?;
         for c in unpacked_contracts {
             contents.push(c.content);
@@ -97,7 +98,7 @@ impl AsyncStorage for AsyncStorageApiProvider {
     }
 
     async fn create_contract(&self, contract: &OfferedContract) -> Result<(), Error> {
-        let data = serialize_contract(&Contract::Offered(contract.clone()))?;
+        let data = serialize_contract(&DlcContract::Offered(contract.clone()))?;
         let uuid = get_contract_id_string(contract.id);
         let req = NewContract {
             uuid: uuid.clone(),
@@ -135,9 +136,9 @@ impl AsyncStorage for AsyncStorageApiProvider {
         }
     }
 
-    async fn update_contract(&self, contract: &Contract) -> Result<(), Error> {
+    async fn update_contract(&self, contract: &DlcContract) -> Result<(), Error> {
         match contract {
-            a @ Contract::Accepted(_) | a @ Contract::Signed(_) => {
+            a @ DlcContract::Accepted(_) | a @ DlcContract::Signed(_) => {
                 match self.delete_contract(&a.get_temporary_id()).await {
                     Ok(_) => {}
                     Err(_) => {} // This happens when the temp contract was already deleted upon moving from Offered to Accepted
@@ -187,7 +188,7 @@ impl AsyncStorage for AsyncStorageApiProvider {
         let contracts_per_state = self.get_contracts_by_state("offered".to_string()).await?;
         let mut res: Vec<OfferedContract> = Vec::new();
         for val in contracts_per_state {
-            if let Contract::Offered(c) = val {
+            if let DlcContract::Offered(c) = val {
                 res.push(c.clone());
             }
         }
@@ -198,7 +199,7 @@ impl AsyncStorage for AsyncStorageApiProvider {
         let contracts_per_state = self.get_contracts_by_state("signed".to_string()).await?;
         let mut res: Vec<SignedContract> = Vec::new();
         for val in contracts_per_state {
-            if let Contract::Signed(c) = val {
+            if let DlcContract::Signed(c) = val {
                 res.push(c.clone());
             }
         }
@@ -209,7 +210,7 @@ impl AsyncStorage for AsyncStorageApiProvider {
         let contracts_per_state = self.get_contracts_by_state("confirmed".to_string()).await?;
         let mut res: Vec<SignedContract> = Vec::new();
         for val in contracts_per_state {
-            if let Contract::Confirmed(c) = val {
+            if let DlcContract::Confirmed(c) = val {
                 res.push(c.clone());
             }
         }
@@ -222,7 +223,7 @@ impl AsyncStorage for AsyncStorageApiProvider {
             .await?;
         let mut res: Vec<PreClosedContract> = Vec::new();
         for val in contracts_per_state {
-            if let Contract::PreClosed(c) = val {
+            if let DlcContract::PreClosed(c) = val {
                 res.push(c.clone());
             }
         }
