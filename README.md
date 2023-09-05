@@ -1,7 +1,6 @@
 # dlc-stack
 
 ![build workflow](https://github.com/dlc-link/dlc-stack/actions/workflows/docker-build.yml/badge.svg)
-[![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
 Modules that work together to provide a seamless lending experience for DLC.Link.
 
