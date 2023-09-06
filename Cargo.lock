@@ -751,7 +751,7 @@ dependencies = [
 [[package]]
 name = "dlc"
 version = "0.4.0"
-source = "git+https://github.com/dlc-link/rust-dlc#2e2708ba212a583f4f566b9d1a427513b96a9aec"
+source = "git+https://github.com/dlc-link/rust-dlc?branch=feat/zero-fee-counterparty#d3dba385d97c0a60e06c15a2f5b859aba50fef55"
 dependencies = [
  "bitcoin 0.29.2",
  "miniscript 9.0.2",
@@ -808,7 +808,7 @@ dependencies = [
 [[package]]
 name = "dlc-manager"
 version = "0.4.0"
-source = "git+https://github.com/dlc-link/rust-dlc#2e2708ba212a583f4f566b9d1a427513b96a9aec"
+source = "git+https://github.com/dlc-link/rust-dlc?branch=feat/zero-fee-counterparty#d3dba385d97c0a60e06c15a2f5b859aba50fef55"
 dependencies = [
  "async-trait",
  "bitcoin 0.29.2",
@@ -824,7 +824,7 @@ dependencies = [
 [[package]]
 name = "dlc-messages"
 version = "0.4.0"
-source = "git+https://github.com/dlc-link/rust-dlc#2e2708ba212a583f4f566b9d1a427513b96a9aec"
+source = "git+https://github.com/dlc-link/rust-dlc?branch=feat/zero-fee-counterparty#d3dba385d97c0a60e06c15a2f5b859aba50fef55"
 dependencies = [
  "bitcoin 0.29.2",
  "dlc",
@@ -917,7 +917,7 @@ dependencies = [
 [[package]]
 name = "dlc-trie"
 version = "0.4.0"
-source = "git+https://github.com/dlc-link/rust-dlc#2e2708ba212a583f4f566b9d1a427513b96a9aec"
+source = "git+https://github.com/dlc-link/rust-dlc?branch=feat/zero-fee-counterparty#d3dba385d97c0a60e06c15a2f5b859aba50fef55"
 dependencies = [
  "bitcoin 0.29.2",
  "dlc",
