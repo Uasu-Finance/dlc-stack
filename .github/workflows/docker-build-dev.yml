@@ -23,6 +23,8 @@ jobs:
       - name: Login to Amazon ECR
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v1
+        with:
+          mask-password: "true"
       - name: Set outputs
         id: vars
         run: echo "sha_short=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
@@ -50,6 +52,8 @@ jobs:
       - name: Login to Amazon ECR
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v1
+        with:
+          mask-password: "true"
       - name: Set outputs
         id: vars
         run: echo "sha_short=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
@@ -77,6 +81,8 @@ jobs:
       - name: Login to Amazon ECR
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v1
+        with:
+          mask-password: "true"
       - name: Set outputs
         id: vars
         run: echo "sha_short=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
@@ -104,6 +110,8 @@ jobs:
       - name: Login to Amazon ECR
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v1
+        with:
+          mask-password: "true"
       - name: Set outputs
         id: vars
         run: echo "sha_short=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
@@ -131,6 +139,8 @@ jobs:
       - name: Login to Amazon ECR
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v1
+        with:
+          mask-password: "true"
       - name: Set outputs
         id: vars
         run: echo "sha_short=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
@@ -144,7 +154,7 @@ jobs:
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
 
   run-test:
-    name: Run integration tests
+    name: Run integration tests & push to ECR on success
     runs-on: ubuntu-latest
     needs: [build-storageapi, build-attestor, build-BI, build-wallet, build-it]
     steps:
@@ -159,22 +169,20 @@ jobs:
       - name: Login to Amazon ECR
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v1
+        with:
+          mask-password: "true"
       - name: Login to Amazon ECR Public
         id: login-ecr-public
         uses: aws-actions/amazon-ecr-login@v1
         with:
           registry-type: public
+          mask-password: "true"
       - name: Set outputs
         id: vars
         run: echo "sha_short=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
       - name: Run test
         env:
-          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-          ECR_PUBLIC_REGISTRY: ${{ steps.login-ecr-public.outputs.registry }}
-          REGISTRY_ALIAS: dlc-link
-          ECR_REPOSITORY: dlc-integration-test
           IMAGE_TAG: test-${{ steps.vars.outputs.sha_short }}
-          NEW_IMAGE_TAG: dev-${{ steps.vars.outputs.sha_short }}
           XPRIV: ${{ secrets.XPRIV }}
           FINGERPRINT: ${{ secrets.FINGERPRINT }}
         run: |
@@ -208,6 +216,12 @@ jobs:
           docker logs integration-test
 
       - name: Retag images and push to ECR
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          ECR_PUBLIC_REGISTRY: ${{ steps.login-ecr-public.outputs.registry }}
+          REGISTRY_ALIAS: dlc-link
+          IMAGE_TAG: test-${{ steps.vars.outputs.sha_short }}
+          NEW_IMAGE_TAG: dev-${{ steps.vars.outputs.sha_short }}
         run: |
           docker tag $ECR_REGISTRY/storage-api:$IMAGE_TAG $ECR_PUBLIC_REGISTRY/$REGISTRY_ALIAS/storage-api:dev
           docker tag $ECR_REGISTRY/storage-api:$IMAGE_TAG $ECR_PUBLIC_REGISTRY/$REGISTRY_ALIAS/storage-api:$NEW_IMAGE_TAG
