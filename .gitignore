@@ -23,10 +23,10 @@
 
 .vscode
 .env
-!.env.tempalte
+!.env.template
 docker/data
 
 # Ingore Mac OS files
 .DS_Store
 
-.rustc_info.json
+**/.rustc_info.json

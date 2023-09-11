@@ -1,3 +1,5 @@
+use bdk::esplora_client::TxStatus;
+use bdk::esplora_client::{AsyncClient, Builder};
 use bitcoin::consensus::Decodable;
 use bitcoin::{Address, Block, Network, OutPoint, Script, Transaction, TxOut, Txid};
 use dlc_manager::{error::Error, Blockchain, Utxo};
@@ -18,6 +20,8 @@ use log::*;
 
 use bdk::blockchain::esplora::EsploraBlockchain;
 use wasm_bindgen_futures::spawn_local;
+
+const REQWEST_TIMEOUT: u64 = 30;
 
 #[derive(Serialize, Deserialize, Debug)]
 struct UtxoResp {
@@ -50,17 +54,24 @@ pub struct EsploraAsyncBlockchainProvider {
     host: String,
     pub blockchain: EsploraBlockchain,
     chain_data: Arc<Mutex<ChainCacheData>>,
+    network: Network,
 }
 
+pub struct TxRawWithConf {
+    pub raw_tx: Vec<u8>,
+    pub confirmations: u32,
+}
 struct ChainCacheData {
     utxos: RefCell<Option<Vec<Utxo>>>,
-    txs: RefCell<Option<HashMap<String, Vec<u8>>>>,
+    txs: RefCell<Option<HashMap<String, TxRawWithConf>>>,
     height: RefCell<Option<u64>>,
 }
 
 impl EsploraAsyncBlockchainProvider {
-    pub fn new(host: String, _network: Network) -> Self {
-        let blockchain = EsploraBlockchain::new(&host, 20);
+    pub fn new(host: String, network: Network) -> Self {
+        let client_builder = Builder::new(&host).timeout(REQWEST_TIMEOUT);
+        let url_client = AsyncClient::from_builder(client_builder).unwrap();
+        let blockchain = EsploraBlockchain::from_client(url_client, 20);
 
         Self {
             host,
@@ -70,6 +81,7 @@ impl EsploraAsyncBlockchainProvider {
                 txs: Some(HashMap::new()).into(),
                 height: Some(0).into(),
             })),
+            network,
         }
     }
 
@@ -129,10 +141,9 @@ impl EsploraAsyncBlockchainProvider {
 
     // gets all the utxos and txs and height of chain, and returns the balance of the address
     pub async fn refresh_chain_data(&self, address: String) -> Result<(), Error> {
-        debug!("locking chain-data");
-        *self.chain_data.lock().unwrap().height.borrow_mut() =
-            Some(self.blockchain.get_height().await.unwrap() as u64);
-        //Some(self.get_u64("blocks/tip/height").await.unwrap());
+        let height = self.blockchain.get_height().await.unwrap() as u64;
+
+        *self.chain_data.lock().unwrap().height.borrow_mut() = Some(height);
 
         debug!("fetching utxos from chain for address {}", address);
 
@@ -203,15 +214,31 @@ impl EsploraAsyncBlockchainProvider {
 
         for utxo in chain_data.utxos.borrow().as_ref().unwrap() {
             let txid = utxo.outpoint.txid.to_string();
-            // self.blockchain.get_tx(txid).await.unwrap();
             trace!("fetching tx {}", txid);
             let tx: Vec<u8> = self.get_bytes(&format!("tx/{}/raw", txid)).await?;
-            chain_data
-                .txs
-                .borrow_mut()
-                .as_mut()
-                .unwrap()
-                .insert(txid, tx.clone());
+
+            let tx_status = self
+                .get_from_json::<TxStatus>(&format!("tx/{txid}/status"))
+                .await?;
+            let confirmations = match tx_status.confirmed {
+                true => {
+                    if let Some(block_height) = tx_status.block_height {
+                        (height - block_height as u64 + 1) as u32
+                    } else {
+                        warn!("tx {} has no block height", txid);
+                        0
+                    }
+                }
+                false => 0,
+            };
+
+            chain_data.txs.borrow_mut().as_mut().unwrap().insert(
+                txid,
+                TxRawWithConf {
+                    raw_tx: tx.clone(),
+                    confirmations, // set this for real
+                },
+            );
         }
         Ok(())
     }
@@ -257,37 +284,39 @@ impl Blockchain for EsploraAsyncBlockchainProvider {
     }
 
     fn get_network(&self) -> Result<bitcoin::network::constants::Network, Error> {
-        Ok(bitcoin::Network::Regtest)
-        //hardcoded?
+        Ok(self.network)
     }
+
     fn get_blockchain_height(&self) -> Result<u64, Error> {
         Ok(self.chain_data.lock().unwrap().height.borrow().unwrap())
     }
+
     fn get_block_at_height(&self, _height: u64) -> Result<Block, Error> {
+        //only used for lightning
         unimplemented!();
     }
+
     fn get_transaction(&self, tx_id: &Txid) -> Result<Transaction, Error> {
-        let raw_tx = self
-            .chain_data
-            .lock()
-            .unwrap()
-            .txs
-            .borrow()
-            .as_ref()
-            .unwrap()
-            .clone();
-        let raw_tx = match raw_tx.get(&tx_id.to_string()) {
-            Some(x) => x,
+        let chain_data = self.chain_data.lock().unwrap();
+        let txs = chain_data.txs.borrow();
+        let raw_txs = txs.as_ref().unwrap();
+        let raw_tx = match raw_txs.get(&tx_id.to_string()) {
+            Some(x) => x.raw_tx.clone(),
             None => return Err(Error::BlockchainError(format!("tx not found {}", tx_id))),
         };
         Transaction::consensus_decode(&mut std::io::Cursor::new(&*raw_tx))
             .map_err(|e| Error::BlockchainError(e.to_string()))
     }
 
-    fn get_transaction_confirmations(&self, _tx_id: &Txid) -> Result<u32, Error> {
-        // unimplemented!()
-        Ok(4)
-        //Need to fix this
+    fn get_transaction_confirmations(&self, tx_id: &Txid) -> Result<u32, Error> {
+        let chain_data = self.chain_data.lock().unwrap();
+        let txs = chain_data.txs.borrow();
+        let raw_txs = txs.as_ref().unwrap();
+        let confirmations = match raw_txs.get(&tx_id.to_string()) {
+            Some(x) => x.confirmations,
+            None => return Err(Error::BlockchainError(format!("tx not found {}", tx_id))),
+        };
+        Ok(confirmations)
     }
 }
 
