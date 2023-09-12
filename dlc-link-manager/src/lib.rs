@@ -285,7 +285,7 @@ where
 
         self.wallet.import_address(&Address::p2wsh(
             &accepted_contract.dlc_transactions.funding_script_pubkey,
-            self.blockchain.get_network()?,
+            self.blockchain.get_network_async().await?,
         ))?;
 
         let contract_id = accepted_contract.get_contract_id();
@@ -360,7 +360,7 @@ where
                 .accepted_contract
                 .dlc_transactions
                 .funding_script_pubkey,
-            self.blockchain.get_network()?,
+            self.blockchain.get_network_async().await?,
         ))?;
 
         self.store
