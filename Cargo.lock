@@ -751,7 +751,7 @@ dependencies = [
 [[package]]
 name = "dlc"
 version = "0.4.0"
-source = "git+https://github.com/dlc-link/rust-dlc#2e2708ba212a583f4f566b9d1a427513b96a9aec"
+source = "git+https://github.com/dlc-link/rust-dlc?rev=4878659695305fd58e8ff256dbe2534ae8157fa6#4878659695305fd58e8ff256dbe2534ae8157fa6"
 dependencies = [
  "bitcoin 0.29.2",
  "miniscript 9.0.2",
@@ -795,7 +795,7 @@ dependencies = [
 [[package]]
 name = "dlc-manager"
 version = "0.4.0"
-source = "git+https://github.com/dlc-link/rust-dlc#2e2708ba212a583f4f566b9d1a427513b96a9aec"
+source = "git+https://github.com/dlc-link/rust-dlc?rev=4878659695305fd58e8ff256dbe2534ae8157fa6#4878659695305fd58e8ff256dbe2534ae8157fa6"
 dependencies = [
  "async-trait",
  "bitcoin 0.29.2",
@@ -811,7 +811,7 @@ dependencies = [
 [[package]]
 name = "dlc-messages"
 version = "0.4.0"
-source = "git+https://github.com/dlc-link/rust-dlc#2e2708ba212a583f4f566b9d1a427513b96a9aec"
+source = "git+https://github.com/dlc-link/rust-dlc?rev=4878659695305fd58e8ff256dbe2534ae8157fa6#4878659695305fd58e8ff256dbe2534ae8157fa6"
 dependencies = [
  "bitcoin 0.29.2",
  "dlc",
@@ -904,7 +904,7 @@ dependencies = [
 [[package]]
 name = "dlc-trie"
 version = "0.4.0"
-source = "git+https://github.com/dlc-link/rust-dlc#2e2708ba212a583f4f566b9d1a427513b96a9aec"
+source = "git+https://github.com/dlc-link/rust-dlc?rev=4878659695305fd58e8ff256dbe2534ae8157fa6#4878659695305fd58e8ff256dbe2534ae8157fa6"
 dependencies = [
  "bitcoin 0.29.2",
  "dlc",
