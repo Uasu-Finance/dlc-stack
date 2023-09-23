@@ -5,6 +5,7 @@ extern crate log;
 
 use bitcoin::{Network, PrivateKey, XOnlyPublicKey};
 use dlc_link_manager::AsyncOracle;
+use dlc_manager::Wallet;
 use dlc_messages::{Message, OfferDlc, SignDlc};
 use secp256k1_zkp::UpstreamError;
 use wasm_bindgen::prelude::*;
@@ -136,7 +137,7 @@ impl JsDLCInterface {
         network: String,
         electrs_url: String,
         attestor_urls: String,
-    ) -> JsDLCInterface {
+    ) -> Result<JsDLCInterface, JsError> {
         console_error_panic_hook::set_once();
 
         let options = JsDLCInterfaceOptions {
@@ -212,19 +213,19 @@ impl JsDLCInterface {
             }
         };
 
-        JsDLCInterface {
+        Ok(JsDLCInterface {
             options,
             manager,
             wallet,
             blockchain,
-        }
+        })
     }
 
-    pub fn get_options(&self) -> JsValue {
-        serde_wasm_bindgen::to_value(&self.options).unwrap()
+    pub fn get_options(&self) -> Result<JsValue, JsError> {
+        Ok(serde_wasm_bindgen::to_value(&self.options)?)
     }
 
-    pub async fn get_wallet_balance(&self) -> u64 {
+    pub async fn get_wallet_balance(&self) -> Result<u64, JsError> {
         log_to_console!("get_wallet_balance");
         match self
             .blockchain
@@ -243,51 +244,47 @@ impl JsDLCInterface {
             }
         };
         match self.blockchain.get_balance().await {
-            Ok(balance) => balance,
+            Ok(balance) => Ok(balance),
             Err(e) => {
                 log_to_console!("Error getting balance: {}", e);
-                0
+                Ok(0)
             }
         }
     }
 
     // public async function for fetching all the contracts on the manager
-    pub async fn get_contracts(&self) -> JsValue {
+    pub async fn get_contracts(&self) -> Result<JsValue, JsError> {
         let contracts: Vec<JsContract> = self
             .manager
-            .lock()
-            .unwrap()
+            .lock()?
             .get_store()
             .get_contracts()
-            .await
-            .unwrap()
+            .await?
             .into_iter()
-            .map(|contract| JsContract::from_contract(contract))
+            .map(JsContract::from_contract)
             .collect();
 
-        serde_wasm_bindgen::to_value(&contracts).unwrap()
+        Ok(serde_wasm_bindgen::to_value(&contracts)?)
     }
 
     // public async function for fetching one contract as a JsContract type
-    pub async fn get_contract(&self, contract_str: String) -> JsValue {
+    pub async fn get_contract(&self, contract_str: String) -> Result<JsValue, JsError> {
         let contract_id = ContractId::read(&mut Cursor::new(&contract_str)).unwrap();
         let contract = self
             .manager
-            .lock()
-            .unwrap()
+            .lock()?
             .get_store()
             .get_contract(&contract_id)
-            .await
-            .unwrap();
+            .await?;
         match contract {
-            Some(contract) => {
-                serde_wasm_bindgen::to_value(&JsContract::from_contract(contract)).unwrap()
-            }
-            None => JsValue::NULL,
+            Some(contract) => Ok(serde_wasm_bindgen::to_value(&JsContract::from_contract(
+                contract,
+            ))?),
+            None => Ok(JsValue::NULL),
         }
     }
 
-    pub async fn accept_offer(&self, offer_json: String) -> String {
+    pub async fn accept_offer(&self, offer_json: String) -> Result<String, JsError> {
         //could consider doing a refresh_chain_data here to have the newest utxos
 
         let accept_msg_result = async {
@@ -312,75 +309,99 @@ impl JsDLCInterface {
                 .await
                 .expect("Error accepting contract offer");
             serde_json::to_string(&accept_msg).map_err(|e| WalletError(e.to_string()))
-        }
-        .await;
-        match accept_msg_result {
-            Ok(accept_msg) => accept_msg,
+        };
+        match accept_msg_result.await {
+            Ok(accept_msg) => Ok(accept_msg),
             Err(e) => {
                 log_to_console!("Error accepting offer: {}", e);
-                format!("Error accepting offer: {}", e)
+                Err(JsError::new(&format!("Error accepting offer: {}", e)))
             }
         }
     }
 
-    pub async fn countersign_and_broadcast(&self, dlc_sign_message: String) -> String {
-        let dlc_sign_message: SignDlc = serde_json::from_str(&dlc_sign_message).unwrap();
-        match self
-            .manager
-            .lock()
-            .unwrap()
-            .on_dlc_message(
-                &Message::Sign(dlc_sign_message.clone()),
-                STATIC_COUNTERPARTY_NODE_ID.parse().unwrap(),
-            )
-            .await
-        {
-            Ok(_) => (),
+    pub async fn countersign_and_broadcast(
+        &self,
+        dlc_sign_message: String,
+    ) -> Result<String, JsError> {
+        let dlc_sign_result = async {
+            let dlc_sign_message: SignDlc = serde_json::from_str(&dlc_sign_message).unwrap();
+            match self
+                .manager
+                .lock()
+                .unwrap()
+                .on_dlc_message(
+                    &Message::Sign(dlc_sign_message.clone()),
+                    STATIC_COUNTERPARTY_NODE_ID.parse().unwrap(),
+                )
+                .await
+            {
+                Ok(_) => (),
+                Err(e) => {
+                    log_to_console!("DLC manager - sign offer error: {}", e.to_string());
+                    panic!();
+                }
+            }
+            let manager = self.manager.lock().unwrap();
+            let store = manager.get_store();
+            let contract = store
+                .get_signed_contracts()
+                .await
+                .map_err(|e| WalletError(e.to_string()))?
+                .into_iter()
+                .find(|c| c.accepted_contract.get_contract_id() == dlc_sign_message.contract_id);
+            match contract {
+                None => {
+                    log_to_console!("DLC manager - sign offer error: {}", "Contract not found");
+                    panic!();
+                }
+                Some(c) => Ok(c.accepted_contract.dlc_transactions.fund.txid().to_string())
+                    as Result<String, WalletError>,
+            }
+        };
+        match dlc_sign_result.await {
+            Ok(txid) => Ok(txid),
             Err(e) => {
-                log_to_console!("DLC manager - sign offer error: {}", e.to_string());
-                panic!();
+                log_to_console!("Error signing and broadcasting: {}", e);
+                Err(JsError::new(&format!(
+                    "Error signing and broadcasting: {}",
+                    e
+                )))
             }
         }
-        let manager = self.manager.lock().unwrap();
-        let store = manager.get_store();
-        let contract: SignedContract = store
-            .get_signed_contracts()
-            .await
-            .unwrap()
-            .into_iter()
-            .filter(|c| c.accepted_contract.get_contract_id() == dlc_sign_message.contract_id)
-            .next()
-            .unwrap();
-        contract
-            .accepted_contract
-            .dlc_transactions
-            .fund
-            .txid()
-            .to_string()
     }
 
-    pub async fn reject_offer(&self, contract_id: String) -> () {
-        let contract_id = ContractId::read(&mut Cursor::new(&contract_id)).unwrap();
-        let contract = self
-            .manager
-            .lock()
-            .unwrap()
-            .get_store()
-            .get_contract(&contract_id)
-            .await
-            .unwrap();
+    pub async fn reject_offer(&self, contract_id: String) -> Result<(), JsError> {
+        let reject_result = async {
+            let contract_id = ContractId::read(&mut Cursor::new(&contract_id)).unwrap();
+            let contract = self
+                .manager
+                .lock()
+                .map_err(|e| WalletError(e.to_string()))?
+                .get_store()
+                .get_contract(&contract_id)
+                .await
+                .unwrap();
 
-        match contract {
-            Some(Contract::Offered(c)) => {
+            if let Some(Contract::Offered(c)) = contract {
                 self.manager
                     .lock()
-                    .unwrap()
+                    .map_err(|e| WalletError(e.to_string()))?
                     .get_store()
                     .update_contract(&Contract::Rejected(c))
                     .await
-                    .unwrap();
+                    .map_err(|e| WalletError(e.to_string()))?;
             }
-            _ => (),
+            Ok(()) as Result<(), WalletError>
+        };
+        match reject_result.await {
+            Ok(_) => Ok(()),
+            Err(e) => {
+                log_to_console!("Error signing and broadcasting: {}", e);
+                Err(JsError::new(&format!(
+                    "Error signing and broadcasting: {}",
+                    e
+                )))
+            }
         }
     }
 }
