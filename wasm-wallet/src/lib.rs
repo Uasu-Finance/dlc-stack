@@ -199,7 +199,7 @@ impl JsDLCInterface {
                 Err(e) => return Err(JsError::new(&format!("Error parsing attestor urls: {}", e))),
             };
 
-        let attestors = generate_attestor_client(attestor_urls_vec).await;
+        let attestors = generate_attestor_client(attestor_urls_vec).await?;
 
         // Set up time provider
         let time_provider = SystemTimeProvider {};
@@ -209,7 +209,7 @@ impl JsDLCInterface {
             Arc::clone(&wallet),
             Arc::clone(&blockchain),
             Box::new(dlc_store),
-            attestors?,
+            attestors,
             Arc::new(time_provider),
         )?));
 
@@ -269,12 +269,14 @@ impl JsDLCInterface {
             .get_contracts()
             .await?
             .into_iter()
-            .map(|c| match JsContract::from_contract(c) {
-                Ok(c) => c,
+            .map(|c| match JsContract::from_contract(c.clone()) {
+                Ok(c) => Ok(c),
                 Err(e) => {
                     log_to_console!("Error getting contract with id {:?}: {}", c.get_id(), e);
+                    Err(e)
                 }
             })
+            .filter_map(Result::ok)
             .collect();
 
         Ok(serde_wasm_bindgen::to_value(&contracts)?)
