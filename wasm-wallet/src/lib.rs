@@ -5,7 +5,6 @@ extern crate log;
 
 use bitcoin::{Network, PrivateKey, XOnlyPublicKey};
 use dlc_link_manager::AsyncOracle;
-use dlc_manager::Wallet;
 use dlc_messages::{Message, OfferDlc, SignDlc};
 use secp256k1_zkp::UpstreamError;
 use wasm_bindgen::prelude::*;
@@ -24,10 +23,7 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-use dlc_manager::{
-    contract::{signed_contract::SignedContract, Contract},
-    ContractId, SystemTimeProvider,
-};
+use dlc_manager::{contract::Contract, ContractId, SystemTimeProvider};
 
 use dlc_link_manager::{AsyncStorage, Manager};
 
@@ -56,15 +52,24 @@ impl std::error::Error for WalletError {}
 
 async fn generate_attestor_client(
     attestor_urls: Vec<String>,
-) -> HashMap<XOnlyPublicKey, Arc<AttestorClient>> {
+) -> Result<HashMap<XOnlyPublicKey, Arc<AttestorClient>>, JsError> {
     let mut attestor_clients = HashMap::new();
 
     for url in attestor_urls.iter() {
-        let p2p_client: AttestorClient = AttestorClient::new(url).await.unwrap();
+        let p2p_client = match AttestorClient::new(url).await {
+            Ok(client) => client,
+            Err(e) => {
+                return Err(JsError::new(&format!(
+                    "Error creating attestor client: {}",
+                    e
+                )))
+            }
+        };
         let attestor = Arc::new(p2p_client);
         attestor_clients.insert(attestor.get_public_key().await, attestor.clone());
     }
-    attestor_clients
+
+    Ok(attestor_clients)
 }
 
 type DlcManager = Manager<
@@ -200,16 +205,13 @@ impl JsDLCInterface {
         let time_provider = SystemTimeProvider {};
 
         // Create the DLC Manager
-        let manager = Arc::new(Mutex::new(
-            Manager::new(
-                Arc::clone(&wallet),
-                Arc::clone(&blockchain),
-                Box::new(dlc_store),
-                attestors,
-                Arc::new(time_provider),
-            )
-            .unwrap(),
-        ));
+        let manager = Arc::new(Mutex::new(Manager::new(
+            Arc::clone(&wallet),
+            Arc::clone(&blockchain),
+            Box::new(dlc_store),
+            attestors?,
+            Arc::new(time_provider),
+        )?));
 
         match blockchain.refresh_chain_data(options.address.clone()).await {
             Ok(_) => (),
@@ -242,7 +244,7 @@ impl JsDLCInterface {
                 log_to_console!("Error refreshing chain data: {}", e);
             }
         };
-        match self.wallet.set_utxos(self.blockchain.get_utxos().unwrap()) {
+        match self.wallet.set_utxos(self.blockchain.get_utxos()?) {
             Ok(_) => (),
             Err(e) => {
                 log_to_console!("Error setting utxos: {}", e);
@@ -259,6 +261,7 @@ impl JsDLCInterface {
 
     // public async function for fetching all the contracts on the manager
     pub async fn get_contracts(&self) -> Result<JsValue, JsError> {
+        // let mut errors: Vec<WalletError> = vec![];
         let contracts: Vec<JsContract> = self
             .manager
             .lock()?
@@ -266,7 +269,12 @@ impl JsDLCInterface {
             .get_contracts()
             .await?
             .into_iter()
-            .map(JsContract::from_contract)
+            .map(|c| match JsContract::from_contract(c) {
+                Ok(c) => c,
+                Err(e) => {
+                    log_to_console!("Error getting contract with id {:?}: {}", c.get_id(), e);
+                }
+            })
             .collect();
 
         Ok(serde_wasm_bindgen::to_value(&contracts)?)
@@ -274,7 +282,8 @@ impl JsDLCInterface {
 
     // public async function for fetching one contract as a JsContract type
     pub async fn get_contract(&self, contract_str: String) -> Result<JsValue, JsError> {
-        let contract_id = ContractId::read(&mut Cursor::new(&contract_str)).unwrap();
+        let contract_id =
+            ContractId::read(&mut Cursor::new(&contract_str)).map_err(to_wallet_error)?;
         let contract = self
             .manager
             .lock()?
@@ -284,7 +293,7 @@ impl JsDLCInterface {
         match contract {
             Some(contract) => Ok(serde_wasm_bindgen::to_value(&JsContract::from_contract(
                 contract,
-            ))?),
+            )?)?),
             None => Ok(JsValue::NULL),
         }
     }
@@ -302,14 +311,14 @@ impl JsDLCInterface {
                 .map_err(|e: UpstreamError| WalletError(e.to_string()))?;
             self.manager
                 .lock()
-                .unwrap()
+                .map_err(to_wallet_error)?
                 .on_dlc_message(&Message::Offer(dlc_offer_message.clone()), counterparty)
                 .await
                 .map_err(to_wallet_error)?;
             let (_contract_id, _public_key, accept_msg) = self
                 .manager
                 .lock()
-                .unwrap()
+                .map_err(to_wallet_error)?
                 .accept_contract_offer(&temporary_contract_id)
                 .await
                 .map_err(to_wallet_error)?;
@@ -329,17 +338,20 @@ impl JsDLCInterface {
         dlc_sign_message: String,
     ) -> Result<String, JsError> {
         let dlc_sign_result = async {
-            let dlc_sign_message: SignDlc = serde_json::from_str(&dlc_sign_message).unwrap();
+            let dlc_sign_message: SignDlc =
+                serde_json::from_str(&dlc_sign_message).map_err(to_wallet_error)?;
             self.manager
                 .lock()
-                .unwrap()
+                .map_err(to_wallet_error)?
                 .on_dlc_message(
                     &Message::Sign(dlc_sign_message.clone()),
-                    STATIC_COUNTERPARTY_NODE_ID.parse().unwrap(),
+                    STATIC_COUNTERPARTY_NODE_ID
+                        .parse()
+                        .map_err(to_wallet_error)?,
                 )
                 .await
                 .map_err(to_wallet_error)?;
-            let manager = self.manager.lock().unwrap();
+            let manager = self.manager.lock().map_err(to_wallet_error)?;
             let store = manager.get_store();
             let contract = store
                 .get_signed_contracts()
@@ -369,7 +381,8 @@ impl JsDLCInterface {
 
     pub async fn reject_offer(&self, contract_id: String) -> Result<(), JsError> {
         let reject_result = async {
-            let contract_id = ContractId::read(&mut Cursor::new(&contract_id)).unwrap();
+            let contract_id =
+                ContractId::read(&mut Cursor::new(&contract_id)).map_err(to_wallet_error)?;
             let contract = self
                 .manager
                 .lock()
@@ -377,7 +390,7 @@ impl JsDLCInterface {
                 .get_store()
                 .get_contract(&contract_id)
                 .await
-                .unwrap();
+                .map_err(to_wallet_error)?;
 
             if let Some(Contract::Offered(c)) = contract {
                 self.manager
@@ -415,7 +428,7 @@ struct JsContract {
 
 // implement the from_contract method for JsContract
 impl JsContract {
-    fn from_contract(contract: Contract) -> JsContract {
+    fn from_contract(contract: Contract) -> Result<JsContract, WalletError> {
         let state = match contract.clone() {
             Contract::Offered(_) => "Offered",
             Contract::Accepted(_) => "Accepted",
@@ -459,19 +472,19 @@ impl JsContract {
             _ => String::new(),
         };
 
-        fn hex_str(value: &[u8]) -> String {
+        fn hex_str(value: &[u8]) -> Result<String, std::fmt::Error> {
             let mut res = String::with_capacity(64);
             for v in value {
-                write!(res, "{:02x}", v).unwrap();
+                write!(res, "{:02x}", v)?;
             }
-            res
+            Ok(res)
         }
 
-        JsContract {
-            id: hex_str(&contract.get_id()),
+        Ok(JsContract {
+            id: hex_str(&contract.get_id()).map_err(to_wallet_error)?,
             state: state.to_string(),
             acceptor_collateral,
             tx_id,
-        }
+        })
     }
 }
