@@ -19,5 +19,5 @@ serde = {version = "*", features = ["derive"]}
 serde_json = "1.0.81"
 
 [dev-dependencies]
-#mocks = {path = "../../rust-dlc"}
+#mocks = {git = "https://github.com/dlc-link/rust-dlc"}
 #secp256k1-zkp = {version = "0.7.0", features = ["global-context"]}
