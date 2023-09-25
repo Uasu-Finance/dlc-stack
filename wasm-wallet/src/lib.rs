@@ -129,6 +129,13 @@ impl Default for JsDLCInterfaceOptions {
     }
 }
 
+fn to_wallet_error<T>(e: T) -> WalletError
+where
+    T: std::fmt::Display,
+{
+    WalletError(e.to_string())
+}
+
 #[wasm_bindgen]
 impl JsDLCInterface {
     pub async fn new(
@@ -159,7 +166,8 @@ impl JsDLCInterface {
             ));
 
         // Generate keypair from secret key
-        let seckey = secp256k1_zkp::SecretKey::from_str(&privkey).unwrap();
+        let seckey = secp256k1_zkp::SecretKey::from_str(&privkey)
+            .map_err(|e| JsError::new(&format!("Error parsing private key: {}", e)))?;
 
         let secp = Secp256k1::new();
 
@@ -183,10 +191,7 @@ impl JsDLCInterface {
         let attestor_urls_vec: Vec<String> =
             match serde_json::from_str(&options.attestor_urls.clone()) {
                 Ok(vec) => vec,
-                Err(e) => {
-                    eprintln!("Error deserializing Attestor URLs: {}", e);
-                    Vec::new()
-                }
+                Err(e) => return Err(JsError::new(&format!("Error parsing attestor urls: {}", e))),
             };
 
         let attestors = generate_attestor_client(attestor_urls_vec).await;
@@ -252,10 +257,6 @@ impl JsDLCInterface {
         }
     }
 
-    pub async fn try_jserror() -> Result<(), JsError> {
-        Err(JsError::new("This is a test error"))
-    }
-
     // public async function for fetching all the contracts on the manager
     pub async fn get_contracts(&self) -> Result<JsValue, JsError> {
         let contracts: Vec<JsContract> = self
@@ -293,7 +294,7 @@ impl JsDLCInterface {
 
         let accept_msg_result = async {
             let dlc_offer_message: OfferDlc =
-                serde_json::from_str(&offer_json).map_err(|e| WalletError(e.to_string()))?;
+                serde_json::from_str(&offer_json).map_err(to_wallet_error)?;
             let temporary_contract_id = dlc_offer_message.temporary_contract_id;
 
             let counterparty = STATIC_COUNTERPARTY_NODE_ID
@@ -304,15 +305,15 @@ impl JsDLCInterface {
                 .unwrap()
                 .on_dlc_message(&Message::Offer(dlc_offer_message.clone()), counterparty)
                 .await
-                .map_err(|e| WalletError(e.to_string()))?;
+                .map_err(to_wallet_error)?;
             let (_contract_id, _public_key, accept_msg) = self
                 .manager
                 .lock()
                 .unwrap()
                 .accept_contract_offer(&temporary_contract_id)
                 .await
-                .expect("Error accepting contract offer");
-            serde_json::to_string(&accept_msg).map_err(|e| WalletError(e.to_string()))
+                .map_err(to_wallet_error)?;
+            serde_json::to_string(&accept_msg).map_err(to_wallet_error)
         };
         match accept_msg_result.await {
             Ok(accept_msg) => Ok(accept_msg),
@@ -329,8 +330,7 @@ impl JsDLCInterface {
     ) -> Result<String, JsError> {
         let dlc_sign_result = async {
             let dlc_sign_message: SignDlc = serde_json::from_str(&dlc_sign_message).unwrap();
-            match self
-                .manager
+            self.manager
                 .lock()
                 .unwrap()
                 .on_dlc_message(
@@ -338,26 +338,19 @@ impl JsDLCInterface {
                     STATIC_COUNTERPARTY_NODE_ID.parse().unwrap(),
                 )
                 .await
-            {
-                Ok(_) => (),
-                Err(e) => {
-                    log_to_console!("DLC manager - sign offer error: {}", e.to_string());
-                    panic!();
-                }
-            }
+                .map_err(to_wallet_error)?;
             let manager = self.manager.lock().unwrap();
             let store = manager.get_store();
             let contract = store
                 .get_signed_contracts()
                 .await
-                .map_err(|e| WalletError(e.to_string()))?
+                .map_err(to_wallet_error)?
                 .into_iter()
                 .find(|c| c.accepted_contract.get_contract_id() == dlc_sign_message.contract_id);
             match contract {
-                None => {
-                    log_to_console!("DLC manager - sign offer error: {}", "Contract not found");
-                    panic!();
-                }
+                None => Err(WalletError(
+                    "DLC Manager: - Sign Offer Error: Contract not found".to_string(),
+                )),
                 Some(c) => Ok(c.accepted_contract.dlc_transactions.fund.txid().to_string())
                     as Result<String, WalletError>,
             }
@@ -380,7 +373,7 @@ impl JsDLCInterface {
             let contract = self
                 .manager
                 .lock()
-                .map_err(|e| WalletError(e.to_string()))?
+                .map_err(to_wallet_error)?
                 .get_store()
                 .get_contract(&contract_id)
                 .await
@@ -389,11 +382,11 @@ impl JsDLCInterface {
             if let Some(Contract::Offered(c)) = contract {
                 self.manager
                     .lock()
-                    .map_err(|e| WalletError(e.to_string()))?
+                    .map_err(to_wallet_error)?
                     .get_store()
                     .update_contract(&Contract::Rejected(c))
                     .await
-                    .map_err(|e| WalletError(e.to_string()))?;
+                    .map_err(to_wallet_error)?;
             }
             Ok(()) as Result<(), WalletError>
         };
