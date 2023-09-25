@@ -19,7 +19,7 @@ dlc-link-manager = { path = "../dlc-link-manager" }
 dlc-clients = { path = "../clients" }
 dlc-messages = { git = "https://github.com/dlc-link/rust-dlc", features = ["use-serde"]}
 dlc-trie = { git = "https://github.com/dlc-link/rust-dlc", features = ["use-serde"]}
-#electrs-blockchain-provider = { path = "../../rust-dlc" }
+#electrs-blockchain-provider = { git = "https://github.com/dlc-link/rust-dlc" }
 esplora-async-blockchain-provider-router-wallet = { path = "../esplora-async-blockchain-provider-router-wallet" }
 env_logger = "0.9.0"
 futures-util = { version = "0.3", default-features = false }
