@@ -252,6 +252,10 @@ impl JsDLCInterface {
         }
     }
 
+    pub async fn try_jserror() -> Result<(), JsError> {
+        Err(JsError::new("This is a test error"))
+    }
+
     // public async function for fetching all the contracts on the manager
     pub async fn get_contracts(&self) -> Result<JsValue, JsError> {
         let contracts: Vec<JsContract> = self
