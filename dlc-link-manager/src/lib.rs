@@ -282,7 +282,7 @@ where
     pub async fn accept_contract_offer(
         &self,
         contract_id: &ContractId,
-    ) -> Result<(ContractId, PublicKey, AcceptDlc, Transaction, u64), Error> {
+    ) -> Result<(ContractId, PublicKey, AcceptDlc, Transaction), Error> {
         let offered_contract =
             get_contract_in_state!(self, contract_id, Offered, None as Option<PublicKey>)?;
 
@@ -311,7 +311,6 @@ where
             counter_party,
             accept_msg,
             accepted_contract.dlc_transactions.fund,
-            accepted_contract.accept_params.input_amount,
         ))
     }
 

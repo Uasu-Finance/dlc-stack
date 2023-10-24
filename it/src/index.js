@@ -144,6 +144,16 @@ async function getBlockchainHeight() {
   return currentBlockchainHeight;
 }
 
+async function sumInputValues(inputs) {
+  let inputAmount = 0;
+  for (const input of inputs) {
+    const [txId, outputIndex] = input.previous_output.split(':');
+    const txDetails = await fetchTxDetails(txId);
+    inputAmount += parseInt(txDetails.vout[parseInt(outputIndex)].value);
+  }
+  return inputAmount;
+}
+
 async function main() {
   console.log('Starting DLC Integration Test');
 
@@ -178,16 +188,15 @@ async function main() {
   //Accepting Offer
   const acceptedContract = await dlcManager.accept_offer(JSON.stringify(offerResponse));
   const parsedResponse = JSON.parse(acceptedContract);
+  console.log('Accepted Contract: ', parsedResponse);
 
-  const protocolVersion = parsedResponse.acceptMsg.protocolVersion;
+  const protocolVersion = parsedResponse.acceptMessage.protocolVersion;
 
-  let outputAmount = 0;
+  const fundingTX = parsedResponse.fundingTX;
 
-  parsedResponse.fund.output.forEach((output) => {
-    outputAmount += output.value;
-  });
+  const inputAmount = await sumInputValues(fundingTX.input);
+  const outputAmount = parsedResponse.fundingTX.output.reduce((acc, output) => acc + output.value, 0);
 
-  const inputAmount = parsedResponse.inputAmount;
   const gasFee = inputAmount - outputAmount;
 
   //Check if the accepted contract is valid
@@ -197,7 +206,7 @@ async function main() {
   }
 
   //Sending Accepted Offer to Protocol Wallet
-  const signedContract = await sendAcceptedOfferToProtocolWallet(JSON.stringify(parsedResponse.acceptMsg));
+  const signedContract = await sendAcceptedOfferToProtocolWallet(JSON.stringify(parsedResponse.acceptMessage));
 
   //Check if the signed contract is valid
   if (!signedContract.contractId) {

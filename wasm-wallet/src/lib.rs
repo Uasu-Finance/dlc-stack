@@ -270,16 +270,15 @@ impl JsDLCInterface {
             .on_dlc_message(&Message::Offer(dlc_offer_message.clone()), counterparty)
             .await
             .map_err(to_wallet_error)?;
-        let (_contract_id, _public_key, accept_msg, fund, input_amount) = self
+        let (_contract_id, _public_key, accept_msg, fund) = self
             .manager
             .accept_contract_offer(&temporary_contract_id)
             .await
             .map_err(to_wallet_error)?;
 
         let response = serde_json::json!({
-            "acceptMsg": accept_msg,
-            "fund": fund,
-            "inputAmount": input_amount,
+            "acceptMessage": accept_msg,
+            "fundingTX": fund,
         });
 
         Ok(response.to_string())
