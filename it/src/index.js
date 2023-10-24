@@ -179,14 +179,25 @@ async function main() {
   const acceptedContract = await dlcManager.accept_offer(JSON.stringify(offerResponse));
   const parsedResponse = JSON.parse(acceptedContract);
 
+  const protocolVersion = parsedResponse.acceptMsg.protocolVersion;
+
+  let outputAmount = 0;
+
+  parsedResponse.fund.output.forEach((output) => {
+    outputAmount += output.value;
+  });
+
+  const inputAmount = parsedResponse.inputAmount;
+  const gasFee = inputAmount - outputAmount;
+
   //Check if the accepted contract is valid
-  if (!parsedResponse.protocolVersion) {
+  if (!protocolVersion) {
     console.log('Error accepting offer: ', parsedResponse);
     process.exit(1);
   }
 
   //Sending Accepted Offer to Protocol Wallet
-  const signedContract = await sendAcceptedOfferToProtocolWallet(acceptedContract);
+  const signedContract = await sendAcceptedOfferToProtocolWallet(JSON.stringify(parsedResponse.acceptMsg));
 
   //Check if the signed contract is valid
   if (!signedContract.contractId) {
@@ -207,7 +218,9 @@ async function main() {
 
   //Fetching Funding TX Details to check if the broadcast was successful
   console.log('Fetching Funding TX Details');
-  await fetchTxDetails(txID);
+  const txDetails = await fetchTxDetails(txID);
+
+  assert(gasFee === txDetails.fee, 'Gas Fee does not match the expected value');
 
   //Waiting for funding transaction confirmations
   const confirmedBroadcastTransaction = await waitForConfirmations(blockchainHeightAtBroadcast, 6);
