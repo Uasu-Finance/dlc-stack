@@ -116,17 +116,23 @@ async fn generate_attestor_client(
     let mut attestor_clients = HashMap::new();
 
     for url in attestor_urls.iter() {
-        let p2p_client: AttestorClient = retry!(
+        let p2p_client = match retry!(
             AttestorClient::new(url).await,
             10,
-            "attestor client creation"
-        );
+            "attestor client creation",
+            6
+        ) {
+            Ok(client) => client,
+            Err(e) => {
+                warn!("Error creating attestor client: {}", e);
+                continue;
+            }
+        };
         let attestor = Arc::new(p2p_client);
         attestor_clients.insert(attestor.get_public_key().await, attestor.clone());
     }
     attestor_clients
 }
-
 fn build_success_response(message: String) -> Result<Response<Body>, GenericError> {
     Ok(Response::builder()
         .status(StatusCode::OK)
@@ -338,18 +344,32 @@ async fn main() -> Result<(), GenericError> {
     let (pubkey_ext, wallet) = setup_wallets(xpriv, active_network);
 
     // Set up Attestor Clients
-    let attestor_urls: Vec<String> = retry!(
+    let attestor_urls: Vec<String> = match retry!(
         get_attestors(blockchain_interface_url.clone()).await,
         10,
-        "Loading attestors from blockchain interface"
-    );
+        "Loading attestors from blockchain interface",
+        0
+    ) {
+        Ok(attestors) => attestors,
+        Err(e) => {
+            panic!("Error getting attestors: {}", e);
+        }
+    };
     let protocol_wallet_attestors = generate_attestor_client(attestor_urls.clone()).await;
 
-    retry!(
+    match retry!(
         blockchain.blockchain.get_height().await,
         10,
-        "get blockchain height"
-    );
+        "Getting blockchain height",
+        0
+    ) {
+        Ok(height) => {
+            info!("Current blockchain height: {}", height);
+        }
+        Err(e) => {
+            panic!("Error getting blockchain height: {}", e);
+        }
+    }
 
     // Set up DLC store
     let dlc_store = Arc::new(AsyncStorageApiProvider::new(
