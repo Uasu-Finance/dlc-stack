@@ -35,7 +35,7 @@ RUN npm install && \
   sudo npm ci wasm-wallet
 
 
-FROM node:16-alpine AS it
+FROM node:18-alpine AS it
 
 COPY --from=it-build /app/it/src/index.js /app/it/src/index.js
 COPY --from=it-build /app/it/src/config.js /app/it/src/config.js

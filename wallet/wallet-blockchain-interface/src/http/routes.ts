@@ -25,7 +25,7 @@ router.get('/get-all-attestors', express.json(), async (req, res) => {
     console.log('GET /get-all-attestors');
     let data;
     if (process.env.TEST_MODE_ENABLED === 'true') {
-        data = ['http://attestor-1:8801', 'http://attestor-2:8802', 'http://attestor-3:8803'];
+        data = ['http://172.17.0.1:8801', 'http://172.17.0.1:8802', 'http://172.17.0.1:8803'];
     } else {
         data = await blockchainWriter.getAllAttestors();
     }
