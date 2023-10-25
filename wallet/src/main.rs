@@ -171,6 +171,7 @@ async fn process_request(
     wallet: Arc<DlcWallet>,
     active_network: String,
     blockchain_interface_url: String,
+    attestor_urls: Vec<String>,
 ) -> Result<Response<Body>, GenericError> {
     match (req.method(), req.uri().path()) {
         (&Method::GET, "/health") => build_success_response(
@@ -217,6 +218,16 @@ async fn process_request(
                     serde_json::from_str(&req.attestor_list.clone()).map_err(|e| {
                         WalletError(format!("Error deserializing attestor list: {}", e))
                     })?;
+
+                // check whether every member in bitcoin_contract_attestor_urls is part of attestor_urls
+                for url in bitcoin_contract_attestor_urls.iter() {
+                    if !attestor_urls.contains(url) {
+                        return Err(WalletError(format!(
+                            "Attestor {} not found in attestor list",
+                            url
+                        )));
+                    }
+                }
 
                 let bitcoin_contract_attestors: HashMap<XOnlyPublicKey, Arc<AttestorClient>> =
                     generate_attestor_client(bitcoin_contract_attestor_urls.clone()).await;
@@ -394,6 +405,7 @@ async fn main() -> Result<(), GenericError> {
         let wallet = wallet.clone();
         let blockchain_interface_url = blockchain_interface_url.clone();
         let active_network = active_network.to_string();
+        let attestor_urls = attestor_urls.clone();
 
         async {
             Ok::<_, GenericError>(service_fn(move |req| {
@@ -404,6 +416,7 @@ async fn main() -> Result<(), GenericError> {
                     wallet.to_owned(),
                     active_network.to_owned(),
                     blockchain_interface_url.to_owned(),
+                    attestor_urls.to_owned(),
                 )
             }))
         }
