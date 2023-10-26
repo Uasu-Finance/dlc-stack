@@ -593,10 +593,13 @@ async fn get_wallet_info(
 
     let mut collected_contracts: Vec<Vec<String>> = vec![vec![]; 9];
 
-    let contracts = store
-        .get_contracts()
-        .await
-        .expect("Error retrieving contract list.");
+    let contracts = match store.get_contracts().await {
+        Ok(contracts) => contracts,
+        Err(e) => {
+            error!("Error retrieving contract list: {}", e.to_string());
+            return build_error_response(e.to_string());
+        }
+    };
 
     for contract in contracts {
         let id = hex_str(&contract.get_id());
