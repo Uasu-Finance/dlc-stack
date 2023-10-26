@@ -7,13 +7,14 @@ use bitcoin::util::bip32::{ChildNumber, DerivationPath, ExtendedPrivKey, Extende
 use bytes::Buf;
 
 use hyper::service::{make_service_fn, service_fn};
-use hyper::{header, Body, Method, Response, Server, StatusCode};
+use hyper::{header, server::conn::AddrStream, Body, Method, Response, Server, StatusCode};
 
 use bdk::descriptor;
 use serde::{Deserialize, Serialize};
 use tokio::{task, time};
 
 use core::panic;
+use std::net::{IpAddr, SocketAddr};
 use std::time::Duration;
 use std::{collections::HashMap, env, str::FromStr, sync::Arc};
 
@@ -164,7 +165,18 @@ fn build_error_response(message: String) -> Result<Response<Body>, GenericError>
         ))?)
 }
 
+fn is_client_local(remote_addr: &SocketAddr) -> bool {
+    match remote_addr.ip() {
+        IpAddr::V4(ipv4) => {
+            ipv4.is_loopback()
+                || (ipv4.octets()[0] == 172 && ipv4.octets()[1] >= 16 && ipv4.octets()[1] <= 31)
+        }
+        IpAddr::V6(ipv6) => ipv6.is_loopback(),
+    }
+}
+
 async fn process_request(
+    remote_addr: SocketAddr,
     req: hyper::Request<hyper::Body>,
     manager: Arc<DlcManager<'_>>,
     dlc_store: Arc<AsyncStorageApiProvider>,
@@ -173,114 +185,124 @@ async fn process_request(
     blockchain_interface_url: String,
     attestor_urls: Vec<String>,
 ) -> Result<Response<Body>, GenericError> {
-    match (req.method(), req.uri().path()) {
-        (&Method::GET, "/health") => build_success_response(
-            json!({"data": [{"status": "healthy", "message": ""}]}).to_string(),
-        ),
-        (&Method::GET, "/info") => get_wallet_info(dlc_store, wallet).await,
-        (&Method::GET, "/periodic_check") => {
-            let result =
-                async { periodic_check(manager, dlc_store, blockchain_interface_url).await };
-            match result.await {
-                Ok(_) => (),
-                Err(e) => {
-                    warn!("Error periodic check: {}", e.to_string());
-                    return build_error_response(e.to_string());
-                }
-            };
-            build_success_response("Periodic check complete".to_string())
-        }
-        (&Method::OPTIONS, "/offer") => build_success_response("".to_string()),
-        (&Method::POST, "/offer") => {
-            #[derive(Deserialize)]
-            #[serde(rename_all = "camelCase")]
-            struct OfferRequest {
-                uuid: String,
-                accept_collateral: u64,
-                offer_collateral: u64,
-                total_outcomes: u64,
-                attestor_list: String,
-            }
-            let result = async {
-                let whole_body = hyper::body::aggregate(req)
-                    .await
-                    .map_err(|e| WalletError(format!("Error aggregating body: {}", e)))?;
+    debug!("Request from: {:?}", remote_addr);
+    let is_localhost = is_client_local(&remote_addr);
+    debug!("Request client is localhost: {}", is_localhost);
 
-                let req: OfferRequest =
-                    serde_json::from_reader(whole_body.reader()).map_err(|e| {
-                        WalletError(format!(
-                            "Error parsing http input to create Offer endpoint: {}",
-                            e.to_string()
-                        ))
-                    })?;
-
-                let bitcoin_contract_attestor_urls: Vec<String> =
-                    serde_json::from_str(&req.attestor_list.clone()).map_err(|e| {
-                        WalletError(format!("Error deserializing attestor list: {}", e))
-                    })?;
-
-                // check whether every member in bitcoin_contract_attestor_urls is part of attestor_urls
-                for url in bitcoin_contract_attestor_urls.iter() {
-                    if !attestor_urls.contains(url) {
-                        return Err(WalletError(format!(
-                            "Attestor {} not found in attestor list",
-                            url
-                        )));
+    if is_localhost {
+        match (req.method(), req.uri().path()) {
+            (&Method::GET, "/health") => build_success_response(
+                json!({"data": [{"status": "healthy", "message": ""}]}).to_string(),
+            ),
+            (&Method::GET, "/info") => get_wallet_info(dlc_store, wallet).await,
+            (&Method::GET, "/periodic_check") => {
+                let result =
+                    async { periodic_check(manager, dlc_store, blockchain_interface_url).await };
+                match result.await {
+                    Ok(_) => (),
+                    Err(e) => {
+                        warn!("Error periodic check: {}", e.to_string());
+                        return build_error_response(e.to_string());
                     }
-                }
-
-                let bitcoin_contract_attestors: HashMap<XOnlyPublicKey, Arc<AttestorClient>> =
-                    generate_attestor_client(bitcoin_contract_attestor_urls.clone()).await;
-
-                create_new_offer(
-                    manager,
-                    bitcoin_contract_attestors,
-                    active_network,
-                    req.uuid,
-                    req.accept_collateral,
-                    req.offer_collateral,
-                    req.total_outcomes,
-                )
-                .await
-            };
-            match result.await {
-                Ok(offer_message) => build_success_response(offer_message),
-                Err(e) => {
-                    warn!("Error generating offer - {}", e);
-                    build_error_response(e.to_string())
-                }
+                };
+                build_success_response("Periodic check complete".to_string())
             }
-        }
-        (&Method::OPTIONS, "/offer/accept") => build_success_response("".to_string()),
-        (&Method::PUT, "/offer/accept") => {
-            info!("Accepting offer");
-            let result = async {
-                // Aggregate the body...
-                let whole_body = hyper::body::aggregate(req).await?;
-                // Decode as JSON...
+            (&Method::OPTIONS, "/offer") => build_success_response("".to_string()),
+            (&Method::POST, "/offer") => {
                 #[derive(Deserialize)]
                 #[serde(rename_all = "camelCase")]
-                struct AcceptOfferRequest {
-                    accept_message: String,
+                struct OfferRequest {
+                    uuid: String,
+                    accept_collateral: u64,
+                    offer_collateral: u64,
+                    total_outcomes: u64,
+                    attestor_list: String,
                 }
-                let data: AcceptOfferRequest = serde_json::from_reader(whole_body.reader())?;
-                let accept_dlc: AcceptDlc = serde_json::from_str(&data.accept_message)?;
-                accept_offer(accept_dlc, manager).await
-            };
-            match result.await {
-                Ok(sign_message) => build_success_response(sign_message),
-                Err(e) => {
-                    warn!("Error accepting offer - {}", e);
-                    build_error_response(e.to_string())
+                let result = async {
+                    let whole_body = hyper::body::aggregate(req)
+                        .await
+                        .map_err(|e| WalletError(format!("Error aggregating body: {}", e)))?;
+
+                    let req: OfferRequest =
+                        serde_json::from_reader(whole_body.reader()).map_err(|e| {
+                            WalletError(format!(
+                                "Error parsing http input to create Offer endpoint: {}",
+                                e.to_string()
+                            ))
+                        })?;
+
+                    let bitcoin_contract_attestor_urls: Vec<String> =
+                        serde_json::from_str(&req.attestor_list.clone()).map_err(|e| {
+                            WalletError(format!("Error deserializing attestor list: {}", e))
+                        })?;
+
+                    // check whether every member in bitcoin_contract_attestor_urls is part of attestor_urls
+                    for url in bitcoin_contract_attestor_urls.iter() {
+                        if !attestor_urls.contains(url) {
+                            return Err(WalletError(format!(
+                                "Attestor {} not found in attestor list",
+                                url
+                            )));
+                        }
+                    }
+
+                    let bitcoin_contract_attestors: HashMap<XOnlyPublicKey, Arc<AttestorClient>> =
+                        generate_attestor_client(bitcoin_contract_attestor_urls.clone()).await;
+
+                    create_new_offer(
+                        manager,
+                        bitcoin_contract_attestors,
+                        active_network,
+                        req.uuid,
+                        req.accept_collateral,
+                        req.offer_collateral,
+                        req.total_outcomes,
+                    )
+                    .await
+                };
+                match result.await {
+                    Ok(offer_message) => build_success_response(offer_message),
+                    Err(e) => {
+                        warn!("Error generating offer - {}", e);
+                        build_error_response(e.to_string())
+                    }
                 }
             }
+            (&Method::OPTIONS, "/offer/accept") => build_success_response("".to_string()),
+            (&Method::PUT, "/offer/accept") => {
+                info!("Accepting offer");
+                let result = async {
+                    // Aggregate the body...
+                    let whole_body = hyper::body::aggregate(req).await?;
+                    // Decode as JSON...
+                    #[derive(Deserialize)]
+                    #[serde(rename_all = "camelCase")]
+                    struct AcceptOfferRequest {
+                        accept_message: String,
+                    }
+                    let data: AcceptOfferRequest = serde_json::from_reader(whole_body.reader())?;
+                    let accept_dlc: AcceptDlc = serde_json::from_str(&data.accept_message)?;
+                    accept_offer(accept_dlc, manager).await
+                };
+                match result.await {
+                    Ok(sign_message) => build_success_response(sign_message),
+                    Err(e) => {
+                        warn!("Error accepting offer - {}", e);
+                        build_error_response(e.to_string())
+                    }
+                }
+            }
+            _ => {
+                // Return 404 not found response.
+                Ok(Response::builder()
+                    .status(StatusCode::NOT_FOUND)
+                    .body(NOTFOUND.into())?)
+            }
         }
-        _ => {
-            // Return 404 not found response.
-            Ok(Response::builder()
-                .status(StatusCode::NOT_FOUND)
-                .body(NOTFOUND.into())?)
-        }
+    } else {
+        Ok(Response::builder()
+            .status(http::StatusCode::FORBIDDEN)
+            .body(hyper::Body::from("Forbidden"))?)
     }
 }
 
@@ -319,6 +341,7 @@ async fn main() -> Result<(), GenericError> {
     // Setup env vars
     let blockchain_interface_url = env::var("BLOCKCHAIN_INTERFACE_URL")
         .expect("BLOCKCHAIN_INTERFACE_URL environment variable not set, couldn't get attestors");
+    debug!("Blockchain interface url: {}", blockchain_interface_url);
     let xpriv_str = env::var("XPRIV")
     .expect("XPRIV environment variable not set, please run `just generate-key`, securely backup the output, and set this env_var accordingly");
     let xpriv = ExtendedPrivKey::from_str(&xpriv_str).expect("Unable to decode xpriv env variable");
@@ -398,7 +421,8 @@ async fn main() -> Result<(), GenericError> {
         Arc::new(time_provider),
     )?);
 
-    let new_service = make_service_fn(move |_| {
+    let new_service = make_service_fn(move |socket: &AddrStream| {
+        let remote_addr = socket.remote_addr().clone();
         // For each connection, clone the counter to use in our service...
         let manager = manager.clone();
         let dlc_store = dlc_store.clone();
@@ -407,9 +431,10 @@ async fn main() -> Result<(), GenericError> {
         let active_network = active_network.to_string();
         let attestor_urls = attestor_urls.clone();
 
-        async {
+        async move {
             Ok::<_, GenericError>(service_fn(move |req| {
                 process_request(
+                    remote_addr,
                     req,
                     manager.to_owned(),
                     dlc_store.to_owned(),

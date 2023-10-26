@@ -274,6 +274,8 @@ async function main() {
     );
   });
 
+  console.log('##############################################');
+  console.log('DLC Integration Test Completed Successfully :)');
   process.exit(0);
 }
 

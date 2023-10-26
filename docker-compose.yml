@@ -117,13 +117,13 @@ services:
     build:
       context: .
       dockerfile: ./wallet/wallet-blockchain-interface/Dockerfile
-    volumes:
-      - ./wallet/wallet-blockchain-interface:/usr/src/app
     ports:
       - 3000:3000
+      - 3003:3003
     environment:
       - 'PORT=3000'
       - 'TEST_MODE_ENABLED=true'
+      - 'ROUTER_WALLET_ADDRESS=http://router-wallet:8085'
     depends_on:
       - dlc-link-attestor-1
       - dlc-link-attestor-2
@@ -136,8 +136,6 @@ services:
     build:
       context: .
       dockerfile: ./wallet/Dockerfile
-    volumes:
-      - ./wallet:/usr/src/app
     ports:
       - 8085:8085
     environment:
