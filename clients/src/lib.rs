@@ -3,7 +3,7 @@
 extern crate serde;
 
 use log::{debug, error};
-use reqwest::{Client, Error, Response, StatusCode};
+use reqwest::{Client, Response, StatusCode};
 use std::fmt::{Debug, Formatter};
 use std::time::Duration;
 use std::{error, fmt};
@@ -143,52 +143,6 @@ struct EffectedNumResponse {
     pub effected_num: u32,
 }
 
-pub struct WalletBackendClient {
-    client: Client,
-    host: String,
-}
-
-impl Debug for WalletBackendClient {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "({})", self.host)
-    }
-}
-
-impl WalletBackendClient {
-    pub fn new(host: String) -> Result<Self, Error> {
-        let mut client_builder = Client::builder();
-        #[cfg(not(target_arch = "wasm32"))]
-        {
-            client_builder = client_builder.timeout(REQWEST_TIMEOUT);
-        }
-        let client = client_builder.build()?;
-        Ok(Self { client, host })
-    }
-
-    pub async fn post_offer_and_accept(
-        &self,
-        offer_request: OfferRequest,
-    ) -> Result<ApiResult, ApiError> {
-        let uri = format!("{}/offer", String::as_str(&self.host.clone()));
-        let res = self.client.post(uri).json(&offer_request).send().await?;
-        let result = ApiResult {
-            status: res.status().as_u16(),
-            response: res,
-        };
-        Ok(result)
-    }
-
-    pub async fn put_accept(&self, accept_request: AcceptMessage) -> Result<ApiResult, ApiError> {
-        let uri = format!("{}/offer/accept", String::as_str(&self.host.clone()));
-        let res = self.client.put(uri).json(&accept_request).send().await?;
-        let result = ApiResult {
-            status: res.status().as_u16(),
-            response: res,
-        };
-        Ok(result)
-    }
-}
-
 #[derive(Clone)]
 pub struct MemoryApiClient {
     events: HashMap<String, String>,
@@ -290,6 +244,7 @@ impl Debug for StorageApiClient {
 impl StorageApiClient {
     pub fn new(host: String) -> Self {
         let mut client_builder = Client::builder();
+        client_builder = client_builder.tcp_keepalive(Some(Duration::from_secs(20)));
         #[cfg(not(target_arch = "wasm32"))]
         {
             client_builder = client_builder.timeout(REQWEST_TIMEOUT);
@@ -313,7 +268,7 @@ impl StorageApiClient {
         let contracts = res.json::<Vec<Contract>>().await.map_err(|e| ApiError {
             message: format!(
                 "get contracts failed, response from API not a list of contract objects, error: {}",
-                e.to_string()
+                e
             ),
             status,
         })?;
@@ -343,7 +298,7 @@ impl StorageApiClient {
         let events = res.json::<Vec<Event>>().await.map_err(|e| ApiError {
             message: format!(
                 "get events failed, response from API not a list of event objects, error: {}",
-                e.to_string()
+                e
             ),
             status,
         })?;
@@ -372,7 +327,7 @@ impl StorageApiClient {
         let contract = res.json::<Contract>().await.map_err(|e| ApiError {
             message: format!(
                 "Create contract failed, response from API not an contract object, error: {}",
-                e.to_string()
+                e
             ),
             status,
         })?;
@@ -387,7 +342,7 @@ impl StorageApiClient {
         let event = res.json::<Event>().await.map_err(|e| ApiError {
             message: format!(
                 "Create event failed, response from API not an event object, error: {}",
-                e.to_string()
+                e
             ),
             status,
         })?;
@@ -405,7 +360,7 @@ impl StorageApiClient {
             .map_err(|e| ApiError {
                 message: format!(
                     "Updating event failed, response from API not a number, error: {}",
-                    e.to_string()
+                    e
                 ),
                 status,
             })?
@@ -434,7 +389,7 @@ impl StorageApiClient {
             .map_err(|e| ApiError {
                 message: format!(
                     "Updating contract failed, response from API not a number, error: {}",
-                    e.to_string()
+                    e
                 ),
                 status,
             })?
@@ -464,7 +419,7 @@ impl StorageApiClient {
             .map_err(|e| ApiError {
                 message: format!(
                     "Deleting event failed, response from API not a number, error: {}",
-                    e.to_string()
+                    e
                 ),
                 status,
             })?
@@ -493,7 +448,7 @@ impl StorageApiClient {
             .map_err(|e| ApiError {
                 message: format!(
                     "Deleting contract failed, response from API not a number, error: {}",
-                    e.to_string()
+                    e
                 ),
                 status,
             })?
