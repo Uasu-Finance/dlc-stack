@@ -106,9 +106,9 @@ impl AttestorClient {
         info!("Getting pubkey from {}", path);
 
         let mut client_builder = reqwest::ClientBuilder::new();
-        client_builder = client_builder.tcp_keepalive(Some(Duration::from_secs(20)));
         #[cfg(not(target_arch = "wasm32"))]
         {
+            client_builder = client_builder.tcp_keepalive(Some(Duration::from_secs(20)));
             client_builder = client_builder.timeout(REQWEST_TIMEOUT);
         }
         let client = client_builder

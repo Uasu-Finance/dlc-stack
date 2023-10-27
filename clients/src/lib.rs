@@ -244,9 +244,9 @@ impl Debug for StorageApiClient {
 impl StorageApiClient {
     pub fn new(host: String) -> Self {
         let mut client_builder = Client::builder();
-        client_builder = client_builder.tcp_keepalive(Some(Duration::from_secs(20)));
         #[cfg(not(target_arch = "wasm32"))]
         {
+            client_builder = client_builder.tcp_keepalive(Some(Duration::from_secs(20)));
             client_builder = client_builder.timeout(REQWEST_TIMEOUT);
         }
         Self {
