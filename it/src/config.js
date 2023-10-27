@@ -47,8 +47,8 @@ const docker = {
   testWalletAddress: 'bcrt1qpnuck30uakpc0ffcmd3nwdd59y547qlzsmf34l',
   bitcoinNetwork: 'regtest',
   bitcoinNetworkURL: 'https://devnet.dlc.link/electrs',
-  protocolWalletURL: 'http://172.17.0.1:3003',
-  attestorList: ['http://172.17.0.1:8801', 'http://172.17.0.1:8802', 'http://172.17.0.1:8803'],
+  protocolWalletURL: 'http://172.20.128.3:3003',
+  attestorList: ['http://172.20.128.5:8801', 'http://172.20.128.6:8802', 'http://172.20.128.7:8803'],
 };
 
 const custom = {

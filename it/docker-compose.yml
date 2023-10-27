@@ -16,6 +16,9 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+    networks:
+      static-network:
+        ipv4_address: 172.20.128.8
 
   storageapi:
     container_name: storageapi
@@ -31,6 +34,9 @@ services:
     depends_on:
       postgresdlc:
         condition: service_healthy
+    networks:
+      static-network:
+        ipv4_address: 172.20.128.1
 
   dlc-link-attestor-1:
     container_name: attestor-1
@@ -51,6 +57,9 @@ services:
     restart: on-failure
     depends_on:
       - storageapi
+    networks:
+      static-network:
+        ipv4_address: 172.20.128.5
 
   dlc-link-attestor-2:
     container_name: attestor-2
@@ -71,6 +80,9 @@ services:
     restart: on-failure
     depends_on:
       - storageapi
+    networks:
+      static-network:
+        ipv4_address: 172.20.128.6
 
   dlc-link-attestor-3:
     container_name: attestor-3
@@ -91,6 +103,9 @@ services:
     restart: on-failure
     depends_on:
       - storageapi
+    networks:
+      static-network:
+        ipv4_address: 172.20.128.7
 
   blockchain-interface:
     container_name: blockchain-interface
@@ -113,6 +128,9 @@ services:
       - dlc-link-attestor-2
       - dlc-link-attestor-3
     restart: on-failure
+    networks:
+      static-network:
+        ipv4_address: 172.20.128.3
 
   router-wallet:
     container_name: router-wallet
@@ -137,13 +155,17 @@ services:
       - 'BLOCKCHAIN_INTERFACE_URL=http://blockchain-interface:3000'
       - 'XPRIV=${XPRIV}'
       - 'FINGERPRINT=${FINGERPRINT}'
+      - 'WALLET_IP=172.20.128.2'
     depends_on:
       - postgresdlc
       - storageapi
       - blockchain-interface
     restart: on-failure
+    networks:
+      static-network:
+        ipv4_address: 172.20.128.2
     healthcheck:
-      test: curl --fail http://localhost:8085/info || exit 1
+      test: curl --fail http://router-wallet:8085/info || exit 1
       interval: 3s
       timeout: 10s
       retries: 10
@@ -163,3 +185,11 @@ services:
     depends_on:
       router-wallet:
         condition: service_healthy
+    networks:
+      static-network:
+        ipv4_address: 172.20.128.9
+networks:
+  static-network:
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
