@@ -57,6 +57,7 @@ impl EsploraAsyncBlockchainProviderRouterWallet {
         let client_builder = Builder::new(&host).timeout(REQWEST_TIMEOUT);
         let url_client = AsyncClient::from_builder(client_builder)
             .expect("To be able to create a reqwest client");
+
         let blockchain = EsploraBlockchain::from_client(url_client, 20);
 
         Self {

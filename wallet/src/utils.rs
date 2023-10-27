@@ -26,8 +26,12 @@ pub(crate) fn get_numerical_contract_info(
             nb_digits: NB_DIGITS as u16,
         });
 
-    let descriptor =
-        get_numerical_contract_descriptor(accept_collateral, offer_collateral, total_outcomes, nb_attestors);
+    let descriptor = get_numerical_contract_descriptor(
+        accept_collateral,
+        offer_collateral,
+        total_outcomes,
+        nb_attestors,
+    );
 
     (event_descriptor, descriptor)
 }

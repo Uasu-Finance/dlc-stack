@@ -210,7 +210,7 @@ async fn process_request(
                     serde_json::from_reader(whole_body.reader()).map_err(|e| {
                         WalletError(format!(
                             "Error parsing http input to create Offer endpoint: {}",
-                            e.to_string()
+                            e
                         ))
                     })?;
 

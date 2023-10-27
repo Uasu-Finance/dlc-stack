@@ -31,7 +31,7 @@ const REQWEST_TIMEOUT: Duration = Duration::from_secs(30);
 pub struct AttestorClient {
     host: String,
     public_key: XOnlyPublicKey,
-    // client: reqwest::blocking::Client,
+    client: reqwest::Client,
 }
 
 #[derive(serde::Deserialize, serde::Serialize)]
@@ -73,36 +73,6 @@ struct AttestationResponse {
     values: Vec<String>,
 }
 
-// fn get_object<T>(path: &str) -> Result<T, DlcManagerError>
-// where
-//     T: serde::de::DeserializeOwned,
-// {
-//     reqwest::blocking::get(path)
-//         .map_err(|x| {
-//             dlc_manager::error::Error::IOError(std::io::Error::new(std::io::ErrorKind::Other, x))
-//         })?
-//         .json::<T>()
-//         .map_err(|e| dlc_manager::error::Error::OracleError(e.to_string()))
-// }
-
-async fn get_json(path: &str) -> Result<Value, DlcManagerError> {
-    let mut client_builder = reqwest::ClientBuilder::new();
-    #[cfg(not(target_arch = "wasm32"))]
-    {
-        client_builder = client_builder.timeout(REQWEST_TIMEOUT);
-    }
-    client_builder
-        .build()
-        .map_err(|x| dlc_manager::error::Error::OracleError(x.to_string()))?
-        .get(path)
-        .send()
-        .await
-        .map_err(|x| dlc_manager::error::Error::OracleError(x.to_string()))?
-        .json::<Value>()
-        .await
-        .map_err(|x| dlc_manager::error::Error::OracleError(x.to_string()))
-}
-
 fn pubkey_path(host: &str) -> String {
     format!("{}{}", host, "publickey")
 }
@@ -138,16 +108,14 @@ impl AttestorClient {
         let mut client_builder = reqwest::ClientBuilder::new();
         #[cfg(not(target_arch = "wasm32"))]
         {
+            client_builder = client_builder.tcp_keepalive(Some(Duration::from_secs(20)));
             client_builder = client_builder.timeout(REQWEST_TIMEOUT);
         }
-        let attestor_key = client_builder
+        let client = client_builder
             .build()
-            .map_err(|e| {
-                DlcManagerError::IOError(std::io::Error::new(
-                    std::io::ErrorKind::NotConnected,
-                    e.to_string(),
-                ))
-            })?
+            .expect("Attestor Client should be able to create a reqwest client");
+
+        let attestor_key = client
             .get(path)
             .send()
             .await
@@ -162,7 +130,22 @@ impl AttestorClient {
             .parse()
             .map_err(|_| DlcManagerError::OracleError("Oracle PubKey Error".to_string()))?;
         info!("The p2pd oracle client has been created successfully");
-        Ok(AttestorClient { host, public_key })
+        Ok(AttestorClient {
+            host,
+            public_key,
+            client,
+        })
+    }
+
+    async fn get_json(&self, path: &str) -> Result<Value, DlcManagerError> {
+        self.client
+            .get(path)
+            .send()
+            .await
+            .map_err(|x| dlc_manager::error::Error::OracleError(x.to_string()))?
+            .json::<Value>()
+            .await
+            .map_err(|x| dlc_manager::error::Error::OracleError(x.to_string()))
     }
 }
 
@@ -212,7 +195,7 @@ impl AsyncOracle for AttestorClient {
         info!("Getting announcement for event_id {event_id}");
         let path = announcement_path(&self.host, event_id);
         info!("Getting announcement at URL {path}");
-        let v = match get_json(&path).await {
+        let v = match self.get_json(&path).await {
             Ok(v) => v,
             Err(e) => {
                 return Err(DlcManagerError::OracleError(format!(
@@ -251,7 +234,7 @@ impl AsyncOracle for AttestorClient {
         event_id: &str,
     ) -> Result<OracleAttestation, dlc_manager::error::Error> {
         let path = attestation_path(&self.host, event_id);
-        let v = get_json(&path).await?;
+        let v = self.get_json(&path).await?;
 
         //TODO: this next line might be None, throwing at unwrap, fix
         let encoded_hex_attestation = match v["rust_attestation"].as_str() {
