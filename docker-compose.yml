@@ -124,6 +124,11 @@ services:
       - 'PORT=3000'
       - 'TEST_MODE_ENABLED=true'
       - 'ROUTER_WALLET_ADDRESS=http://router-wallet:8085'
+      - 'CHAIN=STACKS_MOCKNET'
+      - 'VERSION=1'
+      - 'API_KEY=abcdef1234567890'
+      - 'PRIVATE_KEY=6a1a754ba863d7bab14adbbc3f8ebb090af9e871ace621d3e5ab634e1422885e01'
+      - 'MOCKNET_ADDRESS=devnet.dlc.link'
     depends_on:
       - dlc-link-attestor-1
       - dlc-link-attestor-2
