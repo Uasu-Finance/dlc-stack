@@ -33,7 +33,7 @@ RUN npm install && \
   npx tsc -p . && \
   sudo npm ci attestor
 
-FROM node:16-alpine AS attestor
+FROM node:18-alpine AS attestor
 
 WORKDIR /app/attestor
 

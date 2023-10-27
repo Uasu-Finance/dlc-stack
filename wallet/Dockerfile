@@ -1,6 +1,7 @@
 FROM rustlang/rust:nightly-bullseye AS build
 
-COPY ./wallet /app/dlc-protocol-wallet/
+COPY ./wallet/src /app/dlc-protocol-wallet/src
+COPY ./wallet/Cargo.toml /app/dlc-protocol-wallet/Cargo.toml
 COPY ./dlc-link-manager /app/dlc-link-manager/
 COPY ./clients /app/clients/
 COPY ./attestor-client /app/attestor-client/
