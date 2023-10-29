@@ -431,8 +431,11 @@ async fn main() -> Result<(), GenericError> {
         }
     });
 
-    let ip = wallet_ip;
-    let addr = (ip, wallet_backend_port.parse().expect("Correct port value")).into();
+    let addr = (
+        wallet_ip,
+        wallet_backend_port.parse().expect("Correct port value"),
+    )
+        .into();
 
     let server = Server::bind(&addr).serve(new_service);
 

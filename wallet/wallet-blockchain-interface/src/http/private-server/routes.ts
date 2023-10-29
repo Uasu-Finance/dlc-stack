@@ -1,11 +1,11 @@
 import express from 'express';
 import BlockchainWriterService from '../../services/blockchain-writer.service.js';
-import { localhostOnly } from '../middlewares.js';
+import { localhostOrDockerOnly } from '../middlewares.js';
 
 const blockchainWriter = await BlockchainWriterService.getBlockchainWriter();
 const router = express.Router();
 
-router.post('/set-status-funded', express.json(), localhostOnly, async (req, res) => {
+router.post('/set-status-funded', express.json(), localhostOrDockerOnly, async (req, res) => {
     console.log('POST /set-status-funded with UUID:', req.body.uuid);
     if (!req.body.uuid) {
         res.status(400).send('Missing UUID');
@@ -15,18 +15,22 @@ router.post('/set-status-funded', express.json(), localhostOnly, async (req, res
     res.status(200).send(data);
 });
 
-router.get('/get-all-attestors', express.json(), localhostOnly, async (req, res) => {
+router.get('/get-all-attestors', express.json(), localhostOrDockerOnly, async (req, res) => {
     console.log('GET /get-all-attestors');
     let data;
     if (process.env.TEST_MODE_ENABLED === 'true') {
-        data = ['http://172.20.128.5:8801', 'http://172.20.128.6:8802', 'http://172.20.128.7:8803'];
+        data = [
+            process.env.ATTESTOR_1_ENDPOINT || 'http://172.20.128.5:8801',
+            process.env.ATTESTOR_2_ENDPOINT || 'http://172.20.128.6:8802',
+            process.env.ATTESTOR_3_ENDPOINT || 'http://172.20.128.7:8803',
+        ];
     } else {
         data = await blockchainWriter.getAllAttestors();
     }
     res.status(200).send(data);
 });
 
-router.post('/post-close-dlc', express.json(), localhostOnly, async (req, res) => {
+router.post('/post-close-dlc', express.json(), localhostOrDockerOnly, async (req, res) => {
     if (!req.body.uuid) {
         res.status(400).send('Missing UUID');
         return;
