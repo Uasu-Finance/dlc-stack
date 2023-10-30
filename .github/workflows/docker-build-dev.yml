@@ -38,7 +38,7 @@ jobs:
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
 
   build-attestor:
-    name: Build Attestor
+    name: Build attestor
     runs-on: ubuntu-latest
     steps:
       - name: Check out code
@@ -67,7 +67,7 @@ jobs:
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
 
   build-BI:
-    name: Build Blockchain Interface
+    name: Build blockchain-interface
     runs-on: ubuntu-latest
     steps:
       - name: Check out code
@@ -96,7 +96,7 @@ jobs:
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
 
   build-wallet:
-    name: Build Protocol Wallet
+    name: Build router-wallet
     runs-on: ubuntu-latest
     steps:
       - name: Check out code
