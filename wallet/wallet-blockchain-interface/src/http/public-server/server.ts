@@ -1,6 +1,7 @@
 import * as http from 'http';
 import express from 'express';
 import routes from './routes.js';
+import cors from 'cors';
 
 import * as https from 'https';
 
@@ -10,6 +11,7 @@ export default (TLS_ENABLED: boolean, options?: { key: Buffer; cert: Buffer }) =
     }
 
     const app = express();
+    app.use(cors());
     app.use(routes);
 
     const server = TLS_ENABLED ? https.createServer(options!, app) : http.createServer(app);
