@@ -19,11 +19,7 @@ router.get('/get-all-attestors', express.json(), localhostOrDockerOnly, async (r
     console.log('GET /get-all-attestors');
     let data;
     if (process.env.TEST_MODE_ENABLED === 'true') {
-        data = [
-            process.env.ATTESTOR_1_ENDPOINT || 'http://172.20.128.5:8801',
-            process.env.ATTESTOR_2_ENDPOINT || 'http://172.20.128.6:8802',
-            process.env.ATTESTOR_3_ENDPOINT || 'http://172.20.128.7:8803',
-        ];
+        data = ['http://172.20.128.5:8801', 'http://172.20.128.6:8802', 'http://172.20.128.7:8803'];
     } else {
         data = await blockchainWriter.getAllAttestors();
     }

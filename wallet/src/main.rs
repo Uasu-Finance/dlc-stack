@@ -153,7 +153,7 @@ fn build_error_response(message: String) -> Result<Response<Body>, GenericError>
         .body(Body::from(
             json!(
                 {
-                    "status": 400,
+                    "status": StatusCode::BAD_REQUEST.as_u16(),
                     "errors": vec![ErrorResponse {
                         message: message.to_string(),
                         code: None,
@@ -219,15 +219,13 @@ async fn process_request(
                         WalletError(format!("Error deserializing attestor list: {}", e))
                     })?;
 
-                // check whether every member in bitcoin_contract_attestor_urls is part of attestor_urls
-                for url in bitcoin_contract_attestor_urls.iter() {
-                    if !attestor_urls.contains(url) {
-                        return Err(WalletError(format!(
-                            "Attestor {} not found in attestor list",
-                            url
-                        )));
-                    }
-                }
+                match bitcoin_contract_attestor_urls
+                    .iter()
+                    .any(|url| !attestor_urls.contains(url))
+                {
+                    true => Err(WalletError(format!("Attestor not found in attestor list"))),
+                    _ => Ok(()),
+                }?;
 
                 let bitcoin_contract_attestors: HashMap<XOnlyPublicKey, Arc<AttestorClient>> =
                     generate_attestor_client(bitcoin_contract_attestor_urls.clone()).await;

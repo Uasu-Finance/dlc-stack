@@ -17,7 +17,7 @@ export default class RouterWalletService {
         try {
             const address = this._address + '/health';
             const res = await fetch(address);
-            return await res.json();
+            return res;
         } catch (error) {
             console.error(error);
             return error;
@@ -28,7 +28,7 @@ export default class RouterWalletService {
         try {
             const address = this._address + '/info';
             const res = await fetch(address);
-            return await res.json();
+            return res;
         } catch (error) {
             console.error(error);
             return error;
@@ -43,7 +43,7 @@ export default class RouterWalletService {
                 body: JSON.stringify(body),
                 headers: { 'Content-Type': 'application/json' },
             });
-            return await res.json();
+            return res;
         } catch (error) {
             console.error(error);
             return error;
@@ -58,7 +58,7 @@ export default class RouterWalletService {
                 body: JSON.stringify(body),
                 headers: { 'Content-Type': 'application/json' },
             });
-            return await res.json();
+            return res;
         } catch (error) {
             console.error(error);
             return error;

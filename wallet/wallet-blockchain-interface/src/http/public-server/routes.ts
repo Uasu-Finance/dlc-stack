@@ -14,25 +14,25 @@ router.get('/health', express.json(), async (req, res) => {
 router.get('/wallet-health', express.json(), async (req, res) => {
     console.log('GET /wallet-health');
     const data = await routerWallet.getHealth();
-    res.status(200).send(data);
+    res.status(data.status).send(await data.json());
 });
 
 router.get('/info', express.json(), async (req, res) => {
     console.log('GET /info');
     const data = await routerWallet.getInfo();
-    res.status(200).send(data);
+    res.status(data.status).send(await data.json());
 });
 
 router.post('/offer', express.json(), async (req, res) => {
     console.log('POST /offer');
     const data = await routerWallet.getOffer(req.body);
-    res.status(200).send(data);
+    res.status(data.status).send(await data.json());
 });
 
 router.put('/offer/accept', express.json(), async (req, res) => {
     console.log('PUT /offer/accept');
     const data = await routerWallet.acceptOffer(req.body);
-    res.status(200).send(data);
+    res.status(data.status).send(await data.json());
 });
 
 export default router;
