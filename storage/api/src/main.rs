@@ -1,4 +1,6 @@
-// mod check_auth_middleware;
+#![deny(clippy::unwrap_used)]
+#![deny(unused_mut)]
+#![deny(dead_code)]
 mod contracts;
 mod events;
 mod verify_sigs;
@@ -10,6 +12,7 @@ use rand::distributions::{Alphanumeric, DistString};
 use secp256k1::rand;
 extern crate log;
 use crate::events::get_events;
+use actix_web::dev::Service as _;
 use actix_web::web::Data;
 use actix_web::{error, get, web, App, HttpResponse, HttpServer, Responder};
 use diesel::r2d2::{self, ConnectionManager};
@@ -31,7 +34,7 @@ pub async fn get_health() -> impl Responder {
 
 #[get("/request_nonce")]
 pub async fn request_nonce(server_nonces: Data<Mutex<ServerNonce>>) -> impl Responder {
-    let mut server_nonce_vec = server_nonces.lock().unwrap();
+    let mut server_nonce_vec = server_nonces.lock().expect("Failed to lock nonce vec");
     while server_nonce_vec.nonces.len() >= NONCE_VEC_LENGTH {
         server_nonce_vec.nonces.remove(0); // remove the oldest
     }
@@ -64,7 +67,7 @@ async fn main() -> std::io::Result<()> {
     let migrate: bool = env::var("MIGRATE")
         .unwrap_or("false".to_string())
         .parse()
-        .unwrap();
+        .expect("Missing required env var MIGRATE");
     if migrate {
         apply_migrations(&mut conn);
     }
@@ -82,7 +85,19 @@ async fn main() -> std::io::Result<()> {
             .max_age(3600);
         App::new()
             .wrap(cors)
-            // .wrap(verify_sigs::Logging)
+            .wrap(verify_sigs::Verifier)
+            .wrap_fn(|req, srv| {
+                let header_nonce = req.headers().get("authorization");
+                if let Some(header_nonce) = header_nonce {
+                    req.app_data::<Data<Mutex<ServerNonce>>>()
+                        .expect("Failed to get nonces from app data")
+                        .lock()
+                        .expect("Failed to lock nonce vec")
+                        .nonces
+                        .retain(|n| n != header_nonce);
+                }
+                srv.call(req)
+            })
             .app_data(nonces.clone())
             .app_data(unprotected_paths.clone())
             .app_data(Data::new(pool.clone()))
@@ -115,19 +130,22 @@ async fn main() -> std::io::Result<()> {
 
 #[cfg(test)]
 mod tests {
+    use actix_http::header;
     use actix_web::{
         body::to_bytes,
+        dev::Service,
         http::{Method, StatusCode},
         test::{self, init_service, TestRequest},
         web::Bytes,
         App, Error,
     };
-    use serde_json::Value;
 
     use secp256k1::hashes::sha256;
     use secp256k1::rand::rngs::OsRng;
     use secp256k1::Message;
     use secp256k1::{hashes::Hash, Secp256k1};
+
+    use serde_json::Value;
 
     use super::*;
 
@@ -137,14 +155,13 @@ mod tests {
 
     impl BodyTest for Bytes {
         fn as_str(&self) -> &str {
-            std::str::from_utf8(self).unwrap()
+            std::str::from_utf8(self).expect("Failed to convert bytes to string")
         }
     }
 
     #[actix_web::test]
     async fn test_without_auth() -> Result<(), Error> {
         let app = init_service(App::new().service(get_health)).await;
-
         let req = TestRequest::default()
             .method(Method::GET)
             .uri("/health")
@@ -152,9 +169,9 @@ mod tests {
 
         let res = test::call_service(&app, req).await;
         assert_eq!(res.status(), StatusCode::OK);
-        let body = to_bytes(res.into_body()).await.unwrap();
+        let body = to_bytes(res.into_body()).await.expect("Failed to get body");
         assert_eq!(
-            serde_json::from_str::<Value>(body.as_str()).unwrap(),
+            serde_json::from_str::<Value>(body.as_str()).expect("Failed to parse json"),
             json!({"data": [{"status": "healthy", "message": ""}]}),
         );
 
@@ -173,6 +190,18 @@ mod tests {
             App::new()
                 .app_data(nonces.clone())
                 .app_data(unprotected_paths.clone())
+                .wrap_fn(|req, srv| {
+                    let header_nonce = req.headers().get("authorization");
+                    if let Some(header_nonce) = header_nonce {
+                        req.app_data::<Data<Mutex<ServerNonce>>>()
+                            .expect("Failed to get nonces from app data")
+                            .lock()
+                            .expect("Failed to unlock nonce vec")
+                            .nonces
+                            .retain(|x| x != header_nonce);
+                    }
+                    srv.call(req)
+                })
                 .wrap(verify_sigs::Verifier)
                 .service(request_nonce)
                 .service(create_contract),
@@ -186,7 +215,7 @@ mod tests {
 
         let res = test::call_service(&app, nonce_request).await;
         assert_eq!(res.status(), StatusCode::OK);
-        let body = to_bytes(res.into_body()).await.unwrap();
+        let body = to_bytes(res.into_body()).await.expect("Failed to get body");
         let nonce = body.as_str();
 
         let new_contract = json!({
@@ -203,13 +232,13 @@ mod tests {
 
         let message_body = json!({
             "message": new_contract,
-            "nonce": nonce,
             "public_key": public_key.to_string(),
             "signature": sig.to_string(),
         });
 
         let req = TestRequest::default()
             .method(Method::POST)
+            .insert_header((header::AUTHORIZATION, nonce))
             .uri("/contracts")
             .set_json(message_body)
             .to_request();
@@ -235,6 +264,18 @@ mod tests {
             App::new()
                 .app_data(nonces.clone())
                 .app_data(unprotected_paths.clone())
+                .wrap_fn(|req, srv| {
+                    let header_nonce = req.headers().get("authorization");
+                    if let Some(header_nonce) = header_nonce {
+                        req.app_data::<Data<Mutex<ServerNonce>>>()
+                            .expect("Failed to get nonces from app data")
+                            .lock()
+                            .expect("Failed to unlock nonce vec")
+                            .nonces
+                            .retain(|x| x != header_nonce);
+                    }
+                    srv.call(req)
+                })
                 .wrap(verify_sigs::Verifier)
                 .service(request_nonce)
                 .service(create_contract),
@@ -266,13 +307,13 @@ mod tests {
 
         let message_body = json!({
             "message": new_contract,
-            "nonce": nonce,
             "public_key": public_key.to_string(),
             "signature": sig.to_string(),
         });
 
         let req = TestRequest::default()
             .method(Method::POST)
+            .insert_header((header::AUTHORIZATION, nonce))
             .uri("/contracts")
             .set_json(message_body)
             .to_request();
@@ -295,6 +336,18 @@ mod tests {
             App::new()
                 .app_data(nonces.clone())
                 .app_data(unprotected_paths.clone())
+                .wrap_fn(|req, srv| {
+                    let header_nonce = req.headers().get("authorization");
+                    if let Some(header_nonce) = header_nonce {
+                        req.app_data::<Data<Mutex<ServerNonce>>>()
+                            .expect("Failed to get nonces from app data")
+                            .lock()
+                            .expect("Failed to unlock nonce vec")
+                            .nonces
+                            .retain(|x| x != header_nonce);
+                    }
+                    srv.call(req)
+                })
                 .wrap(verify_sigs::Verifier)
                 .service(request_nonce)
                 .service(create_contract),
@@ -308,7 +361,7 @@ mod tests {
 
         let res = test::call_service(&app, nonce_request).await;
         assert_eq!(res.status(), StatusCode::OK);
-        let body = to_bytes(res.into_body()).await.unwrap();
+        let body = to_bytes(res.into_body()).await.expect("Failed to get body");
         let nonce = body.as_str();
 
         let new_contract = json!({
@@ -323,25 +376,24 @@ mod tests {
         let sig = secp.sign_ecdsa(&digest, &secret_key);
         assert!(secp.verify_ecdsa(&digest, &sig, &public_key).is_ok());
 
-        let first_message_body = json!({
+        let message_body = json!({
             "message": new_contract,
-            "nonce": nonce,
             "public_key": public_key.to_string(),
             "signature": sig.to_string(),
         });
 
-        let second_message_body = first_message_body.clone();
-
         let first_req = TestRequest::default()
             .method(Method::POST)
+            .insert_header((header::AUTHORIZATION, nonce))
             .uri("/contracts")
-            .set_json(first_message_body)
+            .set_json(message_body.clone())
             .to_request();
 
         let second_req = TestRequest::default()
             .method(Method::POST)
+            .insert_header((header::AUTHORIZATION, nonce))
             .uri("/contracts")
-            .set_json(second_message_body)
+            .set_json(message_body)
             .to_request();
 
         let first_res = test::call_service(&app, first_req).await;
@@ -371,6 +423,18 @@ mod tests {
             App::new()
                 .app_data(nonces.clone())
                 .app_data(unprotected_paths.clone())
+                .wrap_fn(|req, srv| {
+                    let header_nonce = req.headers().get("authorization");
+                    if let Some(header_nonce) = header_nonce {
+                        req.app_data::<Data<Mutex<ServerNonce>>>()
+                            .expect("Failed to get nonces from app data")
+                            .lock()
+                            .expect("Failed to unlock nonce vec")
+                            .nonces
+                            .retain(|x| x != header_nonce);
+                    }
+                    srv.call(req)
+                })
                 .wrap(verify_sigs::Verifier)
                 .service(request_nonce)
                 .service(create_contract),
@@ -384,7 +448,7 @@ mod tests {
 
         let res = test::call_service(&app, nonce_request).await;
         assert_eq!(res.status(), StatusCode::OK);
-        let body = to_bytes(res.into_body()).await.unwrap();
+        let body = to_bytes(res.into_body()).await.expect("Failed to get body");
         let nonce = body.as_str();
 
         let new_contract = json!({
@@ -401,13 +465,13 @@ mod tests {
 
         let message_body = json!({
             "message": new_contract,
-            "nonce": nonce.to_string(),
             "public_key": public_key_2.to_string(),
             "signature": sig.to_string(),
         });
 
         let req = TestRequest::default()
             .method(Method::POST)
+            .insert_header((header::AUTHORIZATION, nonce))
             .uri("/contracts")
             .set_json(message_body)
             .to_request();
