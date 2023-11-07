@@ -40,7 +40,7 @@ pub async fn request_nonce(server_nonces: Data<Mutex<ServerNonce>>) -> impl Resp
     HttpResponse::Ok().body(random_nonce.to_string())
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct ServerNonce {
     nonces: Vec<String>,
 }
@@ -218,7 +218,7 @@ mod tests {
 
         // It's not great to expect a 500 in a test, but in this case
         // it means it got to the function and attempted to interact with the DB
-        assert_eq!(res.status(), StatusCode::INTERNAL_SERVER_ERROR);
+        assert_eq!(res.status(), StatusCode::INTERNAL_SERVER_ERROR); // this means it worked
 
         Ok(())
     }
@@ -279,6 +279,80 @@ mod tests {
 
         let res = test::call_service(&app, req).await;
         assert_eq!(res.status(), StatusCode::FORBIDDEN);
+
+        Ok(())
+    }
+
+    #[actix_web::test]
+    async fn test_with_previously_used_nonce() -> Result<(), Error> {
+        let secp = Secp256k1::new();
+        let (secret_key, public_key) = secp.generate_keypair(&mut OsRng);
+        let nonces = Data::new(Mutex::new(ServerNonce { nonces: vec![] }));
+        let unprotected_paths = Data::new(UnprotectedPaths {
+            paths: vec!["/health".to_string(), "/request_nonce".to_string()],
+        });
+        let app = init_service(
+            App::new()
+                .app_data(nonces.clone())
+                .app_data(unprotected_paths.clone())
+                .wrap(verify_sigs::Verifier)
+                .service(request_nonce)
+                .service(create_contract),
+        )
+        .await;
+
+        let nonce_request = TestRequest::default()
+            .method(Method::GET)
+            .uri("/request_nonce")
+            .to_request();
+
+        let res = test::call_service(&app, nonce_request).await;
+        assert_eq!(res.status(), StatusCode::OK);
+        let body = to_bytes(res.into_body()).await.unwrap();
+        let nonce = body.as_str();
+
+        let new_contract = json!({
+            "nonce": nonce,
+            "uuid": "123".to_string(),
+            "state": "123".to_string(),
+            "content": "123".to_string(),
+            "key": public_key.to_string(),
+        });
+
+        let digest = Message::from(sha256::Hash::hash(new_contract.to_string().as_bytes()));
+        let sig = secp.sign_ecdsa(&digest, &secret_key);
+        assert!(secp.verify_ecdsa(&digest, &sig, &public_key).is_ok());
+
+        let first_message_body = json!({
+            "message": new_contract,
+            "nonce": nonce,
+            "public_key": public_key.to_string(),
+            "signature": sig.to_string(),
+        });
+
+        let second_message_body = first_message_body.clone();
+
+        let first_req = TestRequest::default()
+            .method(Method::POST)
+            .uri("/contracts")
+            .set_json(first_message_body)
+            .to_request();
+
+        let second_req = TestRequest::default()
+            .method(Method::POST)
+            .uri("/contracts")
+            .set_json(second_message_body)
+            .to_request();
+
+        let first_res = test::call_service(&app, first_req).await;
+
+        let second_res = test::call_service(&app, second_req).await;
+
+        // It's not great to expect a 500 in a test, but in this case
+        // it means it got to the function and attempted to interact with the DB
+        assert_eq!(first_res.status(), StatusCode::INTERNAL_SERVER_ERROR);
+
+        assert_eq!(second_res.status(), StatusCode::FORBIDDEN);
 
         Ok(())
     }
