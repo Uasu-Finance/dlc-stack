@@ -17,6 +17,7 @@ use super::utils::{deserialize_contract, get_contract_state_str, serialize_contr
 pub struct AsyncStorageApiProvider {
     client: StorageApiClient,
     key: String,
+    // hand in private and pub key, and do the signing here?
 }
 
 impl AsyncStorageApiProvider {

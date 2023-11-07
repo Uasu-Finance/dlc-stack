@@ -5,8 +5,6 @@ use actix_web::{delete, get, post, put, HttpResponse, Responder};
 use dlc_storage_common::models::{
     ContractRequestParams, DeleteContract, NewContract, UpdateContract,
 };
-use dlc_storage_reader;
-use dlc_storage_writer;
 use log::{debug, warn};
 use serde_json::json;
 

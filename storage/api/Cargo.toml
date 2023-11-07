@@ -12,10 +12,13 @@ dlc-storage-common = { path = "../common" }
 dlc-storage-reader = { path = "../reader" }
 dlc-storage-writer = { path = "../writer" }
 actix-web = "4"
+actix-http = "3.4.0"
 actix-cors = "0.6.4"
 diesel = { version = "2.0.0", features = ["postgres", "r2d2"] }
 diesel_migrations = { version = "2.0.0", features = ["postgres"] }
 dotenv = "0.15.0"
+futures-util = "0.3.29"
+secp256k1 = {version = "0.28.0", features = ["rand-std", "hashes-std"]}
 serde = { version = "1.0.137", features = ["derive"] }
 serde_json = "1.0.81"
 env_logger = "0.9.0"
