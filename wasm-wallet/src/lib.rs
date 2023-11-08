@@ -120,7 +120,7 @@ impl Default for JsDLCInterfaceOptions {
     // Default values for Manager Options
     fn default() -> Self {
         Self {
-            attestor_urls: "https://devnet.dlc.link/oracle".to_string(),
+            attestor_urls: "http://96.126.107.204/8801".to_string(),
             network: "regtest".to_string(),
             electrs_url: "http://96.126.107.204:3002".to_string(),
             address: "".to_string(),

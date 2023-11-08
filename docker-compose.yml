@@ -124,6 +124,11 @@ services:
     environment:
       - "PORT=3000"
       - "TEST_MODE_ENABLED=true"
+      - "BRANCH=dev"
+      - "PRIVATE_KEY=4cbf3a503ccabe3de3e8dbaa449fcf84b1f6f42c085d86030510ae00281000d4"
+      - "CHAIN=STACKS_MOCKNET"
+      - "VERSION=1"
+      - "API_KEY=abcdef1234567890"
     depends_on:
       - dlc-link-attestor-1
       - dlc-link-attestor-2
