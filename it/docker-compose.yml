@@ -122,7 +122,7 @@ services:
       - 'VERSION=1'
       - 'API_KEY=abcdef1234567890'
       - 'PRIVATE_KEY=6a1a754ba863d7bab14adbbc3f8ebb090af9e871ace621d3e5ab634e1422885e01'
-      - 'MOCKNET_ADDRESS=devnet.dlc.link'
+      - 'MOCKNET_ADDRESS=96.126.107.204:3999'
     depends_on:
       - dlc-link-attestor-1
       - dlc-link-attestor-2
@@ -140,7 +140,7 @@ services:
       - 8085:8085
     environment:
       # For Internal DLC.Link Bitcoin Mocknet
-      - 'ELECTRUM_API_URL=https://devnet.dlc.link/electrs'
+      - 'ELECTRUM_API_URL=http://96.126.107.204:3002'
       # For Bitcoin Testnet
       # - "ELECTRUM_API_URL=https://blockstream.info/testnet/api"
       # For Bitcoin Mainnet
@@ -181,7 +181,7 @@ services:
       - ENV=docker
       - HANDLE_ATTESTORS=true
       - SUCCESSFUL_ATTESTING=true
-      - ELECTRUM_API_URL=https://devnet.dlc.link/electrs
+      - ELECTRUM_API_URL=http://96.126.107.204:3002
     depends_on:
       router-wallet:
         condition: service_healthy

@@ -27,10 +27,10 @@ export default async (
             break;
         case 'STACKS_MOCKNET':
             network = new StacksMocknet({
-                url: `https://${getEnv('MOCKNET_ADDRESS')}`,
+                url: `http://${getEnv('MOCKNET_ADDRESS')}`,
             });
             deployer = 'ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM';
-            api_base_extended = `https://${getEnv('MOCKNET_ADDRESS')}/extended/v1`;
+            api_base_extended = `http://${getEnv('MOCKNET_ADDRESS')}/extended/v1`;
             break;
         case 'STACKS_LOCAL':
             network = new StacksMocknet();
