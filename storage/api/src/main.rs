@@ -85,19 +85,6 @@ async fn main() -> std::io::Result<()> {
             .max_age(3600);
         App::new()
             .wrap(cors)
-            .wrap(verify_sigs::Verifier)
-            .wrap_fn(|req, srv| {
-                let header_nonce = req.headers().get("authorization");
-                if let Some(header_nonce) = header_nonce {
-                    req.app_data::<Data<Mutex<ServerNonce>>>()
-                        .expect("Failed to get nonces from app data")
-                        .lock()
-                        .expect("Failed to lock nonce vec")
-                        .nonces
-                        .retain(|n| n != header_nonce);
-                }
-                srv.call(req)
-            })
             .app_data(nonces.clone())
             .app_data(unprotected_paths.clone())
             .app_data(Data::new(pool.clone()))
@@ -110,6 +97,19 @@ async fn main() -> std::io::Result<()> {
                 )
                 .into()
             }))
+            .wrap_fn(|req, srv| {
+                let header_nonce = req.headers().get("authorization");
+                if let Some(header_nonce) = header_nonce {
+                    req.app_data::<Data<Mutex<ServerNonce>>>()
+                        .expect("Failed to get nonces from app data")
+                        .lock()
+                        .expect("Failed to lock nonce vec")
+                        .nonces
+                        .retain(|n| n != header_nonce);
+                }
+                srv.call(req)
+            })
+            .wrap(verify_sigs::Verifier)
             .service(request_nonce)
             .service(get_health)
             .service(get_contracts)
@@ -248,6 +248,218 @@ mod tests {
         // It's not great to expect a 500 in a test, but in this case
         // it means it got to the function and attempted to interact with the DB
         assert_eq!(res.status(), StatusCode::INTERNAL_SERVER_ERROR); // this means it worked
+
+        Ok(())
+    }
+
+    #[actix_web::test]
+    async fn test_with_missing_sig() -> Result<(), Error> {
+        let secp = Secp256k1::new();
+        let (_secret_key, public_key) = secp.generate_keypair(&mut OsRng);
+        let nonces = Data::new(Mutex::new(ServerNonce { nonces: vec![] }));
+        let unprotected_paths = Data::new(UnprotectedPaths {
+            paths: vec!["/health".to_string(), "/request_nonce".to_string()],
+        });
+        let app = init_service(
+            App::new()
+                .app_data(nonces.clone())
+                .app_data(unprotected_paths.clone())
+                .wrap_fn(|req, srv| {
+                    let header_nonce = req.headers().get("authorization");
+                    if let Some(header_nonce) = header_nonce {
+                        req.app_data::<Data<Mutex<ServerNonce>>>()
+                            .expect("Failed to get nonces from app data")
+                            .lock()
+                            .expect("Failed to unlock nonce vec")
+                            .nonces
+                            .retain(|x| x != header_nonce);
+                    }
+                    srv.call(req)
+                })
+                .wrap(verify_sigs::Verifier)
+                .service(request_nonce)
+                .service(create_contract),
+        )
+        .await;
+
+        let nonce_request = TestRequest::default()
+            .method(Method::GET)
+            .uri("/request_nonce")
+            .to_request();
+
+        let res = test::call_service(&app, nonce_request).await;
+        assert_eq!(res.status(), StatusCode::OK);
+        let body = to_bytes(res.into_body()).await.expect("Failed to get body");
+        let nonce = body.as_str();
+
+        let new_contract = json!({
+            "nonce": nonce,
+            "uuid": "123".to_string(),
+            "state": "123".to_string(),
+            "content": "123".to_string(),
+            "key": public_key.to_string(),
+        });
+
+        let message_body = json!({
+            "message": new_contract,
+            "public_key": public_key.to_string(),
+        });
+
+        let req = TestRequest::default()
+            .method(Method::POST)
+            .insert_header((header::AUTHORIZATION, nonce))
+            .uri("/contracts")
+            .set_json(message_body)
+            .to_request();
+
+        let res = test::call_service(&app, req).await;
+        assert_eq!(res.status(), StatusCode::FORBIDDEN);
+
+        Ok(())
+    }
+
+    #[actix_web::test]
+    async fn test_with_missing_nonce_in_message_body() -> Result<(), Error> {
+        let secp = Secp256k1::new();
+        let (secret_key, public_key) = secp.generate_keypair(&mut OsRng);
+        let nonces = Data::new(Mutex::new(ServerNonce { nonces: vec![] }));
+        let unprotected_paths = Data::new(UnprotectedPaths {
+            paths: vec!["/health".to_string(), "/request_nonce".to_string()],
+        });
+        let app = init_service(
+            App::new()
+                .app_data(nonces.clone())
+                .app_data(unprotected_paths.clone())
+                .wrap_fn(|req, srv| {
+                    let header_nonce = req.headers().get("authorization");
+                    if let Some(header_nonce) = header_nonce {
+                        req.app_data::<Data<Mutex<ServerNonce>>>()
+                            .expect("Failed to get nonces from app data")
+                            .lock()
+                            .expect("Failed to unlock nonce vec")
+                            .nonces
+                            .retain(|x| x != header_nonce);
+                    }
+                    srv.call(req)
+                })
+                .wrap(verify_sigs::Verifier)
+                .service(request_nonce)
+                .service(create_contract),
+        )
+        .await;
+
+        let nonce_request = TestRequest::default()
+            .method(Method::GET)
+            .uri("/request_nonce")
+            .to_request();
+
+        let res = test::call_service(&app, nonce_request).await;
+        assert_eq!(res.status(), StatusCode::OK);
+        let body = to_bytes(res.into_body()).await.expect("Failed to get body");
+        let nonce = body.as_str();
+
+        let new_contract = json!({
+            "uuid": "123".to_string(),
+            "state": "123".to_string(),
+            "content": "123".to_string(),
+            "key": public_key.to_string(),
+        });
+
+        let digest = Message::from(sha256::Hash::hash(new_contract.to_string().as_bytes()));
+        let sig = secp.sign_ecdsa(&digest, &secret_key);
+        assert!(secp.verify_ecdsa(&digest, &sig, &public_key).is_ok());
+
+        let message_body = json!({
+            "message": new_contract,
+            "public_key": public_key.to_string(),
+            "signature": sig.to_string(),
+        });
+
+        let req = TestRequest::default()
+            .method(Method::POST)
+            .insert_header((header::AUTHORIZATION, nonce))
+            .uri("/contracts")
+            .set_json(message_body)
+            .to_request();
+
+        let res = test::call_service(&app, req).await;
+
+        // It's not great to expect a 500 in a test, but in this case
+        // it means it got to the function and attempted to interact with the DB
+        assert_eq!(res.status(), StatusCode::FORBIDDEN); // this means it worked
+
+        Ok(())
+    }
+
+    #[actix_web::test]
+    async fn test_with_missing_nonce_in_header() -> Result<(), Error> {
+        let secp = Secp256k1::new();
+        let (secret_key, public_key) = secp.generate_keypair(&mut OsRng);
+        let nonces = Data::new(Mutex::new(ServerNonce { nonces: vec![] }));
+        let unprotected_paths = Data::new(UnprotectedPaths {
+            paths: vec!["/health".to_string(), "/request_nonce".to_string()],
+        });
+        let app = init_service(
+            App::new()
+                .app_data(nonces.clone())
+                .app_data(unprotected_paths.clone())
+                .wrap_fn(|req, srv| {
+                    let header_nonce = req.headers().get("authorization");
+                    if let Some(header_nonce) = header_nonce {
+                        req.app_data::<Data<Mutex<ServerNonce>>>()
+                            .expect("Failed to get nonces from app data")
+                            .lock()
+                            .expect("Failed to unlock nonce vec")
+                            .nonces
+                            .retain(|x| x != header_nonce);
+                    }
+                    srv.call(req)
+                })
+                .wrap(verify_sigs::Verifier)
+                .service(request_nonce)
+                .service(create_contract),
+        )
+        .await;
+
+        let nonce_request = TestRequest::default()
+            .method(Method::GET)
+            .uri("/request_nonce")
+            .to_request();
+
+        let res = test::call_service(&app, nonce_request).await;
+        assert_eq!(res.status(), StatusCode::OK);
+        let body = to_bytes(res.into_body()).await.expect("Failed to get body");
+        let nonce = body.as_str();
+
+        let new_contract = json!({
+            "nonce": nonce,
+            "uuid": "123".to_string(),
+            "state": "123".to_string(),
+            "content": "123".to_string(),
+            "key": public_key.to_string(),
+        });
+
+        let digest = Message::from(sha256::Hash::hash(new_contract.to_string().as_bytes()));
+        let sig = secp.sign_ecdsa(&digest, &secret_key);
+        assert!(secp.verify_ecdsa(&digest, &sig, &public_key).is_ok());
+
+        let message_body = json!({
+            "message": new_contract,
+            "public_key": public_key.to_string(),
+            "signature": sig.to_string(),
+        });
+
+        let req = TestRequest::default()
+            .method(Method::POST)
+            .uri("/contracts")
+            .set_json(message_body)
+            .to_request();
+
+        let res = test::call_service(&app, req).await;
+
+        // It's not great to expect a 500 in a test, but in this case
+        // it means it got to the function and attempted to interact with the DB
+        assert_eq!(res.status(), StatusCode::FORBIDDEN); // this means it worked
 
         Ok(())
     }
