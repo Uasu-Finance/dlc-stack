@@ -263,7 +263,7 @@ async fn main() {
                 // Set up DLC store
                 let dlc_store = Box::new(AsyncStorageApiProvider::new(
                     pubkey.to_string(),
-                    "https://devnet.dlc.link/storage-api".to_string(),
+                    "http://96.126.107.204:8100".to_string(),
                 ));
 
                 // Create the DLC Manager

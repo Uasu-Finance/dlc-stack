@@ -249,7 +249,7 @@ async fn run() {
     // Set up DLC store
     let dlc_store = Arc::new(AsyncStorageApiProvider::new(
         pubkey_ext.to_string(),
-        "https://devnet.dlc.link/storage-api".to_string(),
+        "http://96.126.107.204:8100".to_string(),
     ));
 
     // Set up time provider

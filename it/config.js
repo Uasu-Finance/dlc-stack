@@ -8,13 +8,13 @@ const devnet = {
     "b5984262748203b2043923dd34202d1a6e05601af0c00e232d3b1988ce9608f5",
   testWalletAddress: "bcrt1qpnuck30uakpc0ffcmd3nwdd59y547qlzsmf34l",
   bitcoinNetwork: "regtest",
-  bitcoinNetworkURL: "https://devnet.dlc.link/electrs",
+  bitcoinNetworkURL: "http://96.126.107.204:3002",
   // TODO: which wallet?
-  protocolWalletURL: "https://devnet.dlc.link/stacks-wallet",
+  protocolWalletURL: "http://96.126.107.204:8085",
   attestorList: [
-    "https://devnet.dlc.link/attestor-1",
-    "https://devnet.dlc.link/attestor-2",
-    "https://devnet.dlc.link/attestor-3",
+    "http://96.126.107.204:8801",
+    "http://96.126.107.204:8802",
+    "http://96.126.107.204:8803",
   ],
 };
 
@@ -40,7 +40,7 @@ const local = {
     "b5984262748203b2043923dd34202d1a6e05601af0c00e232d3b1988ce9608f5",
   testWalletAddress: "bcrt1qpnuck30uakpc0ffcmd3nwdd59y547qlzsmf34l",
   bitcoinNetwork: "regtest",
-  bitcoinNetworkURL: "https://devnet.dlc.link/electrs",
+  bitcoinNetworkURL: "http://96.126.107.204:3002",
   protocolWalletURL: "http://127.0.0.1:8085",
   attestorList: [
     "http://localhost:8801",
@@ -54,7 +54,7 @@ const docker = {
     "b5984262748203b2043923dd34202d1a6e05601af0c00e232d3b1988ce9608f5",
   testWalletAddress: "bcrt1qpnuck30uakpc0ffcmd3nwdd59y547qlzsmf34l",
   bitcoinNetwork: "regtest",
-  bitcoinNetworkURL: "https://devnet.dlc.link/electrs",
+  bitcoinNetworkURL: "http://96.126.107.204:3002",
   protocolWalletURL: "http://172.17.0.1:8085",
   attestorList: [
     "http://172.17.0.1:8801",
