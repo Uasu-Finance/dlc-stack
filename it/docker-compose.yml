@@ -10,7 +10,8 @@ services:
       POSTGRES_PASSWORD: theraininspainstaysmainlyintheplain
       PGDATA: /data/postgres
     ports:
-      - '5431:5432'
+      - "5433:5433"
+    command: -p 5433
     healthcheck:
       test: ['CMD-SHELL', 'pg_isready -U postgres']
       interval: 5s
@@ -26,7 +27,7 @@ services:
     image: 903295530547.dkr.ecr.us-east-1.amazonaws.com/storage-api:${IMAGE_TAG}
     environment:
       RUST_LOG: 'debug'
-      DATABASE_URL: 'postgresql://postgres:theraininspainstaysmainlyintheplain@postgresdlc:5431/postgres'
+      DATABASE_URL: 'postgresql://postgres:theraininspainstaysmainlyintheplain@postgresdlc:5433/postgres'
       MIGRATE: 'true'
     ports:
       - '8100:8100'
