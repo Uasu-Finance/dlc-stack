@@ -6,7 +6,7 @@ services:
     hostname: postgresdlc
     environment:
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: changeme
+      POSTGRES_PASSWORD: theraininspainstaysmainlyintheplain
       PGDATA: /data/postgres
     ports:
       - '5431:5432'
@@ -27,7 +27,7 @@ services:
       dockerfile: ./storage/Dockerfile
     environment:
       RUST_LOG: 'info'
-      DATABASE_URL: 'postgresql://postgres:changeme@postgresdlc:5432/postgres'
+      DATABASE_URL: 'postgresql://postgres:theraininspainstaysmainlyintheplain@postgresdlc:5432/postgres'
       MIGRATE: 'true'
     ports:
       - '8100:8100'

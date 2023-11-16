@@ -7,7 +7,7 @@ services:
     hostname: postgresdlc
     environment:
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: changeme
+      POSTGRES_PASSWORD: theraininspainstaysmainlyintheplain
       PGDATA: /data/postgres
     ports:
       - '5431:5432'
@@ -26,7 +26,7 @@ services:
     image: 903295530547.dkr.ecr.us-east-1.amazonaws.com/storage-api:${IMAGE_TAG}
     environment:
       RUST_LOG: 'debug'
-      DATABASE_URL: 'postgresql://postgres:changeme@postgresdlc:5432/postgres'
+      DATABASE_URL: 'postgresql://postgres:theraininspainstaysmainlyintheplain@postgresdlc:5431/postgres'
       MIGRATE: 'true'
     ports:
       - '8100:8100'
