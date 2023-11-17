@@ -102,7 +102,7 @@ impl Default for JsDLCInterfaceOptions {
     fn default() -> Self {
         Self {
             network: "regtest".to_string(),
-            electrs_url: "http://96.126.107.204:3002".to_string(),
+            electrs_url: "http://45.79.130.153:3002".to_string(),
             address: "".to_string(),
         }
     }
@@ -152,7 +152,7 @@ impl JsDLCInterface {
         // Set up DLC store
         let dlc_store = AsyncStorageApiProvider::new(
             pubkey.to_string(),
-            "http://96.126.107.204:8100".to_string(),
+            "http://45.79.130.153:8100".to_string(),
         );
 
         // Set up wallet

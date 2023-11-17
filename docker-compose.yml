@@ -9,8 +9,7 @@ services:
       POSTGRES_PASSWORD: theraininspainstaysmainlyintheplain
       PGDATA: /data/postgres
     ports:
-      - "5433:5433"
-    command: -p 5433
+      - "5431:5432"
     healthcheck:
       test: ['CMD-SHELL', 'pg_isready -U postgres']
       interval: 5s
@@ -28,7 +27,7 @@ services:
       dockerfile: ./storage/Dockerfile
     environment:
       RUST_LOG: 'info'
-      DATABASE_URL: 'postgresql://postgres:theraininspainstaysmainlyintheplain@postgresdlc:5433/postgres'
+      DATABASE_URL: 'postgresql://postgres:theraininspainstaysmainlyintheplain@postgresdlc:5432/postgres'
       MIGRATE: 'true'
     ports:
       - '8100:8100'
@@ -144,7 +143,7 @@ services:
       - 'VERSION=1'
       - 'API_KEY=abcdef1234567890'
       - 'PRIVATE_KEY=6a1a754ba863d7bab14adbbc3f8ebb090af9e871ace621d3e5ab634e1422885e01'
-      - 'MOCKNET_ADDRESS=96.126.107.204:3999'
+      - 'MOCKNET_ADDRESS=45.79.130.153:3999'
     depends_on:
       - dlc-link-attestor-1
       - dlc-link-attestor-2
@@ -164,7 +163,7 @@ services:
       - 8085:8085
     environment:
       # For Internal DLC.Link Bitcoin Mocknet
-      - 'ELECTRUM_API_URL=http://96.126.107.204:3002'
+      - 'ELECTRUM_API_URL=http://45.79.130.153:3002'
       # For Bitcoin Testnet
       # - "ELECTRUM_API_URL=https://blockstream.info/testnet/api"
       # For Bitcoin Mainnet
@@ -208,7 +207,7 @@ services:
       - ENV=docker
       - 'HANDLE_ATTESTORS=${HANDLE_ATTESTORS:-true}'
       - 'SUCCESSFUL_ATTESTING=${SUCCESSFUL_ATTESTING:-true}'
-      - ELECTRUM_API_URL=http://96.126.107.204:3002
+      - ELECTRUM_API_URL=http://45.79.130.153:3002
     volumes:
       - ./it:/app/it
     depends_on:

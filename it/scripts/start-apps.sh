@@ -3,7 +3,7 @@
 mkdir -p target
 
 start_storage() {
-  RUST_LOG=debug DATABASE_URL=postgresql://postgres:theraininspainstaysmainlyintheplain@localhost:5433/postgres MIGRATE=true cargo run --bin $storage_api_app > target/$storage_api_app.log 2> target/$storage_api_app.log &
+  RUST_LOG=debug DATABASE_URL=postgresql://postgres:theraininspainstaysmainlyintheplain@localhost:5432/postgres MIGRATE=true cargo run --bin $storage_api_app > target/$storage_api_app.log 2> target/$storage_api_app.log &
   echo $! > $storage_api_pid_file
   while ! nc -z localhost $storage_api_port; do
     echo "Retry to access $storage_api_app on port $storage_api_port in 5 sec ..."

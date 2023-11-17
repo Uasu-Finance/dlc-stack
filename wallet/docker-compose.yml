@@ -26,9 +26,9 @@ services:
     environment:
       # NOTE: these will overwrite envs set in a .env file
       # For DLC.Link Bitcoin Mocknet
-      - "ELECTRUM_API_URL=http://96.126.107.204:3002"
+      - "ELECTRUM_API_URL=http://45.79.130.153:3002"
       - "BITCOIN_NETWORK=regtest"
-      - "STORAGE_API_ENDPOINT=http://96.126.107.204:8100"
+      - "STORAGE_API_ENDPOINT=http://45.79.130.153:8100"
       # For Bitcoin Testnet
       # - "ELECTRUM_API_URL=https://blockstream.info/testnet/api"
       # - "BITCOIN_NETWORK=testnet"

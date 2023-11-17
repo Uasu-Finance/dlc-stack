@@ -26,7 +26,7 @@ pub async fn get_health() -> impl Responder {
 async fn main() -> std::io::Result<()> {
     env_logger::init();
     dotenv().ok();
-    // e.g.: DATABASE_URL=postgresql://postgres:theraininspainstaysmainlyintheplain@localhost:5433/postgres
+    // e.g.: DATABASE_URL=postgresql://postgres:theraininspainstaysmainlyintheplain@localhost:5432/postgres
     let database_url = env::var("DATABASE_URL").expect("DATABASE_URL must be set");
     let manager = ConnectionManager::<PgConnection>::new(database_url);
     let pool: DbPool = r2d2::Pool::builder()

@@ -7,13 +7,13 @@ const devnet = {
   testWalletPrivateKey: 'b5984262748203b2043923dd34202d1a6e05601af0c00e232d3b1988ce9608f5',
   testWalletAddress: 'bcrt1qpnuck30uakpc0ffcmd3nwdd59y547qlzsmf34l',
   bitcoinNetwork: 'regtest',
-  bitcoinNetworkURL: 'http://96.126.107.204:3002',
+  bitcoinNetworkURL: 'http://45.79.130.153:3002',
   // TODO: which wallet?
-  protocolWalletURL: 'http://96.126.107.204:8085',
+  protocolWalletURL: 'http://45.79.130.153:8085',
   attestorList: [
-    'http://96.126.107.204:8801',
-    'http://96.126.107.204:8802',
-    'http://96.126.107.204:8803',
+    'http://45.79.130.153:8801',
+    'http://45.79.130.153:8802',
+    'http://45.79.130.153:8803',
   ],
 };
 
@@ -37,7 +37,7 @@ const local = {
   testWalletPrivateKey: 'b5984262748203b2043923dd34202d1a6e05601af0c00e232d3b1988ce9608f5',
   testWalletAddress: 'bcrt1qpnuck30uakpc0ffcmd3nwdd59y547qlzsmf34l',
   bitcoinNetwork: 'regtest',
-  bitcoinNetworkURL: 'http://96.126.107.204:3002',
+  bitcoinNetworkURL: 'http://45.79.130.153:3002',
   protocolWalletURL: 'http://127.0.0.1:3003',
   attestorList: ['http://localhost:8801', 'http://localhost:8802', 'http://localhost:8803'],
 };
@@ -46,7 +46,7 @@ const docker = {
   testWalletPrivateKey: 'b5984262748203b2043923dd34202d1a6e05601af0c00e232d3b1988ce9608f5',
   testWalletAddress: 'bcrt1qpnuck30uakpc0ffcmd3nwdd59y547qlzsmf34l',
   bitcoinNetwork: 'regtest',
-  bitcoinNetworkURL: 'http://96.126.107.204:3002',
+  bitcoinNetworkURL: 'http://45.79.130.153:3002',
   protocolWalletURL: 'http://172.20.128.3:3003',
   attestorList: ['http://172.20.128.5:8801', 'http://172.20.128.6:8802', 'http://172.20.128.7:8803'],
 };
