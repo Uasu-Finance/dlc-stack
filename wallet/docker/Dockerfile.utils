@@ -16,8 +16,14 @@ WORKDIR /app/dlc-protocol-wallet/
 RUN cargo build --release --bin generate-key --target-dir .
 RUN cargo build --release --bin generate-address-from-key --target-dir .
 
-RUN chmod +x ./release/generate-key ./release/generate-address-from-key
+FROM debian:bullseye-slim
+RUN apt-get update && apt-get install -y openssl libpq-dev ca-certificates
+
+COPY --from=build /app/dlc-protocol-wallet/release/generate-key /app/dlc-protocol-wallet/release/generate-key
+COPY --from=build /app/dlc-protocol-wallet/release/generate-address-from-key /app/dlc-protocol-wallet/release/generate-address-from-key
 
 WORKDIR /app/dlc-protocol-wallet/release/
+
+RUN chmod +x ./generate-key ./generate-address-from-key
 
 CMD [ "/bin/bash" ]
