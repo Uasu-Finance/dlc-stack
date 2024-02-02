@@ -18,9 +18,9 @@ const attestorLists: Array<{ name: string; domains: string[] }> = [
     {
         name: 'devnet',
         domains: [
-            'https://devnet.dlc.link/attestor-1',
-            'https://devnet.dlc.link/attestor-2',
-            'https://devnet.dlc.link/attestor-3',
+            'https://dlink-attestor1.uasu.finance',
+            'https://dlink-attestor2.uasu.finance',
+            'https://dlink-attestor3.uasu.finance',
         ],
     },
     {

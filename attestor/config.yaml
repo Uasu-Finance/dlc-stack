@@ -5,7 +5,7 @@ settings:
   solidity-branch: master
 
   # Endpoint for CET Storage API
-  # storage-api-endpoint: https://devnet.dlc.link/storage-api
+  # storage-api-endpoint: https://dlink-storage.uasu.finance
   # For Bitcoin testnet:
   storage-api-endpoint: https://testnet.dlc.link/storage-api
   # For local development:
