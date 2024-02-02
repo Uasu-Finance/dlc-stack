@@ -31,8 +31,9 @@ use std::string::ToString;
 
 /// The number of confirmations required before moving the the confirmed state.
 pub const NB_CONFIRMATIONS: u32 = 6;
-/// The delay to set the refund value to.
-pub const REFUND_DELAY: u32 = 86400 * 7;
+/// The upper bound for the delay refund verification check, 10 years.
+pub const FIFTY_YEARS: u32 = 86400 * 365 * 50;
+pub const ONE_DAY_IN_SECONDS: u32 = 86400;
 /// The nSequence value used for CETs in DLC channels
 pub const CET_NSEQUENCE: u32 = 288;
 /// Timeout in seconds when waiting for a peer's reply, after which a DLC channel
@@ -88,6 +89,13 @@ pub trait AsyncBlockchain {
     async fn get_transaction_async(&self, tx_id: &Txid) -> Result<Transaction, Error>;
 }
 
+fn calculate_denominator_from_basis_points(basis_points: u64) -> u64 {
+    if basis_points == 0 {
+        return 0;
+    }
+    ((100.0 / basis_points as f64) * 100.0) as u64
+}
+
 /// Used to create and update DLCs.
 pub struct Manager<W: Deref, B: Deref, S: Deref, O: Deref, T: Deref>
 where
@@ -97,7 +105,7 @@ where
     O::Target: AsyncOracle,
     T::Target: Time,
 {
-    oracles: Option<HashMap<XOnlyPublicKey, O>>,
+    pub oracles: Option<HashMap<XOnlyPublicKey, O>>,
     wallet: W,
     blockchain: B,
     store: S,
@@ -210,6 +218,9 @@ where
         &self,
         contract_input: &ContractInput,
         counter_party: PublicKey,
+        refund_delay: u32,
+        protocol_fee_basis_points: u64,
+        fee_address: Address,
     ) -> Result<OfferDlc, Error> {
         let manager_oracles = match &self.oracles {
             // Oracles is now an optional field, so check here before continuing.
@@ -233,10 +244,27 @@ where
             ))?
             .oracles
             .event_id;
+        debug!(
+            "manager_oracles keys {:?}",
+            manager_oracles
+                .keys()
+                .map(|k| k.to_string())
+                .collect::<Vec<String>>()
+                .join(", ")
+        );
         let oracle_set: Vec<Vec<&O>> = contract_input
             .contract_infos
             .iter()
             .map(|x| {
+                debug!(
+                    "contract public keys: {}",
+                    x.oracles
+                        .public_keys
+                        .iter()
+                        .map(|k| k.to_string())
+                        .collect::<Vec<String>>()
+                        .join(", ")
+                );
                 x.oracles
                     .public_keys
                     .iter()
@@ -264,11 +292,13 @@ where
             &self.secp,
             contract_input,
             oracle_announcements,
-            REFUND_DELAY,
+            refund_delay,
             &counter_party,
             &self.wallet,
             &self.blockchain,
             &self.time,
+            calculate_denominator_from_basis_points(protocol_fee_basis_points),
+            fee_address,
         )?;
 
         offered_contract.validate()?;
@@ -325,7 +355,7 @@ where
         offered_message: &OfferDlc,
         counter_party: PublicKey,
     ) -> Result<(), Error> {
-        offered_message.validate(&self.secp, REFUND_DELAY, REFUND_DELAY * 2)?;
+        offered_message.validate(&self.secp, 0, FIFTY_YEARS)?;
         let contract: OfferedContract =
             OfferedContract::try_from_offer_dlc(offered_message, counter_party)?;
         contract.validate()?;
@@ -474,8 +504,8 @@ where
                         .accepted_contract
                         .offered_contract
                         .contract_info
-                        .get(0)
-                        .and_then(|info| info.oracle_announcements.get(0))
+                        .first()
+                        .and_then(|info| info.oracle_announcements.first())
                         .map(|announcement| announcement.oracle_event.event_id.clone())
                         .ok_or(Error::InvalidState("Missing oracle event ID".to_string()))?;
 
@@ -483,7 +513,7 @@ where
                 }
                 Ok(false) => (),
                 Err(e) => error!(
-                    "Error checking confirmed contract {}: {}",
+                    "Error checking signed contract {}: {}",
                     c.accepted_contract.get_contract_id_string(),
                     e
                 ),
@@ -514,8 +544,8 @@ where
                         .accepted_contract
                         .offered_contract
                         .contract_info
-                        .get(0)
-                        .and_then(|info| info.oracle_announcements.get(0))
+                        .first()
+                        .and_then(|info| info.oracle_announcements.first())
                         .map(|announcement| announcement.oracle_event.event_id.clone())
                         .ok_or(Error::InvalidState("Missing oracle event ID".to_string()))?;
 
@@ -639,8 +669,8 @@ where
                         .accepted_contract
                         .offered_contract
                         .contract_info
-                        .get(0)
-                        .and_then(|info| info.oracle_announcements.get(0))
+                        .first()
+                        .and_then(|info| info.oracle_announcements.first())
                         .map(|announcement| announcement.oracle_event.event_id.clone())
                         .ok_or(Error::InvalidState("Missing oracle event ID".to_string()))?;
 
@@ -744,15 +774,47 @@ where
         Ok(Contract::Closed(closed_contract))
     }
 
+    async fn get_json(&self, path: &str) -> Result<serde_json::Value, Error> {
+        reqwest::get(path)
+            .await
+            .map_err(|x| Error::WalletError(Box::new(x)))?
+            .json::<serde_json::Value>()
+            .await
+            .map_err(|x| Error::WalletError(Box::new(x)))
+    }
+
+    async fn get_unixtime(&self) -> Result<u64, Error> {
+        let path = "https://worldtimeapi.org/api/timezone/Etc/UTC";
+        let v = match self.get_json(path).await {
+            Ok(v) => v,
+            Err(e) => {
+                return Err(Error::WalletError(
+                    format!("Error getting unixtime: {e}").into(),
+                ))
+            }
+        };
+
+        let unixtime = match v["unixtime"].as_u64() {
+            //call to_string instead of as_str and watch your world crumble to pieces
+            None => return Err(Error::WalletError("unable to get unixtime".into())),
+            Some(s) => s,
+        };
+
+        Ok(unixtime)
+    }
+
     async fn check_refund(&self, contract: &SignedContract) -> Result<(), Error> {
         // TODO(tibo): should check for confirmation of refund before updating state
+        // use reqwest to fetch the current time
+
+        let unixtime = self.get_unixtime().await?;
         if contract
             .accepted_contract
             .dlc_transactions
             .refund
             .lock_time
             .0 as u64
-            <= self.time.unix_time_now()
+            <= unixtime
         {
             let accepted_contract = &contract.accepted_contract;
             let refund = accepted_contract.dlc_transactions.refund.clone();
@@ -778,86 +840,32 @@ where
     }
 }
 
-// #[cfg(test)]
-// mod test {
-//     use dlc_messages::Message;
-//     use mocks::{
-//         dlc_manager::{manager::Manager, Oracle},
-//         memory_storage_provider::MemoryStorage,
-//         mock_blockchain::MockBlockchain,
-//         mock_oracle_provider::MockOracle,
-//         mock_time::MockTime,
-//         mock_wallet::MockWallet,
-//     };
-//     use secp256k1_zkp::PublicKey;
-//     use std::{collections::HashMap, rc::Rc};
+#[cfg(test)]
+mod test {
+    #[test]
+    fn test_calculate_denominator_from_basis_points() {
+        let basis_points = 100;
+        let denominator = super::calculate_denominator_from_basis_points(basis_points);
+        assert_eq!(denominator, 100);
 
-//     type TestManager = Manager<
-//         Rc<MockWallet>,
-//         Rc<MockBlockchain>,
-//         Rc<MemoryStorage>,
-//         Rc<MockOracle>,
-//         Rc<MockTime>,
-//         Rc<MockBlockchain>,
-//     >;
+        let basis_points = 10;
+        let denominator = super::calculate_denominator_from_basis_points(basis_points);
+        assert_eq!(denominator, 1000);
 
-//     fn get_manager() -> TestManager {
-//         let blockchain = Rc::new(MockBlockchain::new());
-//         let store = Rc::new(MemoryStorage::new());
-//         let wallet = Rc::new(MockWallet::new(
-//             &blockchain,
-//             &(0..100).map(|x| x as u64 * 1000000).collect::<Vec<_>>(),
-//         ));
+        let basis_points = 50;
+        let denominator = super::calculate_denominator_from_basis_points(basis_points);
+        assert_eq!(denominator, 200);
 
-//         let oracle_list = (0..5).map(|_| MockOracle::new()).collect::<Vec<_>>();
-//         let oracles: HashMap<bitcoin::XOnlyPublicKey, _> = oracle_list
-//             .into_iter()
-//             .map(|x| (x.get_public_key(), Rc::new(x)))
-//             .collect();
-//         let time = Rc::new(MockTime {});
+        let basis_points = 200;
+        let denominator = super::calculate_denominator_from_basis_points(basis_points);
+        assert_eq!(denominator, 50);
 
-//         mocks::mock_time::set_time(0);
+        let basis_points = 1000;
+        let denominator = super::calculate_denominator_from_basis_points(basis_points);
+        assert_eq!(denominator, 10);
 
-//         Manager::new(wallet, blockchain.clone(), store, oracles, time, blockchain).unwrap()
-//     }
-
-//     fn pubkey() -> PublicKey {
-//         "0218845781f631c48f1c9709e23092067d06837f30aa0cd0544ac887fe91ddd166"
-//             .parse()
-//             .unwrap()
-//     }
-
-//     #[test]
-//     fn reject_offer_with_existing_contract_id() {
-//         let offer_message = Message::Offer(
-//             serde_json::from_str(include_str!("../test_inputs/offer_contract.json")).unwrap(),
-//         );
-
-//         let mut manager = get_manager();
-
-//         manager
-//             .on_dlc_message(&offer_message, pubkey())
-//             .expect("To accept the first offer message");
-
-//         manager
-//             .on_dlc_message(&offer_message, pubkey())
-//             .expect_err("To reject the second offer message");
-//     }
-
-//     #[test]
-//     fn reject_channel_offer_with_existing_channel_id() {
-//         let offer_message = Message::OfferChannel(
-//             serde_json::from_str(include_str!("../test_inputs/offer_channel.json")).unwrap(),
-//         );
-
-//         let mut manager = get_manager();
-
-//         manager
-//             .on_dlc_message(&offer_message, pubkey())
-//             .expect("To accept the first offer message");
-
-//         manager
-//             .on_dlc_message(&offer_message, pubkey())
-//             .expect_err("To reject the second offer message");
-//     }
-// }
+        let basis_points = 0;
+        let denominator = super::calculate_denominator_from_basis_points(basis_points);
+        assert_eq!(denominator, 0);
+    }
+}

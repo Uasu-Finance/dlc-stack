@@ -1,0 +1,44 @@
+version: '3.9'
+services:
+  router-wallet:
+    container_name: router-wallet
+    hostname: router-wallet
+    image: wallet:new
+    volumes:
+      - ./config.yaml:/app/config.yaml
+      - ./docker/supervisord.conf:/etc/supervisor/conf.d/supervisord.conf
+    ports:
+      - 3001:3001
+      - 3003:3003
+      - 8085:8085
+    environment:
+      - "INFURA_API_KEY=${INFURA_API_KEY}"
+      - "SEPOLIA_PRIVATE_KEY=${EVM_PRIVATE_KEY}"
+      - "GOERLI_PRIVATE_KEY=${EVM_PRIVATE_KEY}"
+      - "X1TEST_PRIVATE_KEY=${EVM_PRIVATE_KEY}"
+      - "STX_MOCKNET_PRIVATE_KEY=${STX_MOCKNET_PRIVATE_KEY}"
+      - "ATTESTOR_CONFIG=${ATTESTOR_CONFIG:-devnet}"
+      - "TEST_MODE_ENABLED=${TEST_MODE_ENABLED:-false}"
+      # For DLC.Link Bitcoin Mocknet
+      - "ELECTRUM_API_URL=https://devnet.dlc.link/electrs"
+      - "BITCOIN_NETWORK=regtest"
+      - "STORAGE_API_ENDPOINT=https://devnet.dlc.link/storage-api"
+      # For Bitcoin Testnet
+      # - "ELECTRUM_API_URL=https://blockstream.info/testnet/api"
+      # - "BITCOIN_NETWORK=testnet"
+      # - "STORAGE_API_ENDPOINT=https://testnet.dlc.link/storage-api"
+      # Common:
+      - "BITCOIN_CHECK_INTERVAL_SECONDS=60"
+      - "RUST_LOG=warn,dlc_protocol_wallet=debug"
+      - "RUST_BACKTRACE=full"
+      - "CONTRACT_CLEANUP_ENABLED=${CONTRACT_CLEANUP_ENABLED:-false}"
+      - "BLOCKCHAIN_INTERFACE_URL=http://localhost:3001"
+      - "XPRIV=${XPRIV}"
+      - "FINGERPRINT=${FINGERPRINT}"
+    restart: on-failure
+    healthcheck:
+      test: curl --fail http://localhost:8085/info || exit 1
+      interval: 3s
+      timeout: 10s
+      retries: 10
+      start_period: 10s

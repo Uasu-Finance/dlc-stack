@@ -1,21 +1,29 @@
-export interface ConfigSet {
-  chain: Chain;
+export interface ChainConfig {
+  network: Chain;
   version: string;
   api_key?: string;
+  deployer?: string;
+  endpoint: string;
 }
 
-export type EthChain = 'ETH_MAINNET' | 'ETH_SEPOLIA' | 'ETH_GOERLI' | 'ETH_LOCAL';
-export type StacksChain = 'STACKS_MAINNET' | 'STACKS_TESTNET' | 'STACKS_MOCKNET' | 'STACKS_LOCAL';
+export const evmPrefix = 'evm-';
+export type EthChain = 'mainnet' | 'sepolia' | 'goerli' | 'localhost';
+export type L2Chains = 'x1test';
 
-export type Chain = EthChain | StacksChain;
+export const stxPrefix = 'stx-';
+export type StacksChain = 'mainnet' | 'testnet' | 'mocknet' | 'local';
+
+export type Chain = EthChain | StacksChain | L2Chains;
+
+export type PrefixedChain = `${'evm-' | 'stx-'}${Chain}`;
 
 export const validChains: Chain[] = [
-  'ETH_MAINNET',
-  'ETH_SEPOLIA',
-  'ETH_GOERLI',
-  'ETH_LOCAL',
-  'STACKS_MAINNET',
-  'STACKS_TESTNET',
-  'STACKS_MOCKNET',
-  'STACKS_LOCAL',
+  'mainnet',
+  'sepolia',
+  'goerli',
+  'localhost',
+  'testnet',
+  'mocknet',
+  'local',
+  'x1test',
 ];

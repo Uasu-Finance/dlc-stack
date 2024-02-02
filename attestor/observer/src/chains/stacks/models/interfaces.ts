@@ -31,6 +31,7 @@ export interface AddressSubscription {
 export interface DeploymentInfo {
   deployer: string;
   api_base_extended: string;
+  chainName: string;
 }
 
 export interface ContractConfig {
@@ -54,9 +55,7 @@ export type FunctionName =
   | 'unregister-contract'
   | 'set-status-funded'
   | 'post-create-dlc'
-  | 'post-close-dlc'
-  | 'get-btc-price'
-  | 'validate-price-data';
+  | 'post-close-dlc';
 
 export type ArgumentName =
   | 'uuid'
@@ -65,9 +64,11 @@ export type ArgumentName =
   | 'creator'
   | 'protocol-wallet'
   | 'contract-address'
-  | 'attestors'
-  | 'actual-closing-time'
-  | 'event-source';
+  | 'event-source'
+  | 'refund-delay'
+  | 'value-locked'
+  | 'btc-fee-recipient'
+  | 'btc-fee-basis-points';
 
 export type UnwrappedPrintEvent = {
   [arg in ArgumentName]?: {

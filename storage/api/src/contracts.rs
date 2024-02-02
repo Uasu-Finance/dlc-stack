@@ -5,8 +5,6 @@ use actix_web::{delete, get, post, put, HttpResponse, Responder};
 use dlc_storage_common::models::{
     ContractRequestParams, DeleteContract, NewContract, UpdateContract,
 };
-use dlc_storage_reader;
-use dlc_storage_writer;
 use log::{debug, warn};
 use serde_json::json;
 
@@ -33,7 +31,7 @@ pub async fn create_contract(
     let mut conn = pool.get().expect("couldn't get db connection from pool");
     match dlc_storage_writer::create_contract(&mut conn, contract_params.into_inner()) {
         Ok(contract) => {
-            debug!("Created contract: {:?}", contract);
+            debug!("Created contract: {:?}", contract.uuid);
             HttpResponse::Ok().json(contract)
         }
         Err(e) => {
@@ -83,9 +81,11 @@ pub async fn delete_contract(
     }
 }
 
+//remove this?
 #[delete("/contracts/{ckey}")]
 pub async fn delete_contracts(pool: Data<DbPool>, ckey: Path<String>) -> impl Responder {
     let mut conn = pool.get().expect("couldn't get db connection from pool");
-    let num_deleted = dlc_storage_writer::delete_all_contracts(&mut conn, &ckey).unwrap();
+    let num_deleted = dlc_storage_writer::delete_all_contracts(&mut conn, &ckey)
+        .expect("couldn't delete contracts from db");
     HttpResponse::Ok().json(json!({ "effected_num": num_deleted }))
 }

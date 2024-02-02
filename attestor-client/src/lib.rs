@@ -22,7 +22,7 @@ use chrono::{DateTime, Utc};
 use dlc_link_manager::AsyncOracle;
 use dlc_manager::error::Error as DlcManagerError;
 use dlc_messages::oracle_msgs::{OracleAnnouncement, OracleAttestation};
-use log::info;
+use log::{debug, info};
 use secp256k1_zkp::{schnorr::Signature, XOnlyPublicKey};
 use serde_json::Value;
 
@@ -137,6 +137,34 @@ impl AttestorClient {
         })
     }
 
+    pub async fn get_chain(&self, event_id: &str) -> Result<String, DlcManagerError> {
+        debug!("Getting chain for event_id {event_id}");
+        let path = announcement_path(&self.host, event_id);
+        debug!("Getting chain at URL {path}");
+        let v = match self.get_json(&path).await {
+            Ok(v) => v,
+            Err(e) => {
+                return Err(DlcManagerError::OracleError(format!(
+                    "Error getting announcement: {e}",
+                    e = e
+                )))
+            }
+        };
+
+        let chain = match v["chain"].as_str() {
+            //call to_string instead of as_str and watch your world crumble to pieces
+            None => {
+                return Err(DlcManagerError::OracleError(format!(
+                    "missing chain for event {}",
+                    event_id,
+                )))
+            }
+            Some(s) => s,
+        };
+
+        Ok(chain.to_string())
+    }
+
     async fn get_json(&self, path: &str) -> Result<Value, DlcManagerError> {
         self.client
             .get(path)
@@ -192,15 +220,14 @@ impl AsyncOracle for AttestorClient {
         &self,
         event_id: &str,
     ) -> Result<OracleAnnouncement, DlcManagerError> {
-        info!("Getting announcement for event_id {event_id}");
+        debug!("Getting announcement for event_id {event_id}");
         let path = announcement_path(&self.host, event_id);
-        info!("Getting announcement at URL {path}");
+        debug!("Getting announcement at URL {path}");
         let v = match self.get_json(&path).await {
             Ok(v) => v,
             Err(e) => {
                 return Err(DlcManagerError::OracleError(format!(
-                    "Error getting announcement: {e}",
-                    e = e
+                    "Error getting announcement {event_id}: {e}"
                 )))
             }
         };
@@ -256,7 +283,6 @@ impl AsyncOracle for AttestorClient {
             )
             .unwrap();
 
-        info!("GOT ATTESTATION as OBJECT! {:?}", decoded_attestation);
         Ok(decoded_attestation)
     }
 }

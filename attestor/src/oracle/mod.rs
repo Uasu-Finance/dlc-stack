@@ -1,4 +1,5 @@
-use secp256k1_zkp::{All, KeyPair, Secp256k1, SecretKey, XOnlyPublicKey as SchnorrPublicKey};
+use secp256k1_zkp::PublicKey;
+use secp256k1_zkp::{All, KeyPair, Secp256k1, SecretKey};
 use serde::{Deserialize, Serialize};
 
 mod error;
@@ -9,11 +10,12 @@ pub use error::Result;
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct DbValue(
-    pub Option<Vec<SecretKey>>, // outstanding_sk_nonces?
-    pub Vec<u8>,                // announcement
-    pub Option<Vec<u8>>,        // attestation?
-    pub Option<u64>,            // outcome?
-    pub String,                 // uuid
+    pub Option<Vec<SecretKey>>,           // outstanding_sk_nonces?
+    pub Vec<u8>,                          // announcement
+    pub Option<Vec<u8>>,                  // attestation?
+    pub Option<u64>,                      // outcome?
+    pub String,                           // uuid
+    #[serde(default)] pub Option<String>, // chain name
 );
 
 #[derive(Clone)]
@@ -27,13 +29,11 @@ impl Oracle {
     pub fn new(
         key_pair: KeyPair,
         secp: Secp256k1<All>,
-        storage_api_enabled: bool,
         storage_api_endpoint: String,
     ) -> Result<Oracle> {
         let event_handler = EventHandler::new(
-            storage_api_enabled,
             storage_api_endpoint,
-            SchnorrPublicKey::from_keypair(&key_pair).0.to_string(),
+            PublicKey::from_keypair(&key_pair).to_string(),
         );
 
         Ok(Oracle {
@@ -50,7 +50,3 @@ impl Oracle {
         &self.secp
     }
 }
-
-// pub mod oracle_queryable;
-pub mod secret_key;
-pub mod vault;

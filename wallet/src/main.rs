@@ -2,14 +2,17 @@
 #![deny(clippy::unwrap_used)]
 #![deny(unused_mut)]
 #![deny(dead_code)]
+#![allow(clippy::too_many_arguments)]
 
 use bitcoin::util::bip32::{ChildNumber, DerivationPath, ExtendedPrivKey, ExtendedPubKey};
 use bytes::Buf;
 
+use futures_util::future::join_all;
 use hyper::service::{make_service_fn, service_fn};
 use hyper::{header, Body, Method, Response, Server, StatusCode};
 
 use bdk::descriptor;
+use secp256k1_zkp::SecretKey;
 use serde::{Deserialize, Serialize};
 use tokio::{task, time};
 
@@ -18,8 +21,9 @@ use std::net::Ipv4Addr;
 use std::time::Duration;
 use std::{collections::HashMap, env, str::FromStr, sync::Arc};
 
-use bitcoin::XOnlyPublicKey;
-use dlc_link_manager::{AsyncOracle, AsyncStorage, Manager};
+use bitcoin::{Address, PublicKey, XOnlyPublicKey};
+
+use dlc_link_manager::{AsyncOracle, AsyncStorage, Manager, ONE_DAY_IN_SECONDS};
 use dlc_manager::{
     contract::{
         contract_input::{ContractInput, ContractInputInfo, OracleInput},
@@ -111,6 +115,42 @@ async fn get_attestors(
     }
 }
 
+async fn get_chain_from_attestors(
+    attestors: HashMap<XOnlyPublicKey, Arc<AttestorClient>>,
+    uuid: String,
+) -> Result<String, GenericError> {
+    let attestors_with_uuid: Vec<((&XOnlyPublicKey, &Arc<AttestorClient>), String)> =
+        attestors.iter().map(|x| (x, uuid.clone())).collect();
+    let chains = join_all(
+        attestors_with_uuid
+            .iter()
+            .map(|((_k, v), uuid)| async move {
+                match v.get_chain(&uuid.clone()).await {
+                    Ok(chain) => Some(chain),
+                    Err(e) => {
+                        error!("Error getting chain from attestor: {}", e);
+                        None
+                    }
+                }
+            }),
+    )
+    .await;
+
+    // check that all values in chains are the same
+    if chains.is_empty() || !chains.iter().all(|x| x.as_ref() == chains[0].as_ref()) {
+        error!("Chains from attestors are not all the same.");
+        return Err("Chains from attestors are not all the same.".into());
+    }
+    match &chains[0] {
+        Some(chain) => {
+            let json_chain = serde_json::to_string(chain)
+                .map_err(|e| format!("Failed to serialize chain to JSON: {}", e))?;
+            Ok(json_chain)
+        }
+        None => Err("Failed to get chain from attestors".into()),
+    }
+}
+
 async fn generate_attestor_client(
     attestor_urls: Vec<String>,
 ) -> HashMap<XOnlyPublicKey, Arc<AttestorClient>> {
@@ -171,13 +211,31 @@ async fn process_request(
     wallet: Arc<DlcWallet>,
     active_network: String,
     blockchain_interface_url: String,
-    attestor_urls: Vec<String>,
 ) -> Result<Response<Body>, GenericError> {
     match (req.method(), req.uri().path()) {
         (&Method::GET, "/health") => build_success_response(
             json!({"data": [{"status": "healthy", "message": ""}]}).to_string(),
         ),
         (&Method::GET, "/info") => get_wallet_info(dlc_store, wallet).await,
+        (&Method::GET, path) if path.starts_with("/get_chain/") => {
+            let event_id = path.trim_start_matches("/get_chain/").to_string();
+            info!("Getting chain for event id {}", event_id);
+            let result = async {
+                let attestors: HashMap<XOnlyPublicKey, Arc<AttestorClient>> = manager
+                    .oracles
+                    .clone()
+                    .ok_or(WalletError("No attestors from Manager".to_string()))?;
+
+                get_chain_from_attestors(attestors, event_id).await
+            };
+            match result.await {
+                Ok(chain) => build_success_response(chain),
+                Err(e) => {
+                    error!("Error getting chain from attestors: {}", e);
+                    return build_error_response(e.to_string());
+                }
+            }
+        }
         (&Method::GET, "/periodic_check") => {
             let result =
                 async { periodic_check(manager, dlc_store, blockchain_interface_url).await };
@@ -199,9 +257,16 @@ async fn process_request(
                 accept_collateral: u64,
                 offer_collateral: u64,
                 total_outcomes: u64,
-                attestor_list: String,
+                refund_delay: u32,
+                btc_fee_recipient: String,
+                btc_fee_basis_points: u64,
             }
             let result = async {
+                let attestors: HashMap<XOnlyPublicKey, Arc<AttestorClient>> = manager
+                    .oracles
+                    .clone()
+                    .ok_or(WalletError("No attestors from Manager".to_string()))?;
+
                 let whole_body = hyper::body::aggregate(req)
                     .await
                     .map_err(|e| WalletError(format!("Error aggregating body: {}", e)))?;
@@ -214,30 +279,17 @@ async fn process_request(
                         ))
                     })?;
 
-                let bitcoin_contract_attestor_urls: Vec<String> =
-                    serde_json::from_str(&req.attestor_list.clone()).map_err(|e| {
-                        WalletError(format!("Error deserializing attestor list: {}", e))
-                    })?;
-
-                match bitcoin_contract_attestor_urls
-                    .iter()
-                    .any(|url| !attestor_urls.contains(url))
-                {
-                    true => Err(WalletError(format!("Attestor not found in attestor list"))),
-                    _ => Ok(()),
-                }?;
-
-                let bitcoin_contract_attestors: HashMap<XOnlyPublicKey, Arc<AttestorClient>> =
-                    generate_attestor_client(bitcoin_contract_attestor_urls.clone()).await;
-
                 create_new_offer(
                     manager,
-                    bitcoin_contract_attestors,
+                    attestors,
                     active_network,
                     req.uuid,
                     req.accept_collateral,
                     req.offer_collateral,
                     req.total_outcomes,
+                    req.refund_delay,
+                    req.btc_fee_recipient,
+                    req.btc_fee_basis_points,
                 )
                 .await
             };
@@ -359,7 +411,7 @@ async fn main() -> Result<(), GenericError> {
         electrs_host.to_string(),
         active_network,
     ));
-    let (pubkey_ext, wallet) = setup_wallets(xpriv, active_network);
+    let (pubkey, wallet, secret_key) = setup_wallets(xpriv, active_network);
 
     // Set up Attestor Clients
     let attestor_urls: Vec<String> = match retry!(
@@ -391,7 +443,8 @@ async fn main() -> Result<(), GenericError> {
 
     // Set up DLC store
     let dlc_store = Arc::new(AsyncStorageApiProvider::new(
-        pubkey_ext.to_string(),
+        pubkey.to_string(),
+        secret_key,
         storage_api_url,
     ));
 
@@ -412,7 +465,6 @@ async fn main() -> Result<(), GenericError> {
         let wallet = wallet.clone();
         let blockchain_interface_url = blockchain_interface_url.clone();
         let active_network = active_network.to_string();
-        let attestor_urls = attestor_urls.clone();
 
         async move {
             Ok::<_, GenericError>(service_fn(move |req| {
@@ -423,7 +475,6 @@ async fn main() -> Result<(), GenericError> {
                     wallet.to_owned(),
                     active_network.to_owned(),
                     blockchain_interface_url.to_owned(),
-                    attestor_urls.to_owned(),
                 )
             }))
         }
@@ -462,7 +513,7 @@ where
 fn setup_wallets(
     xpriv: ExtendedPrivKey,
     active_network: bitcoin::Network,
-) -> (ExtendedPubKey, Arc<DlcWallet>) {
+) -> (PublicKey, Arc<DlcWallet>, SecretKey) {
     let secp = bitcoin::secp256k1::Secp256k1::new();
 
     let external_derivation_path =
@@ -493,8 +544,8 @@ fn setup_wallets(
 
     let wallet: Arc<DlcWallet> = Arc::new(DlcWallet::new(static_address.clone(), seckey_ext));
 
-    let pubkey = ExtendedPubKey::from_priv(&secp, &derived_ext_xpriv);
-    (pubkey, wallet)
+    let pubkey = ExtendedPubKey::from_priv(&secp, &derived_ext_xpriv).to_pub();
+    (pubkey, wallet, seckey_ext)
 }
 
 async fn create_new_offer(
@@ -505,19 +556,19 @@ async fn create_new_offer(
     accept_collateral: u64,
     offer_collateral: u64,
     total_outcomes: u64,
+    refund_delay: u32,
+    btc_fee_recipient: String,
+    btc_fee_basis_points: u64,
 ) -> Result<String, WalletError> {
-    let active_network = bitcoin::Network::from_str(&active_network).map_err(|e| {
-        WalletError(format!(
-            "Unknown Network in offer creation: {}",
-            e.to_string()
-        ))
-    })?;
+    let active_network = bitcoin::Network::from_str(&active_network)
+        .map_err(|e| WalletError(format!("Unknown Network in offer creation: {}", e)))?;
     let (_event_descriptor, descriptor) = get_numerical_contract_info(
         accept_collateral,
         offer_collateral,
         total_outcomes,
         attestors.len(),
-    );
+    )
+    .map_err(|e| WalletError(e.to_string()))?;
     info!(
         "Creating new offer with event id: {}, accept collateral: {}, offer_collateral: {}",
         event_id.clone(),
@@ -548,7 +599,23 @@ async fn create_new_offer(
         contract_infos: vec![contract_info],
     };
 
-    //had to make this mutable because of the borrow, not sure why
+    const TEN_DAYS: u32 = ONE_DAY_IN_SECONDS * 10;
+    let adjusted_refund_delay = match refund_delay {
+        // 0 => FIFTY_YEARS - ONE_DAY_IN_SECONDS,
+        0 => TEN_DAYS,
+        TEN_DAYS..=u32::MAX => TEN_DAYS,
+        _ => refund_delay,
+    };
+
+    let fee_address_string = if btc_fee_basis_points > 0 {
+        btc_fee_recipient
+    } else {
+        "bcrt1qvgkz8m4m73kly4xhm28pcnv46n6u045lfq9ta3".to_string()
+    };
+
+    let fee_address = Address::from_str(&fee_address_string)
+        .map_err(|e| WalletError(format!("Error parsing fee address: {}", e)))?;
+
     let man = manager;
 
     let offer = man
@@ -557,6 +624,9 @@ async fn create_new_offer(
             STATIC_COUNTERPARTY_NODE_ID
                 .parse()
                 .expect("To be able to parse the static counterparty id to a pubkey"),
+            adjusted_refund_delay,
+            btc_fee_basis_points,
+            fee_address,
         )
         .await
         .map_err(|e| WalletError(e.to_string()))?;
@@ -654,7 +724,12 @@ async fn periodic_check(
     let funded_url = format!("{}/set-status-funded", blockchain_interface_url);
     let closed_url = format!("{}/post-close-dlc", blockchain_interface_url);
 
-    debug!("Running periodic_check");
+    let attestors: HashMap<XOnlyPublicKey, Arc<AttestorClient>> = match manager.oracles.clone() {
+        Some(oracles) => oracles,
+        None => {
+            return Err("No attestors from manager".into());
+        }
+    };
 
     let updated_contracts = match manager.periodic_check().await {
         Ok(updated_contracts) => updated_contracts,
@@ -663,7 +738,7 @@ async fn periodic_check(
             vec![]
         }
     };
-    let mut newly_confirmed_uuids: Vec<String> = vec![];
+    let mut newly_confirmed_uuids: Vec<(String, bitcoin::Txid)> = vec![];
     let mut newly_closed_uuids: Vec<(String, bitcoin::Txid)> = vec![];
 
     for (id, uuid) in updated_contracts {
@@ -679,8 +754,9 @@ async fn periodic_check(
             }
         };
         match contract {
-            Contract::Confirmed(_c) => {
-                newly_confirmed_uuids.push(uuid);
+            Contract::Confirmed(c) => {
+                newly_confirmed_uuids
+                    .push((uuid, c.accepted_contract.dlc_transactions.fund.txid()));
             }
             Contract::PreClosed(c) => {
                 newly_closed_uuids.push((uuid, c.signed_cet.txid()));
@@ -691,6 +767,9 @@ async fn periodic_check(
                     uuid
                 );
             }
+            Contract::Refunded(_) => {
+                debug!("Contract is being set to the Refunded state: {}", uuid);
+            }
             _ => error!(
                 "Error retrieving contract in periodic_check: {}, skipping",
                 uuid
@@ -698,24 +777,45 @@ async fn periodic_check(
         };
     }
 
-    for uuid in newly_confirmed_uuids {
-        debug!("Contract is funded, setting funded to true: {}", uuid);
-        reqwest::Client::new()
-            .post(&funded_url)
-            .timeout(REQWEST_TIMEOUT)
-            .json(&json!({ "uuid": uuid }))
-            .send()
-            .await?;
+    for (uuid, txid) in newly_confirmed_uuids {
+        debug!(
+            "Contract is funded, setting funded to true: {}, btc tx id: {}",
+            uuid, txid
+        );
+
+        match get_chain_from_attestors(attestors.clone(), uuid.clone()).await {
+            Ok(chain) => {
+                reqwest::Client::new()
+                    .post(&funded_url)
+                    .timeout(REQWEST_TIMEOUT)
+                    .json(&json!({"uuid": uuid, "btcTxId": txid.to_string(), "chain": chain}))
+                    .send()
+                    .await?
+            }
+            Err(e) => {
+                error!("Failed to get chain from attestors: {}", e);
+                return Err(e);
+            }
+        };
     }
 
     for (uuid, txid) in newly_closed_uuids {
         debug!("Contract is closed, firing post-close url: {}", uuid);
-        reqwest::Client::new()
-            .post(&closed_url)
-            .timeout(REQWEST_TIMEOUT)
-            .json(&json!({"uuid": uuid, "btcTxId": txid.to_string()}))
-            .send()
-            .await?;
+
+        match get_chain_from_attestors(attestors.clone(), uuid.clone()).await {
+            Ok(chain) => {
+                reqwest::Client::new()
+                    .post(&closed_url)
+                    .timeout(REQWEST_TIMEOUT)
+                    .json(&json!({"uuid": uuid, "btcTxId": txid.to_string(), "chain": chain}))
+                    .send()
+                    .await?
+            }
+            Err(e) => {
+                error!("Failed to get chain from attestors: {}", e);
+                return Err(e);
+            }
+        };
     }
     Ok("Success running periodic check".to_string())
 }

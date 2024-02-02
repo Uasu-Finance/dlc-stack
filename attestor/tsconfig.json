@@ -6,8 +6,10 @@
     "esModuleInterop": true,
     "forceConsistentCasingInFileNames": true,
     "moduleResolution": "NodeNext",
+    "resolveJsonModule": true,
     "outDir": "./dist",
-    "rootDir": ".",
-    "skipLibCheck": true                                 /* Skip type checking all .d.ts files. */
+    "rootDir": "./observer",
+    "skipLibCheck": true, // Skip type checking all .d.ts files.
+    "sourceMap": true,
   }
 }

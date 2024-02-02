@@ -13,33 +13,38 @@ clippy-mac:
   cd ./node-manager && AR=/opt/homebrew/opt/llvm/bin/llvm-ar CC=/opt/homebrew/opt/llvm/bin/clang cargo clippy -- -Aclippy::drop_non_drop
 
 create-cert:
-  ./create_cert.sh
+  mkdir ./dist/.cert
+  openssl req -subj '/CN=' -new -newkey rsa:2048 -sha256 -days 365 -nodes -x509 -keyout server.key -out server.crt
+  mv server.crt ./dist/.cert
+  mv server.key ./dist/.cert
+
 
 ##############################
 # wallet-blockchain-interface
 
 build-wbi:
-  cd ./wallet-blockchain-interface && npm i && npm run build
+  npm i && npm run build
 
 wbi: build-wbi
-  cd ./wallet-blockchain-interface && npm run start
+  npm run start
 
 
 ##############################
 # wallet
 
 build-wallet:
-  cargo build --release --bins --target-dir .
+  cargo build --release --bin dlc-protocol-wallet --target-dir .
 
-generate-key: build-wallet
+generate-key:
+  cargo build --release --bin generate-key --target-dir .
   ./release/generate-key
+
+generate-address-from-key:
+  cargo build --release --bin generate-address-from-key --target-dir .
+  ./release/generate-address-from-key
 
 wallet: build-wallet
   ./release/dlc-protocol-wallet
-
-generate-address-from-key: build-wallet
-  ./release/generate-address-from-key
-
 
 ##############################
 # both
@@ -49,3 +54,6 @@ build: build-wbi build-wallet
 run: build
   just wbi &
   just wallet && fg
+
+docker-compose:
+  docker compose -f docker/docker-compose.yml --project-directory . up

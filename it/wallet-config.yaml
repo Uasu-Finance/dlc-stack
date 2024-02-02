@@ -1,0 +1,15 @@
+settings:
+  solidity-branch: dev
+  router-wallet-address: http://router-wallet:8085
+  public-server-port: 3003
+  private-server-port: 3001
+  tls-enabled: false
+
+evm-chains:
+
+stx-chains:
+  - network: mocknet
+    version: 1
+    deployer: ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM
+    endpoint: https://stx-btc1.dlc.link:3999
+    private_key: ${STX_MOCKNET_PRIVATE_KEY}
